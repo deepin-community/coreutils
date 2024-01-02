@@ -1,5 +1,5 @@
 /* sleep - delay for a specified amount of time.
-   Copyright (C) 1984-2022 Free Software Foundation, Inc.
+   Copyright (C) 1984-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,8 +20,6 @@
 
 #include "system.h"
 #include "cl-strtod.h"
-#include "die.h"
-#include "error.h"
 #include "long-options.h"
 #include "quote.h"
 #include "xnanosleep.h"
@@ -109,7 +107,7 @@ main (int argc, char **argv)
 
   parse_gnu_standard_options_only (argc, argv, PROGRAM_NAME, PACKAGE_NAME,
                                    Version, true, usage, AUTHORS,
-                                   (char const *) NULL);
+                                   (char const *) nullptr);
 
   if (argc == 1)
     {
@@ -140,7 +138,7 @@ main (int argc, char **argv)
     usage (EXIT_FAILURE);
 
   if (xnanosleep (seconds))
-    die (EXIT_FAILURE, errno, _("cannot read realtime clock"));
+    error (EXIT_FAILURE, errno, _("cannot read realtime clock"));
 
   return EXIT_SUCCESS;
 }

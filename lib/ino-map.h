@@ -1,5 +1,5 @@
 /* Maintain a mapping of ino_t numbers to small integers.
-   Copyright (C) 2010-2022 Free Software Foundation, Inc.
+   Copyright (C) 2010-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,6 +18,12 @@
 
 #ifndef _GL_INO_MAP_H
 # define _GL_INO_MAP_H
+
+/* This file uses _GL_ATTRIBUTE_DEALLOC, _GL_ATTRIBUTE_MALLOC,
+   _GL_ATTRIBUTE_NONNULL.  */
+# if !_GL_CONFIG_H_INCLUDED
+#  error "Please include config.h first."
+# endif
 
 # include <sys/types.h>
 

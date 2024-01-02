@@ -1,6 +1,6 @@
 /* Generate buffers of random data.
 
-   Copyright (C) 2006-2022 Free Software Foundation, Inc.
+   Copyright (C) 2006-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -29,8 +29,6 @@
 #include <exitfail.h>
 #include <fcntl.h>
 #include <quote.h>
-#include <stdalign.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,6 +38,7 @@
 #include "gettext.h"
 #define _(msgid) gettext (msgid)
 
+#include "assure.h"
 #include "minmax.h"
 #include "rand-isaac.h"
 #include "stdio-safer.h"
@@ -105,11 +104,10 @@ struct randread_source
 static void
 randread_error (void const *file_name)
 {
-  if (file_name)
-    error (exit_failure, errno,
-           errno == 0 ? _("%s: end of file") : _("%s: read error"),
-           quote (file_name));
-  abort ();
+  affirm (exit_failure);
+  error (exit_failure, errno,
+         errno == 0 ? _("%s: end of file") : _("%s: read error"),
+         quote (file_name));
 }
 
 /* Simply return a new randread_source object with the default error
@@ -134,7 +132,13 @@ get_nonce (void *buffer, size_t bufsize)
   char *buf = buffer, *buflim = buf + bufsize;
   while (buf < buflim)
     {
-      ssize_t nbytes = getrandom (buf, buflim - buf, 0);
+#if defined __sun
+# define MAX_GETRANDOM 1024
+#else
+# define MAX_GETRANDOM SIZE_MAX
+#endif
+      size_t max_bytes = MIN (buflim - buf, MAX_GETRANDOM);
+      ssize_t nbytes = getrandom (buf, max_bytes, 0);
       if (0 <= nbytes)
         buf += nbytes;
       else if (errno != EINTR)
@@ -163,21 +167,21 @@ randread_free_body (struct randread_source *s)
    default handler.  Unless a non-default handler is used, NAME's
    lifetime should be at least that of the returned value.
 
-   Return NULL (setting errno) on failure.  */
+   Return nullptr (setting errno) on failure.  */
 
 struct randread_source *
 randread_new (char const *name, size_t bytes_bound)
 {
   if (bytes_bound == 0)
-    return simple_new (NULL, NULL);
+    return simple_new (nullptr, nullptr);
   else
     {
-      FILE *source = NULL;
+      FILE *source = nullptr;
       struct randread_source *s;
 
       if (name)
         if (! (source = fopen_safer (name, "rb")))
-          return NULL;
+          return nullptr;
 
       s = simple_new (source, name);
 
@@ -192,7 +196,7 @@ randread_new (char const *name, size_t bytes_bound)
               int e = errno;
               randread_free_body (s);
               errno = e;
-              return NULL;
+              return nullptr;
             }
           isaac_seed (&s->buf.isaac.state);
         }

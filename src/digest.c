@@ -1,5 +1,5 @@
 /* Compute checksums of files or strings.
-   Copyright (C) 1995-2022 Free Software Foundation, Inc.
+   Copyright (C) 1995-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -32,6 +32,7 @@
 #endif
 #if HASH_ALGO_CKSUM
 # include "cksum.h"
+# include "base64.h"
 #endif
 #if HASH_ALGO_BLAKE2 || HASH_ALGO_CKSUM
 # include "blake2/b2sum.h"
@@ -51,8 +52,6 @@
 #if HASH_ALGO_CKSUM
 # include "sm3.h"
 #endif
-#include "die.h"
-#include "error.h"
 #include "fadvise.h"
 #include "stdio--.h"
 #include "xbinary-io.h"
@@ -136,11 +135,11 @@
   proper_name ("David MacKenzie")
 #elif HASH_ALGO_CKSUM
 # define AUTHORS \
-  proper_name ("Padraig Brady"), \
+  proper_name_lite ("Padraig Brady", "P\303\241draig Brady"), \
   proper_name ("Q. Frank Xia")
 #elif HASH_ALGO_BLAKE2
 # define AUTHORS \
-  proper_name ("Padraig Brady"), \
+  proper_name_lite ("Padraig Brady", "P\303\241draig Brady"), \
   proper_name ("Samuel Neves")
 #else
 # define AUTHORS \
@@ -167,7 +166,7 @@
 #if !HASH_ALGO_SUM
 static void
 output_file (char const *file, int binary_file, void const *digest,
-             bool tagged, unsigned char delim, bool args,
+             bool raw, bool tagged, unsigned char delim, bool args,
              uintmax_t length);
 #endif
 
@@ -204,12 +203,20 @@ static int bsd_reversed = -1;
 /* line delimiter.  */
 static unsigned char digest_delim = '\n';
 
+#if HASH_ALGO_CKSUM
+/* If true, print base64-encoded digests, not hex.  */
+static bool base64_digest = false;
+#endif
+
+/* If true, print binary digests, not hex.  */
+static bool raw_digest = false;
+
 #if HASH_ALGO_BLAKE2 || HASH_ALGO_CKSUM
 # define BLAKE2B_MAX_LEN BLAKE2B_OUTBYTES
 static uintmax_t digest_length;
 #endif /* HASH_ALGO_BLAKE2 */
 
-typedef void (*digest_output_fn)(char const *, int, void const *,
+typedef void (*digest_output_fn)(char const *, int, void const *, bool,
                                  bool, unsigned char, bool, uintmax_t);
 #if HASH_ALGO_SUM
 enum Algorithm
@@ -291,7 +298,7 @@ enum Algorithm
 static char const *const algorithm_args[] =
 {
   "bsd", "sysv", "crc", "md5", "sha1", "sha224",
-  "sha256", "sha384", "sha512", "blake2b", "sm3", NULL
+  "sha256", "sha384", "sha512", "blake2b", "sm3", nullptr
 };
 static enum Algorithm const algorithm_types[] =
 {
@@ -303,7 +310,7 @@ ARGMATCH_VERIFY (algorithm_args, algorithm_types);
 static char const *const algorithm_tags[] =
 {
   "BSD", "SYSV", "CRC", "MD5", "SHA1", "SHA224",
-  "SHA256", "SHA384", "SHA512", "BLAKE2b", "SM3", NULL
+  "SHA256", "SHA384", "SHA512", "BLAKE2b", "SM3", nullptr
 };
 static int const algorithm_bits[] =
 {
@@ -311,8 +318,8 @@ static int const algorithm_bits[] =
   256, 384, 512, 512, 256, 0
 };
 
-verify (ARRAY_CARDINALITY (algorithm_bits)
-        == ARRAY_CARDINALITY (algorithm_args));
+static_assert (ARRAY_CARDINALITY (algorithm_bits)
+               == ARRAY_CARDINALITY (algorithm_args));
 
 static bool algorithm_specified = false;
 static enum Algorithm cksum_algorithm = crc;
@@ -359,40 +366,43 @@ enum
   TAG_OPTION,
   UNTAG_OPTION,
   DEBUG_PROGRAM_OPTION,
+  RAW_OPTION,
+  BASE64_OPTION,
 };
 
 static struct option const long_options[] =
 {
 #if HASH_ALGO_BLAKE2 || HASH_ALGO_CKSUM
-  { "length", required_argument, NULL, 'l'},
+  { "length", required_argument, nullptr, 'l'},
 #endif
 
 #if !HASH_ALGO_SUM
-  { "check", no_argument, NULL, 'c' },
-  { "ignore-missing", no_argument, NULL, IGNORE_MISSING_OPTION},
-  { "quiet", no_argument, NULL, QUIET_OPTION },
-  { "status", no_argument, NULL, STATUS_OPTION },
-  { "warn", no_argument, NULL, 'w' },
-  { "strict", no_argument, NULL, STRICT_OPTION },
-  { "tag", no_argument, NULL, TAG_OPTION },
-  { "zero", no_argument, NULL, 'z' },
+  { "check", no_argument, nullptr, 'c' },
+  { "ignore-missing", no_argument, nullptr, IGNORE_MISSING_OPTION},
+  { "quiet", no_argument, nullptr, QUIET_OPTION },
+  { "status", no_argument, nullptr, STATUS_OPTION },
+  { "warn", no_argument, nullptr, 'w' },
+  { "strict", no_argument, nullptr, STRICT_OPTION },
+  { "tag", no_argument, nullptr, TAG_OPTION },
+  { "zero", no_argument, nullptr, 'z' },
 
 # if HASH_ALGO_CKSUM
-  { "algorithm", required_argument, NULL, 'a'},
-  { "debug", no_argument, NULL, DEBUG_PROGRAM_OPTION},
-  { "untagged", no_argument, NULL, UNTAG_OPTION },
-# else
-  { "binary", no_argument, NULL, 'b' },
-  { "text", no_argument, NULL, 't' },
+  { "algorithm", required_argument, nullptr, 'a'},
+  { "base64", no_argument, nullptr, BASE64_OPTION },
+  { "debug", no_argument, nullptr, DEBUG_PROGRAM_OPTION},
+  { "raw", no_argument, nullptr, RAW_OPTION},
+  { "untagged", no_argument, nullptr, UNTAG_OPTION },
 # endif
+  { "binary", no_argument, nullptr, 'b' },
+  { "text", no_argument, nullptr, 't' },
 
 #else
-  {"sysv", no_argument, NULL, 's'},
+  {"sysv", no_argument, nullptr, 's'},
 #endif
 
   { GETOPT_HELP_OPTION_DECL },
   { GETOPT_VERSION_OPTION_DECL },
-  { NULL, 0, NULL, 0 }
+  { nullptr, 0, nullptr, 0 }
 };
 
 void
@@ -434,6 +444,10 @@ Print or check %s (%d-bit) checksums.\n\
   -a, --algorithm=TYPE  select the digest type to use.  See DIGEST below.\
 \n\
 "), stdout);
+        fputs (_("\
+      --base64          emit base64-encoded digests, not hexadecimal\
+\n\
+"), stdout);
 #endif
 #if !HASH_ALGO_SUM
 # if !HASH_ALGO_CKSUM
@@ -457,6 +471,10 @@ Print or check %s (%d-bit) checksums.\n\
 "), stdout);
 # endif
 # if HASH_ALGO_CKSUM
+        fputs (_("\
+      --raw             emit a raw binary digest, not hexadecimal\
+\n\
+"), stdout);
       fputs (_("\
       --tag             create a BSD-style checksum (the default)\n\
 "), stdout);
@@ -542,6 +560,18 @@ or equivalent standalone program.\
   exit (status);
 }
 
+/* Given a string S, return TRUE if it contains problematic characters
+   that need escaping.  Note we escape '\' itself to provide some forward
+   compat to introduce escaping of other characters.  */
+
+ATTRIBUTE_PURE
+static bool
+problematic_chars (char const *s)
+{
+  size_t length = strcspn (s, "\\\n\r");
+  return s[length] != '\0';
+}
+
 #define ISWHITE(c) ((c) == ' ' || (c) == '\t')
 
 /* Given a file name, S of length S_LEN, that is not NUL-terminated,
@@ -551,7 +581,7 @@ or equivalent standalone program.\
    and each "\\\\" with a single backslash, NUL-terminate it and return S.
    If S is not a valid escaped file name, i.e., if it ends with an odd number
    of backslashes or if it contains a backslash followed by anything other
-   than "n" or another backslash, return NULL.  */
+   than "n" or another backslash, return nullptr.  */
 
 static char *
 filename_unescape (char *s, size_t s_len)
@@ -566,7 +596,7 @@ filename_unescape (char *s, size_t s_len)
           if (i == s_len - 1)
             {
               /* File name ends with an unescaped backslash: invalid.  */
-              return NULL;
+              return nullptr;
             }
           ++i;
           switch (s[i])
@@ -582,13 +612,13 @@ filename_unescape (char *s, size_t s_len)
               break;
             default:
               /* Only '\', 'n' or 'r' may follow a backslash.  */
-              return NULL;
+              return nullptr;
             }
           break;
 
         case '\0':
           /* The file name may not contain a NUL.  */
-          return NULL;
+          return nullptr;
 
         default:
           *dst++ = s[i];
@@ -601,36 +631,61 @@ filename_unescape (char *s, size_t s_len)
   return s;
 }
 
-/* Return true if S is a NUL-terminated string of DIGEST_HEX_BYTES hex digits.
-   Otherwise, return false.  */
+/* Return true if S is a LEN-byte NUL-terminated string of hex or base64
+   digits and has the expected length.  Otherwise, return false.  */
 ATTRIBUTE_PURE
 static bool
-hex_digits (unsigned char const *s)
+valid_digits (unsigned char const *s, size_t len)
 {
-  for (unsigned int i = 0; i < digest_hex_bytes; i++)
+#if HASH_ALGO_CKSUM
+  if (len == BASE64_LENGTH (digest_length / 8))
     {
-      if (!isxdigit (*s))
-        return false;
-      ++s;
+      size_t i;
+      for (i = 0; i < len - digest_length % 3; i++)
+        {
+          if (!isbase64 (*s))
+            return false;
+          ++s;
+        }
+      for ( ; i < len; i++)
+        {
+          if (*s != '=')
+            return false;
+          ++s;
+        }
     }
+  else
+#endif
+  if (len == digest_hex_bytes)
+    {
+      for (idx_t i = 0; i < digest_hex_bytes; i++)
+        {
+          if (!isxdigit (*s))
+            return false;
+          ++s;
+        }
+    }
+  else
+    return false;
+
   return *s == '\0';
 }
 
 /* Split the checksum string S (of length S_LEN) from a BSD 'md5' or
    'sha1' command into two parts: a hexadecimal digest, and the file
-   name.  S is modified.  Return true if successful.  */
+   name.  S is modified.  Set *D_LEN to the length of the digest string.
+   Return true if successful.  */
 
 static bool
-bsd_split_3 (char *s, size_t s_len, unsigned char **hex_digest,
+bsd_split_3 (char *s, size_t s_len,
+             unsigned char **digest, size_t *d_len,
              char **file_name, bool escaped_filename)
 {
-  size_t i;
-
   if (s_len == 0)
     return false;
 
   /* Find end of filename.  */
-  i = s_len - 1;
+  size_t i = s_len - 1;
   while (i && s[i] != ')')
     i--;
 
@@ -639,7 +694,7 @@ bsd_split_3 (char *s, size_t s_len, unsigned char **hex_digest,
 
   *file_name = s;
 
-  if (escaped_filename && filename_unescape (s, i) == NULL)
+  if (escaped_filename && filename_unescape (s, i) == nullptr)
     return false;
 
   s[i++] = '\0';
@@ -655,9 +710,10 @@ bsd_split_3 (char *s, size_t s_len, unsigned char **hex_digest,
   while (ISWHITE (s[i]))
     i++;
 
-  *hex_digest = (unsigned char *) &s[i];
+  *digest = (unsigned char *) &s[i];
 
-  return hex_digits (*hex_digest);
+  *d_len = s_len - i;
+  return valid_digits (*digest, *d_len);
 }
 
 #if HASH_ALGO_CKSUM
@@ -701,11 +757,12 @@ algorithm_from_tag (char *s)
 
 /* Split the string S (of length S_LEN) into three parts:
    a hexadecimal digest, binary flag, and the file name.
-   S is modified.  Return true if successful.  */
+   S is modified.  Set *D_LEN to the length of the digest string.
+   Return true if successful.  */
 
 static bool
 split_3 (char *s, size_t s_len,
-         unsigned char **hex_digest, int *binary, char **file_name)
+         unsigned char **digest, size_t *d_len, int *binary, char **file_name)
 {
   bool escaped_filename = false;
   size_t algo_name_len;
@@ -761,7 +818,7 @@ split_3 (char *s, size_t s_len,
         {
           uintmax_t length;
           char *siend;
-          if (! (xstrtoumax (s + i, &siend, 0, &length, NULL) == LONGINT_OK
+          if (! (xstrtoumax (s + i, &siend, 0, &length, nullptr) == LONGINT_OK
                  && 0 < length && length <= digest_length
                  && length % 8 == 0))
             return false;
@@ -778,7 +835,7 @@ split_3 (char *s, size_t s_len,
           ++i;
           *binary = 0;
           return bsd_split_3 (s + i, s_len - i,
-                              hex_digest, file_name, escaped_filename);
+                              digest, d_len, file_name, escaped_filename);
         }
       return false;
     }
@@ -790,14 +847,14 @@ split_3 (char *s, size_t s_len,
   if (s_len - i < min_digest_line_length + (s[i] == '\\'))
     return false;
 
-  *hex_digest = (unsigned char *) &s[i];
+  *digest = (unsigned char *) &s[i];
 
 #if HASH_ALGO_BLAKE2 || HASH_ALGO_CKSUM
   /* Auto determine length.  */
 # if HASH_ALGO_CKSUM
   if (cksum_algorithm == blake2b) {
 # endif
-  unsigned char const *hp = *hex_digest;
+  unsigned char const *hp = *digest;
   digest_hex_bytes = 0;
   while (isxdigit (*hp++))
     digest_hex_bytes++;
@@ -810,16 +867,19 @@ split_3 (char *s, size_t s_len,
 # endif
 #endif
 
-  /* The first field has to be the n-character hexadecimal
-     representation of the message digest.  If it is not followed
-     immediately by a white space it's an error.  */
-  i += digest_hex_bytes;
-  if (!ISWHITE (s[i]))
+  /* This field must be the hexadecimal or base64 representation
+     of the message digest.  */
+  while (s[i] && !ISWHITE (s[i]))
+    i++;
+
+  /* The digest must be followed by at least one whitespace character.  */
+  if (i == s_len)
     return false;
 
+  *d_len = &s[i] - (char *) *digest;
   s[i++] = '\0';
 
-  if (! hex_digits (*hex_digest))
+  if (! valid_digits (*digest, *d_len))
     return false;
 
   /* If "bsd reversed" format detected.  */
@@ -846,7 +906,7 @@ split_3 (char *s, size_t s_len,
   *file_name = &s[i];
 
   if (escaped_filename)
-    return filename_unescape (&s[i], s_len - i) != NULL;
+    return filename_unescape (&s[i], s_len - i) != nullptr;
 
   return true;
 }
@@ -925,7 +985,7 @@ digest_file (char const *filename, int *binary, unsigned char *bin_result,
   else
     {
       fp = fopen (filename, (O_BINARY && *binary ? "rb" : "r"));
-      if (fp == NULL)
+      if (fp == nullptr)
         {
           if (ignore_missing && errno == ENOENT)
             {
@@ -968,17 +1028,22 @@ digest_file (char const *filename, int *binary, unsigned char *bin_result,
 #if !HASH_ALGO_SUM
 static void
 output_file (char const *file, int binary_file, void const *digest,
-             bool tagged, unsigned char delim, MAYBE_UNUSED bool args,
+             bool raw, bool tagged, unsigned char delim, MAYBE_UNUSED bool args,
              MAYBE_UNUSED uintmax_t length)
 {
+# if HASH_ALGO_CKSUM
+  if (raw)
+    {
+      fwrite (digest, 1, digest_length / 8, stdout);
+      return;
+    }
+# endif
+
   unsigned char const *bin_buffer = digest;
 
-  /* Output a leading backslash if the file name contains problematic chars.
-     Note we escape '\' itself to provide some forward compat to introduce
-     escaping of other characters.  */
-  bool needs_escape = delim == '\n' && (strchr (file, '\\')
-                                        || strchr (file, '\n')
-                                        || strchr (file, '\r'));
+  /* Output a leading backslash if the file name contains problematic chars.  */
+  bool needs_escape = delim == '\n' && problematic_chars (file);
+
   if (needs_escape)
     putchar ('\\');
 
@@ -1000,20 +1065,25 @@ output_file (char const *file, int binary_file, void const *digest,
       fputs (") = ", stdout);
     }
 
-  for (size_t i = 0; i < (digest_hex_bytes / 2); ++i)
-    printf ("%02x", bin_buffer[i]);
+# if HASH_ALGO_CKSUM
+  if (base64_digest)
+    {
+      char b64[BASE64_LENGTH (DIGEST_BIN_BYTES) + 1];
+      base64_encode ((char const *) bin_buffer, digest_length / 8,
+                     b64, sizeof b64);
+      fputs (b64, stdout);
+    }
+  else
+# endif
+    {
+      for (size_t i = 0; i < (digest_hex_bytes / 2); ++i)
+        printf ("%02x", bin_buffer[i]);
+    }
 
   if (!tagged)
     {
       putchar (' ');
-
-# if HASH_ALGO_CKSUM
-      /* Simplify output as always in binary mode.  */
-      putchar (' ');
-# else
       putchar (binary_file ? '*' : ' ');
-# endif
-
       print_filename (file, needs_escape);
     }
 
@@ -1021,12 +1091,49 @@ output_file (char const *file, int binary_file, void const *digest,
 }
 #endif
 
+#if HASH_ALGO_CKSUM
+/* Return true if B64_DIGEST is the same as the base64 digest of the
+   DIGEST_LENGTH/8 bytes at BIN_BUFFER.  */
+static bool
+b64_equal (unsigned char const *b64_digest, unsigned char const *bin_buffer)
+{
+  size_t b64_n_bytes = BASE64_LENGTH (digest_length / 8);
+  char b64[BASE64_LENGTH (DIGEST_BIN_BYTES) + 1];
+  base64_encode ((char const *) bin_buffer, digest_length / 8, b64, sizeof b64);
+  return memcmp (b64_digest, b64, b64_n_bytes + 1) == 0;
+}
+#endif
+
+/* Return true if HEX_DIGEST is the same as the hex-encoded digest of the
+   DIGEST_LENGTH/8 bytes at BIN_BUFFER.  */
+static bool
+hex_equal (unsigned char const *hex_digest, unsigned char const *bin_buffer)
+{
+  static const char bin2hex[] = { '0', '1', '2', '3',
+                                  '4', '5', '6', '7',
+                                  '8', '9', 'a', 'b',
+                                  'c', 'd', 'e', 'f' };
+  size_t digest_bin_bytes = digest_hex_bytes / 2;
+
+  /* Compare generated binary number with text representation
+     in check file.  Ignore case of hex digits.  */
+  size_t cnt;
+  for (cnt = 0; cnt < digest_bin_bytes; ++cnt)
+    {
+      if (tolower (hex_digest[2 * cnt])
+          != bin2hex[bin_buffer[cnt] >> 4]
+          || (tolower (hex_digest[2 * cnt + 1])
+              != (bin2hex[bin_buffer[cnt] & 0xf])))
+        break;
+    }
+  return cnt == digest_bin_bytes;
+}
+
 static bool
 digest_check (char const *checkfile_name)
 {
   FILE *checkfile_stream;
   uintmax_t n_misformatted_lines = 0;
-  uintmax_t n_improperly_formatted_lines = 0;
   uintmax_t n_mismatched_checksums = 0;
   uintmax_t n_open_or_read_failures = 0;
   bool properly_formatted_lines = false;
@@ -1048,7 +1155,7 @@ digest_check (char const *checkfile_name)
   else
     {
       checkfile_stream = fopen (checkfile_name, "r");
-      if (checkfile_stream == NULL)
+      if (checkfile_stream == nullptr)
         {
           error (0, errno, "%s", quotef (checkfile_name));
           return false;
@@ -1056,19 +1163,19 @@ digest_check (char const *checkfile_name)
     }
 
   line_number = 0;
-  line = NULL;
+  line = nullptr;
   line_chars_allocated = 0;
   do
     {
       char *filename;
       int binary;
-      unsigned char *hex_digest;
+      unsigned char *digest;
       ssize_t line_length;
 
       ++line_number;
       if (line_number == 0)
-        die (EXIT_FAILURE, 0, _("%s: too many checksum lines"),
-             quotef (checkfile_name));
+        error (EXIT_FAILURE, 0, _("%s: too many checksum lines"),
+               quotef (checkfile_name));
 
       line_length = getline (&line, &line_chars_allocated, checkfile_stream);
       if (line_length <= 0)
@@ -1089,7 +1196,8 @@ digest_check (char const *checkfile_name)
 
       line[line_length] = '\0';
 
-      if (! (split_3 (line, line_length, &hex_digest, &binary, &filename)
+      size_t d_len;
+      if (! (split_3 (line, line_length, &digest, &d_len, &binary, &filename)
              && ! (is_stdin && STREQ (filename, "-"))))
         {
           ++n_misformatted_lines;
@@ -1102,20 +1210,12 @@ digest_check (char const *checkfile_name)
                      quotef (checkfile_name), line_number,
                      DIGEST_TYPE_STRING);
             }
-
-          ++n_improperly_formatted_lines;
         }
       else
         {
-          static const char bin2hex[] = { '0', '1', '2', '3',
-                                          '4', '5', '6', '7',
-                                          '8', '9', 'a', 'b',
-                                          'c', 'd', 'e', 'f' };
           bool ok;
           bool missing;
-          /* Only escape in the edge case producing multiple lines,
-             to ease automatic processing of status output.  */
-          bool needs_escape = ! status_only && strchr (filename, '\n');
+          bool needs_escape = ! status_only && problematic_chars (filename);
 
           properly_formatted_lines = true;
 
@@ -1140,34 +1240,30 @@ digest_check (char const *checkfile_name)
             }
           else
             {
-              size_t digest_bin_bytes = digest_hex_bytes / 2;
-              size_t cnt;
-
-              /* Compare generated binary number with text representation
-                 in check file.  Ignore case of hex digits.  */
-              for (cnt = 0; cnt < digest_bin_bytes; ++cnt)
-                {
-                  if (tolower (hex_digest[2 * cnt])
-                      != bin2hex[bin_buffer[cnt] >> 4]
-                      || (tolower (hex_digest[2 * cnt + 1])
-                          != (bin2hex[bin_buffer[cnt] & 0xf])))
-                    break;
-                }
-              if (cnt != digest_bin_bytes)
-                ++n_mismatched_checksums;
+              bool match = false;
+#if HASH_ALGO_CKSUM
+              if (d_len < digest_hex_bytes)
+                match = b64_equal (digest, bin_buffer);
               else
+#endif
+                if (d_len == digest_hex_bytes)
+                  match = hex_equal (digest, bin_buffer);
+
+              if (match)
                 matched_checksums = true;
+              else
+                ++n_mismatched_checksums;
 
               if (!status_only)
                 {
-                  if (cnt != digest_bin_bytes || ! quiet)
+                  if (! match || ! quiet)
                     {
                       if (needs_escape)
                         putchar ('\\');
                       print_filename (filename, needs_escape);
                     }
 
-                  if (cnt != digest_bin_bytes)
+                  if (! match)
                     printf (": %s\n", _("FAILED"));
                   else if (!quiet)
                     printf (": %s\n", _("OK"));
@@ -1236,7 +1332,7 @@ digest_check (char const *checkfile_name)
           && matched_checksums
           && n_mismatched_checksums == 0
           && n_open_or_read_failures == 0
-          && (!strict || n_improperly_formatted_lines == 0));
+          && (!strict || n_misformatted_lines == 0));
 }
 
 int
@@ -1248,11 +1344,10 @@ main (int argc, char **argv)
   bool do_check = false;
   int opt;
   bool ok = true;
+  int binary = -1;
 #if HASH_ALGO_CKSUM
-  int binary = 1;
   bool prefix_tag = true;
 #else
-  int binary = -1;
   bool prefix_tag = false;
 #endif
 
@@ -1267,7 +1362,7 @@ main (int argc, char **argv)
 
   /* Line buffer stdout to ensure lines are written atomically and immediately
      so that processes running in parallel do not intersperse their output.  */
-  setvbuf (stdout, NULL, _IOLBF, 0);
+  setvbuf (stdout, nullptr, _IOLBF, 0);
 
 #if HASH_ALGO_SUM
   char const *short_opts = "rs";
@@ -1281,7 +1376,8 @@ main (int argc, char **argv)
   char const *short_opts = "bctwz";
 #endif
 
-  while ((opt = getopt_long (argc, argv, short_opts, long_options, NULL)) != -1)
+  while ((opt = getopt_long (argc, argv, short_opts, long_options, nullptr))
+         != -1)
     switch (opt)
       {
 #if HASH_ALGO_CKSUM
@@ -1303,7 +1399,7 @@ main (int argc, char **argv)
         if (digest_length % 8 != 0)
           {
             error (0, 0, _("invalid length: %s"), quote (digest_length_str));
-            die (EXIT_FAILURE, 0, _("length is not a multiple of 8"));
+            error (EXIT_FAILURE, 0, _("length is not a multiple of 8"));
           }
         break;
 #endif
@@ -1316,14 +1412,12 @@ main (int argc, char **argv)
         warn = false;
         quiet = false;
         break;
-# if !HASH_ALGO_CKSUM
       case 'b':
         binary = 1;
         break;
       case 't':
         binary = 0;
         break;
-# endif
       case 'w':
         status_only = false;
         warn = true;
@@ -1341,6 +1435,12 @@ main (int argc, char **argv)
         strict = true;
         break;
 # if HASH_ALGO_CKSUM
+      case BASE64_OPTION:
+        base64_digest = true;
+        break;
+      case RAW_OPTION:
+        raw_digest = true;
+        break;
       case UNTAG_OPTION:
         prefix_tag = false;
         break;
@@ -1372,16 +1472,16 @@ main (int argc, char **argv)
 #if HASH_ALGO_BLAKE2 || HASH_ALGO_CKSUM
 # if HASH_ALGO_CKSUM
   if (digest_length && cksum_algorithm != blake2b)
-    die (EXIT_FAILURE, 0,
-         _("--length is only supported with --algorithm=blake2b"));
+    error (EXIT_FAILURE, 0,
+           _("--length is only supported with --algorithm=blake2b"));
 # endif
   if (digest_length > BLAKE2B_MAX_LEN * 8)
     {
       error (0, 0, _("invalid length: %s"), quote (digest_length_str));
-      die (EXIT_FAILURE, 0,
-           _("maximum digest length for %s is %d bits"),
-           quote (DIGEST_TYPE_STRING),
-           BLAKE2B_MAX_LEN * 8);
+      error (EXIT_FAILURE, 0,
+             _("maximum digest length for %s is %d bits"),
+             quote (DIGEST_TYPE_STRING),
+             BLAKE2B_MAX_LEN * 8);
     }
   if (digest_length == 0)
     {
@@ -1403,13 +1503,18 @@ main (int argc, char **argv)
     case sysv:
     case crc:
         if (do_check && algorithm_specified)
-          die (EXIT_FAILURE, 0,
-              _("--check is not supported with --algorithm={bsd,sysv,crc}"));
+          error (EXIT_FAILURE, 0,
+                 _("--check is not supported with --algorithm={bsd,sysv,crc}"));
         break;
     default:
         break;
     }
 
+  if (base64_digest && raw_digest)
+   {
+     error (0, 0, _("--base64 and --raw are mutually exclusive"));
+     usage (EXIT_FAILURE);
+   }
 #endif
 
   if (prefix_tag && !binary)
@@ -1419,7 +1524,11 @@ main (int argc, char **argv)
         However that's invasive enough that it was agreed to
         not support this mode with --tag, as --text use cases
         are adequately supported by the default output format.  */
+#if !HASH_ALGO_CKSUM
      error (0, 0, _("--tag does not support --text mode"));
+#else
+     error (0, 0, _("--text mode is only supported with --untagged"));
+#endif
      usage (EXIT_FAILURE);
    }
 
@@ -1438,14 +1547,12 @@ main (int argc, char **argv)
     }
 #endif
 
-#if !HASH_ALGO_CKSUM
   if (0 <= binary && do_check)
     {
       error (0, 0, _("the --binary and --text options are meaningless when "
                      "verifying checksums"));
       usage (EXIT_FAILURE);
     }
-#endif
 
   if (ignore_missing && !do_check)
     {
@@ -1489,6 +1596,9 @@ main (int argc, char **argv)
   char **operand_lim = argv + argc;
   if (optind == argc)
     *operand_lim++ = bad_cast ("-");
+  else if (1 < argc - optind && raw_digest)
+    error (EXIT_FAILURE, 0,
+           _("the --raw option is not supported with multiple files"));
 
   for (char **operandp = argv + optind; operandp < operand_lim; operandp++)
     {
@@ -1505,14 +1615,14 @@ main (int argc, char **argv)
             ok = false;
           else
             {
-              DIGEST_OUT (file, binary_file, bin_buffer, prefix_tag,
+              DIGEST_OUT (file, binary_file, bin_buffer, raw_digest, prefix_tag,
                           digest_delim, optind != argc, length);
             }
         }
     }
 
   if (have_read_stdin && fclose (stdin) == EOF)
-    die (EXIT_FAILURE, errno, _("standard input"));
+    error (EXIT_FAILURE, errno, _("standard input"));
 
   return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }

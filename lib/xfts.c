@@ -1,6 +1,6 @@
 /* xfts.c -- a wrapper for fts_open
 
-   Copyright (C) 2003-2022 Free Software Foundation, Inc.
+   Copyright (C) 2003-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,11 +19,10 @@
 
 #include <config.h>
 
-#include <stdbool.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <assert.h>
 
+#include "assure.h"
 #include "xalloc.h"
 #include "xfts.h"
 
@@ -34,11 +33,11 @@ xfts_open (char * const *argv, int options,
            int (*compar) (const FTSENT **, const FTSENT **))
 {
   FTS *fts = fts_open (argv, options | FTS_CWDFD, compar);
-  if (fts == NULL)
+  if (fts == nullptr)
     {
       /* This can fail in two ways: out of memory or with errno==EINVAL,
          which indicates it was called with invalid bit_flags.  */
-      assert (errno != EINVAL);
+      affirm (errno != EINVAL);
       xalloc_die ();
     }
 

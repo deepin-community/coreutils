@@ -1,5 +1,5 @@
 /* timeout -- run a command with bounded time
-   Copyright (C) 2008-2022 Free Software Foundation, Inc.
+   Copyright (C) 2008-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -59,7 +59,6 @@
 #include "xstrtod.h"
 #include "sig2str.h"
 #include "operand2sig.h"
-#include "error.h"
 #include "quote.h"
 
 #if HAVE_SETRLIMIT
@@ -75,7 +74,7 @@
 
 #define PROGRAM_NAME "timeout"
 
-#define AUTHORS proper_name ("Padraig Brady")
+#define AUTHORS proper_name_lite ("Padraig Brady", "P\303\241draig Brady")
 
 static int timed_out;
 static int term_signal = SIGTERM;  /* same default as kill command.  */
@@ -95,14 +94,14 @@ enum
 
 static struct option const long_options[] =
 {
-  {"kill-after", required_argument, NULL, 'k'},
-  {"signal", required_argument, NULL, 's'},
-  {"verbose", no_argument, NULL, 'v'},
-  {"foreground", no_argument, NULL, FOREGROUND_OPTION},
-  {"preserve-status", no_argument, NULL, PRESERVE_STATUS_OPTION},
+  {"kill-after", required_argument, nullptr, 'k'},
+  {"signal", required_argument, nullptr, 's'},
+  {"verbose", no_argument, nullptr, 'v'},
+  {"foreground", no_argument, nullptr, FOREGROUND_OPTION},
+  {"preserve-status", no_argument, nullptr, PRESERVE_STATUS_OPTION},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
-  {NULL, 0, NULL, 0}
+  {nullptr, 0, nullptr, 0}
 };
 
 /* Start the timeout after which we'll receive a SIGALRM.
@@ -120,9 +119,9 @@ settimeout (double duration, bool warn)
   struct timespec ts = dtotimespec (duration);
   struct itimerspec its = { {0, 0}, ts };
   timer_t timerid;
-  if (timer_create (CLOCK_REALTIME, NULL, &timerid) == 0)
+  if (timer_create (CLOCK_REALTIME, nullptr, &timerid) == 0)
     {
-      if (timer_settime (timerid, 0, &its, NULL) == 0)
+      if (timer_settime (timerid, 0, &its, nullptr) == 0)
         return;
       else
         {
@@ -153,7 +152,7 @@ settimeout (double duration, bool warn)
         tv.tv_usec--;
     }
   struct itimerval it = { {0, 0}, tv };
-  if (setitimer (ITIMER_REAL, &it, NULL) == 0)
+  if (setitimer (ITIMER_REAL, &it, nullptr) == 0)
     return;
   else
     {
@@ -299,7 +298,7 @@ It may be necessary to use the KILL signal, since this signal can't be caught.\
 \n"), stdout);
 
       fputs (_("\n\
-EXIT status:\n\
+Exit status:\n\
   124  if COMMAND times out, and --preserve-status is not specified\n\
   125  if the timeout command itself fails\n\
   126  if COMMAND is found but cannot be invoked\n\
@@ -375,7 +374,7 @@ unblock_signal (int sig)
   sigset_t unblock_set;
   sigemptyset (&unblock_set);
   sigaddset (&unblock_set, sig);
-  if (sigprocmask (SIG_UNBLOCK, &unblock_set, NULL) != 0)
+  if (sigprocmask (SIG_UNBLOCK, &unblock_set, nullptr) != 0)
     error (0, errno, _("warning: sigprocmask"));
 }
 
@@ -388,7 +387,7 @@ install_sigchld (void)
   sa.sa_flags = SA_RESTART;   /* Restart syscalls if possible, as that's
                                  more likely to work cleanly.  */
 
-  sigaction (SIGCHLD, &sa, NULL);
+  sigaction (SIGCHLD, &sa, nullptr);
 
   /* We inherit the signal mask from our parent process,
      so ensure SIGCHLD is not blocked. */
@@ -404,12 +403,12 @@ install_cleanup (int sigterm)
   sa.sa_flags = SA_RESTART;   /* Restart syscalls if possible, as that's
                                  more likely to work cleanly.  */
 
-  sigaction (SIGALRM, &sa, NULL); /* our timeout.  */
-  sigaction (SIGINT, &sa, NULL);  /* Ctrl-C at terminal for example.  */
-  sigaction (SIGQUIT, &sa, NULL); /* Ctrl-\ at terminal for example.  */
-  sigaction (SIGHUP, &sa, NULL);  /* terminal closed for example.  */
-  sigaction (SIGTERM, &sa, NULL); /* if we're killed, stop monitored proc.  */
-  sigaction (sigterm, &sa, NULL); /* user specified termination signal.  */
+  sigaction (SIGALRM, &sa, nullptr); /* our timeout.  */
+  sigaction (SIGINT, &sa, nullptr);  /* Ctrl-C at terminal for example.  */
+  sigaction (SIGQUIT, &sa, nullptr); /* Ctrl-\ at terminal for example.  */
+  sigaction (SIGHUP, &sa, nullptr);  /* terminal closed for example.  */
+  sigaction (SIGTERM, &sa, nullptr); /* if killed, stop monitored proc.  */
+  sigaction (sigterm, &sa, nullptr); /* user specified termination signal.  */
 }
 
 /* Block all signals which were registered with cleanup() as the signal
@@ -475,7 +474,7 @@ main (int argc, char **argv)
   initialize_exit_failure (EXIT_CANCELED);
   atexit (close_stdout);
 
-  while ((c = getopt_long (argc, argv, "+k:s:v", long_options, NULL)) != -1)
+  while ((c = getopt_long (argc, argv, "+k:s:v", long_options, nullptr)) != -1)
     {
       switch (c)
         {
@@ -545,7 +544,7 @@ main (int argc, char **argv)
       signal (SIGTTIN, SIG_DFL);
       signal (SIGTTOU, SIG_DFL);
 
-      execvp (argv[0], argv);   /* FIXME: should we use "sh -c" ... here?  */
+      execvp (argv[0], argv);
 
       /* exit like sh, env, nohup, ...  */
       int exit_status = errno == ENOENT ? EXIT_ENOENT : EXIT_CANNOT_INVOKE;
@@ -593,7 +592,7 @@ main (int argc, char **argv)
                   unblock_signal (sig);
                   raise (sig);
                 }
-              /* Allow users to distinguish if command was forcably killed.
+              /* Allow users to distinguish if command was forcibly killed.
                  Needed with --foreground where we don't send SIGKILL to
                  the timeout process itself.  */
               if (timed_out && sig == SIGKILL)

@@ -1,7 +1,7 @@
 %{
 /* Parse a string into an internal timestamp.
 
-   Copyright (C) 1999-2000, 2002-2022 Free Software Foundation, Inc.
+   Copyright (C) 1999-2000, 2002-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -38,7 +38,6 @@
 #include "idx.h"
 #include "intprops.h"
 #include "timespec.h"
-#include "verify.h"
 #include "strftime.h"
 
 /* There's no need to extend the stack, so there's no need to involve
@@ -52,19 +51,10 @@
 #define YYMAXDEPTH 20
 #define YYINITDEPTH YYMAXDEPTH
 
-/* Since the code of parse-datetime.y is not included in the Emacs executable
-   itself, there is no need to #define static in this file.  Even if
-   the code were included in the Emacs executable, it probably
-   wouldn't do any harm to #undef it here; this will only cause
-   problems if we try to write to a static variable, which I don't
-   think this code needs to do.  */
-#ifdef emacs
-# undef static
-#endif
-
 #include <inttypes.h>
 #include <c-ctype.h>
 #include <stdarg.h>
+#include <stdckdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -104,9 +94,9 @@
 /* Verify that time_t is an integer as POSIX requires, and that every
    time_t value fits in intmax_t.  Please file a bug report if these
    assumptions are false on your platform.  */
-verify (TYPE_IS_INTEGER (time_t));
-verify (!TYPE_SIGNED (time_t) || INTMAX_MIN <= TYPE_MINIMUM (time_t));
-verify (TYPE_MAXIMUM (time_t) <= INTMAX_MAX);
+static_assert (TYPE_IS_INTEGER (time_t));
+static_assert (!TYPE_SIGNED (time_t) || INTMAX_MIN <= TYPE_MINIMUM (time_t));
+static_assert (TYPE_MAXIMUM (time_t) <= INTMAX_MAX);
 
 /* True if N is out of range for time_t.  */
 static bool
@@ -215,6 +205,7 @@ typedef struct
   bool rels_seen;
   idx_t dates_seen;
   idx_t days_seen;
+  idx_t J_zones_seen;
   idx_t local_zones_seen;
   idx_t dsts_seen;
   idx_t times_seen;
@@ -291,8 +282,7 @@ digits_to_date_time (parser_control *pc, textint text_int)
               pc->hour = text_int.value / 100;
               pc->minutes = text_int.value % 100;
             }
-          pc->seconds.tv_sec = 0;
-          pc->seconds.tv_nsec = 0;
+          pc->seconds = (struct timespec) {0};
           pc->meridian = MER24;
         }
     }
@@ -304,20 +294,20 @@ static bool
 apply_relative_time (parser_control *pc, relative_time rel, int factor)
 {
   if (factor < 0
-      ? (INT_SUBTRACT_WRAPV (pc->rel.ns, rel.ns, &pc->rel.ns)
-         | INT_SUBTRACT_WRAPV (pc->rel.seconds, rel.seconds, &pc->rel.seconds)
-         | INT_SUBTRACT_WRAPV (pc->rel.minutes, rel.minutes, &pc->rel.minutes)
-         | INT_SUBTRACT_WRAPV (pc->rel.hour, rel.hour, &pc->rel.hour)
-         | INT_SUBTRACT_WRAPV (pc->rel.day, rel.day, &pc->rel.day)
-         | INT_SUBTRACT_WRAPV (pc->rel.month, rel.month, &pc->rel.month)
-         | INT_SUBTRACT_WRAPV (pc->rel.year, rel.year, &pc->rel.year))
-      : (INT_ADD_WRAPV (pc->rel.ns, rel.ns, &pc->rel.ns)
-         | INT_ADD_WRAPV (pc->rel.seconds, rel.seconds, &pc->rel.seconds)
-         | INT_ADD_WRAPV (pc->rel.minutes, rel.minutes, &pc->rel.minutes)
-         | INT_ADD_WRAPV (pc->rel.hour, rel.hour, &pc->rel.hour)
-         | INT_ADD_WRAPV (pc->rel.day, rel.day, &pc->rel.day)
-         | INT_ADD_WRAPV (pc->rel.month, rel.month, &pc->rel.month)
-         | INT_ADD_WRAPV (pc->rel.year, rel.year, &pc->rel.year)))
+      ? (ckd_sub (&pc->rel.ns, pc->rel.ns, rel.ns)
+         | ckd_sub (&pc->rel.seconds, pc->rel.seconds, rel.seconds)
+         | ckd_sub (&pc->rel.minutes, pc->rel.minutes, rel.minutes)
+         | ckd_sub (&pc->rel.hour, pc->rel.hour, rel.hour)
+         | ckd_sub (&pc->rel.day, pc->rel.day, rel.day)
+         | ckd_sub (&pc->rel.month, pc->rel.month, rel.month)
+         | ckd_sub (&pc->rel.year, pc->rel.year, rel.year))
+      : (ckd_add (&pc->rel.ns, pc->rel.ns, rel.ns)
+         | ckd_add (&pc->rel.seconds, pc->rel.seconds, rel.seconds)
+         | ckd_add (&pc->rel.minutes, pc->rel.minutes, rel.minutes)
+         | ckd_add (&pc->rel.hour, pc->rel.hour, rel.hour)
+         | ckd_add (&pc->rel.day, pc->rel.day, rel.day)
+         | ckd_add (&pc->rel.month, pc->rel.month, rel.month)
+         | ckd_add (&pc->rel.year, pc->rel.year, rel.year)))
     return false;
   pc->rels_seen = true;
   return true;
@@ -330,8 +320,7 @@ set_hhmmss (parser_control *pc, intmax_t hour, intmax_t minutes,
 {
   pc->hour = hour;
   pc->minutes = minutes;
-  pc->seconds.tv_sec = sec;
-  pc->seconds.tv_nsec = nsec;
+  pc->seconds = (struct timespec) { .tv_sec = sec, .tv_nsec = nsec };
 }
 
 /* Return a textual representation of the day ordinal/number values
@@ -634,6 +623,11 @@ item:
         pc->local_zones_seen++;
         debug_print_current_time (_("local_zone"), pc);
       }
+  | 'J'
+      {
+        pc->J_zones_seen++;
+        debug_print_current_time ("J", pc);
+      }
   | zone
       {
         pc->zones_seen++;
@@ -767,7 +761,7 @@ zone:
       }
   | tZONE tSNUMBER o_colon_minutes
       { if (! time_zone_hhmm (pc, $2, $3)) YYABORT;
-        if (INT_ADD_WRAPV (pc->time_zone, $1, &pc->time_zone)) YYABORT; }
+        if (ckd_add (&pc->time_zone, pc->time_zone, $1)) YYABORT; }
   | tDAYZONE
       { pc->time_zone = $1 + 60 * 60; }
   | tZONE tDST
@@ -843,15 +837,15 @@ date:
         /* E.g., 17-JUN-1992.  */
         pc->day = $1.value;
         pc->month = $2;
-        if (INT_SUBTRACT_WRAPV (0, $3.value, &pc->year.value)) YYABORT;
+        if (ckd_sub (&pc->year.value, 0, $3.value)) YYABORT;
         pc->year.digits = $3.digits;
       }
   | tMONTH tSNUMBER tSNUMBER
       {
         /* E.g., JUN-17-1992.  */
         pc->month = $1;
-        if (INT_SUBTRACT_WRAPV (0, $2.value, &pc->day)) YYABORT;
-        if (INT_SUBTRACT_WRAPV (0, $3.value, &pc->year.value)) YYABORT;
+        if (ckd_sub (&pc->day, 0, $2.value)) YYABORT;
+        if (ckd_sub (&pc->year.value, 0, $3.value)) YYABORT;
         pc->year.digits = $3.digits;
       }
   | tMONTH tUNUMBER
@@ -884,8 +878,8 @@ iso_8601_date:
       {
         /* ISO 8601 format.  YYYY-MM-DD.  */
         pc->year = $1;
-        if (INT_SUBTRACT_WRAPV (0, $2.value, &pc->month)) YYABORT;
-        if (INT_SUBTRACT_WRAPV (0, $3.value, &pc->day)) YYABORT;
+        if (ckd_sub (&pc->month, 0, $2.value)) YYABORT;
+        if (ckd_sub (&pc->day, 0, $3.value)) YYABORT;
       }
   ;
 
@@ -913,10 +907,10 @@ relunit:
       { $$ = RELATIVE_TIME_0; $$.month = 1; }
   | tORDINAL tDAY_UNIT
       { $$ = RELATIVE_TIME_0;
-        if (INT_MULTIPLY_WRAPV ($1, $2, &$$.day)) YYABORT; }
+        if (ckd_mul (&$$.day, $1, $2)) YYABORT; }
   | tUNUMBER tDAY_UNIT
       { $$ = RELATIVE_TIME_0;
-        if (INT_MULTIPLY_WRAPV ($1.value, $2, &$$.day)) YYABORT; }
+        if (ckd_mul (&$$.day, $1.value, $2)) YYABORT; }
   | tDAY_UNIT
       { $$ = RELATIVE_TIME_0; $$.day = $1; }
   | tORDINAL tHOUR_UNIT
@@ -951,7 +945,7 @@ relunit_snumber:
       { $$ = RELATIVE_TIME_0; $$.month = $1.value; }
   | tSNUMBER tDAY_UNIT
       { $$ = RELATIVE_TIME_0;
-        if (INT_MULTIPLY_WRAPV ($1.value, $2, &$$.day)) YYABORT; }
+        if (ckd_mul (&$$.day, $1.value, $2)) YYABORT; }
   | tSNUMBER tHOUR_UNIT
       { $$ = RELATIVE_TIME_0; $$.hour = $1.value; }
   | tSNUMBER tMINUTE_UNIT
@@ -971,14 +965,14 @@ signed_seconds:
     tSDECIMAL_NUMBER
   | tSNUMBER
       { if (time_overflow ($1.value)) YYABORT;
-        $$.tv_sec = $1.value; $$.tv_nsec = 0; }
+        $$ = (struct timespec) { .tv_sec = $1.value }; }
   ;
 
 unsigned_seconds:
     tUDECIMAL_NUMBER
   | tUNUMBER
       { if (time_overflow ($1.value)) YYABORT;
-        $$.tv_sec = $1.value; $$.tv_nsec = 0; }
+        $$ = (struct timespec) { .tv_sec = $1.value }; }
   ;
 
 number:
@@ -1163,7 +1157,8 @@ static table const time_zone_table[] =
    RFC 822 got these backwards, but RFC 5322 makes the incorrect
    treatment optional, so do them the right way here.
 
-   Note 'T' is a special case, as it is used as the separator in ISO
+   'J' is special, as it is local time.
+   'T' is also special, as it is the separator in ISO
    8601 date and time of day representation.  */
 static table const military_table[] =
 {
@@ -1176,6 +1171,7 @@ static table const military_table[] =
   { "G", tZONE,  HOUR ( 7) },
   { "H", tZONE,  HOUR ( 8) },
   { "I", tZONE,  HOUR ( 9) },
+  { "J", 'J',    0 },
   { "K", tZONE,  HOUR (10) },
   { "L", tZONE,  HOUR (11) },
   { "M", tZONE,  HOUR (12) },
@@ -1219,10 +1215,10 @@ time_zone_hhmm (parser_control *pc, textint s, intmax_t mm)
     n_minutes = (s.value / 100) * 60 + s.value % 100;
   else
     {
-      overflow |= INT_MULTIPLY_WRAPV (s.value, 60, &n_minutes);
+      overflow |= ckd_mul (&n_minutes, s.value, 60);
       overflow |= (s.negative
-                   ? INT_SUBTRACT_WRAPV (n_minutes, mm, &n_minutes)
-                   : INT_ADD_WRAPV (n_minutes, mm, &n_minutes));
+                   ? ckd_sub (&n_minutes, n_minutes, mm)
+                   : ckd_add (&n_minutes, n_minutes, mm));
     }
 
   if (overflow || ! (-24 * 60 <= n_minutes && n_minutes <= 24 * 60))
@@ -1255,7 +1251,7 @@ enum { TM_YEAR_BUFSIZE = INT_BUFSIZE_BOUND (int) + 1 };
 static char const *
 tm_year_str (int tm_year, char buf[TM_YEAR_BUFSIZE])
 {
-  verify (TM_YEAR_BASE % 100 == 0);
+  static_assert (TM_YEAR_BASE % 100 == 0);
   sprintf (buf, &"-%02d%02d"[-TM_YEAR_BASE <= tm_year],
            abs (tm_year / 100 + TM_YEAR_BASE / 100),
            abs (tm_year % 100));
@@ -1282,8 +1278,8 @@ to_tm_year (textint textyear, bool debug, int *tm_year)
     }
 
   if (year < 0
-      ? INT_SUBTRACT_WRAPV (-TM_YEAR_BASE, year, tm_year)
-      : INT_SUBTRACT_WRAPV (year, TM_YEAR_BASE, tm_year))
+      ? ckd_sub (tm_year, -TM_YEAR_BASE, year)
+      : ckd_sub (tm_year, year, TM_YEAR_BASE))
     {
       if (debug)
         dbg_printf (_("error: out-of-range year %"PRIdMAX"\n"), year);
@@ -1439,9 +1435,9 @@ yylex (union YYSTYPE *lvalp, parser_control *pc)
           time_t value = 0;
           do
             {
-              if (INT_MULTIPLY_WRAPV (value, 10, &value))
+              if (ckd_mul (&value, value, 10))
                 return '?';
-              if (INT_ADD_WRAPV (value, sign < 0 ? '0' - c : c - '0', &value))
+              if (ckd_add (&value, value, sign < 0 ? '0' - c : c - '0'))
                 return '?';
               c = *++p;
             }
@@ -1478,13 +1474,13 @@ yylex (union YYSTYPE *lvalp, parser_control *pc)
                  negative.  */
               if (sign < 0 && ns)
                 {
-                  if (INT_SUBTRACT_WRAPV (s, 1, &s))
+                  if (ckd_sub (&s, s, 1))
                     return '?';
                   ns = BILLION - ns;
                 }
 
-              lvalp->timespec.tv_sec = s;
-              lvalp->timespec.tv_nsec = ns;
+              lvalp->timespec = (struct timespec) { .tv_sec = s,
+                                                    .tv_nsec = ns };
               pc->input = p;
               return sign ? tSDECIMAL_NUMBER : tUDECIMAL_NUMBER;
             }
@@ -1642,7 +1638,7 @@ debug_strftime (struct tm const *tm, char *buf, int n)
     date:        normalized time: '(Y-M-D) 2006-04-02 03:45:00'
     date:                                             __
     date:      possible reasons:
-    date:        non-existing due to daylight-saving time;
+    date:        nonexistent due to daylight-saving time;
     date:        numeric values overflow;
     date:        missing timezone;
  */
@@ -1694,7 +1690,7 @@ debug_mktime_not_ok (struct tm const *tm0, struct tm const *tm1,
 
   dbg_printf (_("     possible reasons:\n"));
   if (dst_shift)
-    dbg_printf (_("       non-existing due to daylight-saving time;\n"));
+    dbg_printf (_("       nonexistent due to daylight-saving time;\n"));
   if (!eq_mday && !eq_month)
     dbg_printf (_("       invalid day/month combination;\n"));
   dbg_printf (_("       numeric values overflow;\n"));
@@ -1804,7 +1800,7 @@ parse_datetime_body (struct timespec *result, char const *p,
 #ifdef GNULIB_PARSE_DATETIME2
   pc.parse_datetime_debug = (flags & PARSE_DATETIME_DEBUG) != 0;
 #endif
-  if (INT_ADD_WRAPV (tmp.tm_year, TM_YEAR_BASE, &pc.year.value))
+  if (ckd_add (&pc.year.value, tmp.tm_year, TM_YEAR_BASE))
     {
       if (debugging (&pc))
         dbg_printf (_("error: initial year out of range\n"));
@@ -1815,8 +1811,7 @@ parse_datetime_body (struct timespec *result, char const *p,
   pc.day = tmp.tm_mday;
   pc.hour = tmp.tm_hour;
   pc.minutes = tmp.tm_min;
-  pc.seconds.tv_sec = tmp.tm_sec;
-  pc.seconds.tv_nsec = Start_ns;
+  pc.seconds = (struct timespec) { .tv_sec = tmp.tm_sec, .tv_nsec = Start_ns };
   tm.tm_isdst = tmp.tm_isdst;
 
   pc.meridian = MER24;
@@ -1826,6 +1821,7 @@ parse_datetime_body (struct timespec *result, char const *p,
   pc.dates_seen = 0;
   pc.days_seen = 0;
   pc.times_seen = 0;
+  pc.J_zones_seen = 0;
   pc.local_zones_seen = 0;
   pc.dsts_seen = 0;
   pc.zones_seen = 0;
@@ -1851,7 +1847,7 @@ parse_datetime_body (struct timespec *result, char const *p,
     for (quarter = 1; quarter <= 3; quarter++)
       {
         time_t probe;
-        if (INT_ADD_WRAPV (Start, quarter * (90 * 24 * 60 * 60), &probe))
+        if (ckd_add (&probe, Start, quarter * (90 * 24 * 60 * 60)))
           break;
         struct tm probe_tm;
         if (localtime_rz (tz, &probe, &probe_tm) && probe_tm.tm_zone
@@ -1951,7 +1947,7 @@ parse_datetime_body (struct timespec *result, char const *p,
   else
     {
       if (1 < (pc.times_seen | pc.dates_seen | pc.days_seen | pc.dsts_seen
-               | (pc.local_zones_seen + pc.zones_seen)))
+               | (pc.J_zones_seen + pc.local_zones_seen + pc.zones_seen)))
         {
           if (debugging (&pc))
             {
@@ -1963,15 +1959,15 @@ parse_datetime_body (struct timespec *result, char const *p,
                 dbg_printf ("error: seen multiple days parts\n");
               if (pc.dsts_seen > 1)
                 dbg_printf ("error: seen multiple daylight-saving parts\n");
-              if ((pc.local_zones_seen + pc.zones_seen) > 1)
+              if ((pc.J_zones_seen + pc.local_zones_seen + pc.zones_seen) > 1)
                 dbg_printf ("error: seen multiple time-zone parts\n");
             }
           goto fail;
         }
 
       if (! to_tm_year (pc.year, debugging (&pc), &tm.tm_year)
-          || INT_ADD_WRAPV (pc.month, -1, &tm.tm_mon)
-          || INT_ADD_WRAPV (pc.day, 0, &tm.tm_mday))
+          || ckd_add (&tm.tm_mon, pc.month, -1)
+          || ckd_add (&tm.tm_mday, pc.day, 0))
         {
           if (debugging (&pc))
             dbg_printf (_("error: year, month, or day overflow\n"));
@@ -2077,13 +2073,13 @@ parse_datetime_body (struct timespec *result, char const *p,
         {
           intmax_t dayincr;
           tm.tm_yday = -1;
-          if (! (INT_MULTIPLY_WRAPV ((pc.day_ordinal
-                                      - (0 < pc.day_ordinal
-                                         && tm.tm_wday != pc.day_number)),
-                                     7, &dayincr)
-                 || INT_ADD_WRAPV ((pc.day_number - tm.tm_wday + 7) % 7,
-                                   dayincr, &dayincr)
-                 || INT_ADD_WRAPV (dayincr, tm.tm_mday, &tm.tm_mday)))
+          intmax_t day_ordinal = (pc.day_ordinal
+                                  - (0 < pc.day_ordinal
+                                     && tm.tm_wday != pc.day_number));
+          if (! (ckd_mul (&dayincr, day_ordinal, 7)
+                 || ckd_add (&dayincr, (pc.day_number - tm.tm_wday + 7) % 7,
+                             dayincr)
+                 || ckd_add (&tm.tm_mday, dayincr, tm.tm_mday)))
             {
               tm.tm_isdst = -1;
               Start = mktime_z (tz, &tm);
@@ -2140,9 +2136,9 @@ parse_datetime_body (struct timespec *result, char const *p,
             }
 
           int year, month, day;
-          if (INT_ADD_WRAPV (tm.tm_year, pc.rel.year, &year)
-              || INT_ADD_WRAPV (tm.tm_mon, pc.rel.month, &month)
-              || INT_ADD_WRAPV (tm.tm_mday, pc.rel.day, &day))
+          if (ckd_add (&year, tm.tm_year, pc.rel.year)
+              || ckd_add (&month, tm.tm_mon, pc.rel.month)
+              || ckd_add (&day, tm.tm_mday, pc.rel.day))
             {
               if (debugging (&pc))
                 dbg_printf (_("error: %s:%d\n"), __FILE__, __LINE__);
@@ -2239,9 +2235,9 @@ parse_datetime_body (struct timespec *result, char const *p,
                         : (overflow = true, 0));
 #endif
           intmax_t delta;
-          overflow |= INT_SUBTRACT_WRAPV (pc.time_zone, utcoff, &delta);
+          overflow |= ckd_sub (&delta, pc.time_zone, utcoff);
           time_t t1;
-          overflow |= INT_SUBTRACT_WRAPV (Start, delta, &t1);
+          overflow |= ckd_sub (&t1, Start, delta);
           if (overflow)
             {
               if (debugging (&pc))
@@ -2275,12 +2271,12 @@ parse_datetime_body (struct timespec *result, char const *p,
         int d4 = (sum_ns - normalized_ns) / BILLION;
         intmax_t d1, t1, d2, t2, t3;
         time_t t4;
-        if (INT_MULTIPLY_WRAPV (pc.rel.hour, 60 * 60, &d1)
-            || INT_ADD_WRAPV (Start, d1, &t1)
-            || INT_MULTIPLY_WRAPV (pc.rel.minutes, 60, &d2)
-            || INT_ADD_WRAPV (t1, d2, &t2)
-            || INT_ADD_WRAPV (t2, pc.rel.seconds, &t3)
-            || INT_ADD_WRAPV (t3, d4, &t4))
+        if (ckd_mul (&d1, pc.rel.hour, 60 * 60)
+            || ckd_add (&t1, Start, d1)
+            || ckd_mul (&d2, pc.rel.minutes, 60)
+            || ckd_add (&t2, t1, d2)
+            || ckd_add (&t3, t2, pc.rel.seconds)
+            || ckd_add (&t4, t3, d4))
           {
             if (debugging (&pc))
               dbg_printf (_("error: adding relative time caused an "

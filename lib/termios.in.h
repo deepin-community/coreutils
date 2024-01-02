@@ -1,5 +1,5 @@
 /* Substitute for and wrapper around <termios.h>.
-   Copyright (C) 2010-2022 Free Software Foundation, Inc.
+   Copyright (C) 2010-2023 Free Software Foundation, Inc.
 
    This file is free software: you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as
@@ -39,6 +39,11 @@ extern "C" {
 
 #ifndef _@GUARD_PREFIX@_TERMIOS_H
 #define _@GUARD_PREFIX@_TERMIOS_H
+
+/* This file uses GNULIB_POSIXCHECK, HAVE_RAW_DECL_*.  */
+#if !_GL_CONFIG_H_INCLUDED
+ #error "Please include config.h first."
+#endif
 
 /* Get pid_t.  */
 #include <sys/types.h>

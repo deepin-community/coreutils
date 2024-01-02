@@ -1,5 +1,5 @@
 /* I/O block size definitions for coreutils
-   Copyright (C) 1989-2022 Free Software Foundation, Inc.
+   Copyright (C) 1989-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,11 +17,11 @@
 /* Include this file _after_ system headers if possible.  */
 
 /* sys/stat.h and minmax.h will already have been included by system.h. */
-#include "idx.h"
+#include "count-leading-zeros.h"
 #include "stat-size.h"
 
 
-/* As of May 2014, 128KiB is determined to be the minimium
+/* As of May 2014, 128KiB is determined to be the minimum
    blksize to best minimize system call overhead.
    This can be tested with this script:
 
@@ -75,8 +75,33 @@ enum { IO_BUFSIZE = 128 * 1024 };
 static inline idx_t
 io_blksize (struct stat sb)
 {
+  /* Treat impossible blocksizes as if they were IO_BUFSIZE.  */
+  idx_t blocksize = ST_BLKSIZE (sb) <= 0 ? IO_BUFSIZE : ST_BLKSIZE (sb);
+
+  /* Use a blocksize of at least IO_BUFSIZE bytes, keeping it a
+     multiple of the original blocksize.  */
+  blocksize += (IO_BUFSIZE - 1) - (IO_BUFSIZE - 1) % blocksize;
+
+  /* For regular files we can ignore the blocksize if we think we know better.
+     ZFS sometimes understates the blocksize, because it thinks
+     apps stupidly allocate a block that large even for small files.
+     This misinformation can cause coreutils to use wrong-sized blocks.
+     Work around some of the performance bug by substituting the next
+     power of two when the reported blocksize is not a power of two.  */
+  if (S_ISREG (sb.st_mode)
+      && blocksize & (blocksize - 1))
+    {
+      int leading_zeros = count_leading_zeros_ll (blocksize);
+      if (IDX_MAX < ULLONG_MAX || leading_zeros)
+        {
+          unsigned long long power = 1ull << (ULLONG_WIDTH - leading_zeros);
+          if (power <= IDX_MAX)
+            blocksize = power;
+        }
+    }
+
   /* Don’t go above the largest power of two that fits in idx_t and size_t,
      as that is asking for trouble.  */
   return MIN (MIN (IDX_MAX, SIZE_MAX) / 2 + 1,
-              MAX (IO_BUFSIZE, ST_BLKSIZE (sb)));
+              blocksize);
 }

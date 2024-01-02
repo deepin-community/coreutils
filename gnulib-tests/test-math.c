@@ -1,5 +1,5 @@
 /* Test of <math.h> substitute.
-   Copyright (C) 2007-2022 Free Software Foundation, Inc.
+   Copyright (C) 2007-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -50,14 +50,14 @@ choke me
 choke me
 #endif
 
-#include <limits.h>
-
-#include "macros.h"
-
 #if 0
 /* Check that NAN expands into a constant expression.  */
 static float n = NAN;
 #endif
+
+#include <limits.h>
+
+#include "macros.h"
 
 /* Compare two numbers with ==.
    This is a separate function because IRIX 6.5 "cc -O" miscompiles an

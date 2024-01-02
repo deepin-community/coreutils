@@ -2,7 +2,7 @@
 
 /* Modified to run with the GNU shell by bfox. */
 
-/* Copyright (C) 1987-2022 Free Software Foundation, Inc.
+/* Copyright (C) 1987-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -44,6 +44,7 @@
 #endif
 
 #include "system.h"
+#include "assure.h"
 #include "quote.h"
 #include "stat-time.h"
 #include "strnumcmp.h"
@@ -119,7 +120,7 @@ unary_advance (void)
  * beyond - call when we're beyond the end of the argument list (an
  *	error condition)
  */
-static void
+static _Noreturn void
 beyond (void)
 {
   test_syntax_error (_("missing argument after %s"), quote (argv[argc - 1]));
@@ -377,7 +378,7 @@ binary_operator (bool l_is_l)
     }
 
   /* Not reached.  */
-  abort ();
+  affirm (false);
 }
 
 static bool
@@ -389,7 +390,6 @@ unary_operator (void)
     {
     default:
       test_syntax_error (_("%s: unary operator expected"), quote (argv[pos]));
-      return false;
 
       /* All of the following unary operators use unary_advance (), which
          checks to make sure that there is an argument, and then advances
@@ -511,7 +511,7 @@ unary_operator (void)
         unary_advance ();
         arg = find_int (argv[pos - 1]);
         errno = 0;
-        fd = strtol (arg, NULL, 10);
+        fd = strtol (arg, nullptr, 10);
         return (errno != ERANGE && 0 <= fd && fd <= INT_MAX && isatty (fd));
       }
 
@@ -666,8 +666,7 @@ posixtest (int nargs)
         FALLTHROUGH;
       case 5:
       default:
-        if (nargs <= 0)
-          abort ();
+        affirm (0 < nargs);
         value = expr ();
     }
 
@@ -838,7 +837,7 @@ main (int margc, char **margv)
           if (STREQ (margv[1], "--version"))
             {
               version_etc (stdout, PROGRAM_NAME, PACKAGE_NAME, Version, AUTHORS,
-                           (char *) NULL);
+                           (char *) nullptr);
               test_main_return (EXIT_SUCCESS);
             }
         }

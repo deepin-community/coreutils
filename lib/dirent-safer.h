@@ -1,6 +1,6 @@
 /* Invoke dirent-like functions, but avoid some glitches.
 
-   Copyright (C) 2009-2022 Free Software Foundation, Inc.
+   Copyright (C) 2009-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -16,6 +16,11 @@
    along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* Written by Eric Blake.  */
+
+/* This file uses _GL_ATTRIBUTE_DEALLOC.  */
+#if !_GL_CONFIG_H_INCLUDED
+ #error "Please include config.h first."
+#endif
 
 #include <dirent.h>
 

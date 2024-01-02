@@ -1,6 +1,6 @@
 /* Target directory operands for coreutils
 
-   Copyright 2022 Free Software Foundation, Inc.
+   Copyright 2022-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
    along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <fcntl.h>
-#include <stdbool.h>
 #include <sys/stat.h>
 
 #ifndef _GL_INLINE_HEADER_BEGIN

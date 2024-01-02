@@ -1,5 +1,5 @@
 /* cksum -- calculate and print POSIX checksums and sizes of files
-   Copyright (C) 1992-2022 Free Software Foundation, Inc.
+   Copyright (C) 1992-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -76,12 +76,6 @@ cksum_pclmul (FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out)
           return false;
         }
       length += bytes_read;
-
-      if (bytes_read == 0)
-        {
-          if (ferror (fp))
-            return false;
-        }
 
       datap = (__m128i *)buf;
 
@@ -191,5 +185,5 @@ cksum_pclmul (FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out)
   *crc_out = crc;
   *length_out = length;
 
-  return true;
+  return !ferror (fp);
 }

@@ -1,6 +1,6 @@
 /* mountlist.c -- return a list of mounted file systems
 
-   Copyright (C) 1991-1992, 1997-2022 Free Software Foundation, Inc.
+   Copyright (C) 1991-1992, 1997-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -154,11 +154,18 @@
 
 /* The results of opendir() in this file are not used with dirfd and fchdir,
    therefore save some unnecessary work in fchdir.c.  */
-#ifdef GNULIB_defined_opendir
+#ifdef GNULIB_defined_DIR
+# undef DIR
 # undef opendir
-#endif
-#ifdef GNULIB_defined_closedir
 # undef closedir
+# undef readdir
+#else
+# ifdef GNULIB_defined_opendir
+#  undef opendir
+# endif
+# ifdef GNULIB_defined_closedir
+#  undef closedir
+# endif
 #endif
 
 #define ME_DUMMY_0(Fs_name, Fs_type)            \

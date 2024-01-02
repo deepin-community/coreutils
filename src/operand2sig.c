@@ -1,5 +1,5 @@
 /* operand2sig.c -- common function for parsing signal specifications
-   Copyright (C) 2008-2022 Free Software Foundation, Inc.
+   Copyright (C) 2008-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -27,7 +27,6 @@
 #include <sys/wait.h>
 
 #include "system.h"
-#include "error.h"
 #include "quote.h"
 #include "sig2str.h"
 #include "operand2sig.h"
@@ -48,7 +47,7 @@ operand2sig (char const *operand, char *signame)
          But some shells may use other adjustments in future to be
          (forward) compatible with systems that support
          wider exit status values as discussed at
-         http://austingroupbugs.net/view.php?id=947  */
+         https://austingroupbugs.net/view.php?id=947  */
 
       char *endp;
       long int l = (errno = 0, strtol (operand, &endp, 10));

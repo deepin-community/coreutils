@@ -1,5 +1,5 @@
 /* core functions for copying files and directories
-   Copyright (C) 1989-2022 Free Software Foundation, Inc.
+   Copyright (C) 1989-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 #ifndef COPY_H
 # define COPY_H
 
-# include <stdbool.h>
 # include "hash.h"
 
 struct selabel_handle;
@@ -58,11 +57,25 @@ enum Reflink_type
   REFLINK_ALWAYS
 };
 
+/* Control how existing destination files are updated.  */
+enum Update_type
+{
+  /* Always update..  */
+  UPDATE_ALL,
+
+  /* Update if dest older.  */
+  UPDATE_OLDER,
+
+  /* Leave existing files.  */
+  UPDATE_NONE,
+};
+
 /* This type is used to help mv (via copy.c) distinguish these cases.  */
 enum Interactive
 {
   I_ALWAYS_YES = 1,
-  I_ALWAYS_NO,
+  I_ALWAYS_NO,       /* Skip and fail.   */
+  I_ALWAYS_SKIP,     /* Skip and ignore. */
   I_ASK_USER,
   I_UNSPECIFIED
 };
@@ -135,9 +148,9 @@ struct cp_options
      Create destination directories as usual. */
   bool hard_link;
 
-  /* If true, rather than copying, first attempt to use rename.
-     If that fails, then resort to copying.  */
-  bool move_mode;
+  /* If MOVE_MODE, first try to rename.
+     If that fails and NO_COPY, fail instead of copying.  */
+  bool move_mode, no_copy;
 
   /* If true, install(1) is the caller.  */
   bool install_mode;
@@ -243,6 +256,9 @@ struct cp_options
   /* If true, display the names of the files before copying them. */
   bool verbose;
 
+  /* If true, display details of how files were copied.  */
+  bool debug;
+
   /* If true, stdin is a tty.  */
   bool stdin_tty;
 
@@ -270,7 +286,7 @@ struct cp_options
        rm -rf a b c; mkdir a b c; touch a/f b/f; mv a/f b/f c
      For now, it protects only regular files when copying (i.e., not renaming).
      When renaming, it protects all non-directories.
-     Use dest_info_init to initialize it, or set it to NULL to disable
+     Use dest_info_init to initialize it, or set it to nullptr to disable
      this feature.  */
   Hash_table *dest_info;
 

@@ -1,5 +1,5 @@
 /* macros useful in interpreting size-related values in struct stat.
-   Copyright (C) 1989, 1991-2022 Free Software Foundation, Inc.
+   Copyright (C) 1989, 1991-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -24,6 +24,11 @@
  */
 #ifndef STAT_SIZE_H
 #define STAT_SIZE_H
+
+/* This file uses HAVE_SYS_PARAM_H, HAVE_STRUCT_STAT_ST_BLOCKS.  */
+#if !_GL_CONFIG_H_INCLUDED
+ #error "Please include config.h first."
+#endif
 
 /* sys/param.h may define DEV_BSIZE */
 #if HAVE_SYS_PARAM_H

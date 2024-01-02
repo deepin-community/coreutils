@@ -1,6 +1,6 @@
 /* aligned memory allocation
 
-   Copyright 2022 Free Software Foundation, Inc.
+   Copyright 2022-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,13 +20,16 @@
 #ifndef ALIGNALLOC_H_
 #define ALIGNALLOC_H_
 
+/* This file uses _GL_INLINE_HEADER_BEGIN, _GL_INLINE, _GL_ATTRIBUTE_ALLOC_SIZE,
+   _GL_ATTRIBUTE_MALLOC, _GL_ATTRIBUTE_RETURNS_NONNULL, HAVE_POSIX_MEMALIGN.  */
+#if !_GL_CONFIG_H_INCLUDED
+ #error "Please include config.h first."
+#endif
+
 #include <errno.h>
 #include <stdlib.h>
 #include "idx.h"
 
-#ifndef _GL_INLINE_HEADER_BEGIN
- #error "Please include config.h first."
-#endif
 _GL_INLINE_HEADER_BEGIN
 #ifndef ALIGNALLOC_INLINE
 # define ALIGNALLOC_INLINE _GL_INLINE
@@ -35,7 +38,7 @@ _GL_INLINE_HEADER_BEGIN
 /* Whether aligned_alloc supports any power-of-two alignment,
    returns a nonnull pointer for size-zero allocations,
    and sets errno on failure.  */
-#if 2 < __GLIBC__ + (15 <= __GLIBC_MINOR__)
+#if 2 < __GLIBC__ + (16 <= __GLIBC_MINOR__)
 # define ALIGNALLOC_VIA_ALIGNED_ALLOC 1
 #else
 # define ALIGNALLOC_VIA_ALIGNED_ALLOC 0

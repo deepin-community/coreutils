@@ -1,5 +1,5 @@
 /* set-fields.c -- common functions for parsing field list
-   Copyright (C) 2015-2022 Free Software Foundation, Inc.
+   Copyright (C) 2015-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 #include <config.h>
 
 #include "system.h"
-#include "error.h"
 #include "quote.h"
 #include "set-fields.h"
 
@@ -55,13 +54,12 @@ add_range_pair (uintmax_t lo, uintmax_t hi)
 
 
 /* Comparison function for qsort to order the list of
-   struct range_pairs.  */
+   struct field_range_pairs.  */
 static int
 compare_ranges (const void *a, const void *b)
 {
-  int a_start = ((const struct field_range_pair *) a)->lo;
-  int b_start = ((const struct field_range_pair *) b)->lo;
-  return a_start < b_start ? -1 : a_start > b_start;
+  struct field_range_pair const *ap = a, *bp = b;
+  return (ap->lo > bp->lo) - (ap->lo < bp->lo);
 }
 
 /* Reallocate Range Pair entries, with corresponding
@@ -73,7 +71,7 @@ complement_rp (void)
   struct field_range_pair *c = frp;
   size_t n = n_frp;
 
-  frp = NULL;
+  frp = nullptr;
   n_frp = 0;
   n_frp_allocated = 0;
 

@@ -1,5 +1,5 @@
 /* Include and determine availability of smack routines
-   Copyright (C) 2013-2022 Free Software Foundation, Inc.
+   Copyright (C) 2013-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -16,8 +16,6 @@
 
 /* Here we replace or wrap the most common smack functions used by coreutils.
    Others will need to be protected by HAVE_SMACK.  */
-
-#include <config.h>
 
 #ifdef HAVE_SMACK
 # include <sys/smack.h>
@@ -39,7 +37,7 @@ static inline bool
 is_smack_enabled (void)
 {
 #ifdef HAVE_SMACK
-  return smack_smackfs_path () != NULL;
+  return smack_smackfs_path () != nullptr;
 #else
   return false;
 #endif

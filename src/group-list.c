@@ -1,5 +1,5 @@
 /* group-list.c --Print a list of group IDs or names.
-   Copyright (C) 1989-2022 Free Software Foundation, Inc.
+   Copyright (C) 1989-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -25,7 +25,6 @@
 #include <grp.h>
 
 #include "system.h"
-#include "error.h"
 #include "mgetgroups.h"
 #include "quote.h"
 #include "group-list.h"
@@ -38,12 +37,12 @@ print_group_list (char const *username,
                   bool use_names, char delim)
 {
   bool ok = true;
-  struct passwd *pwd = NULL;
+  struct passwd *pwd = nullptr;
 
   if (username)
     {
       pwd = getpwuid (ruid);
-      if (pwd == NULL)
+      if (pwd == nullptr)
         ok = false;
     }
 
@@ -102,16 +101,24 @@ gidtostr_ptr (gid_t const *gid)
 extern bool
 print_group (gid_t gid, bool use_name)
 {
-  struct group *grp = NULL;
+  struct group *grp = nullptr;
   bool ok = true;
 
   if (use_name)
     {
       grp = getgrgid (gid);
-      if (grp == NULL)
+      if (grp == nullptr)
         {
-          error (0, 0, _("cannot find name for group ID %lu"),
-                 (unsigned long int) gid);
+          if (TYPE_SIGNED (gid_t))
+            {
+              intmax_t g = gid;
+              error (0, 0, _("cannot find name for group ID %"PRIdMAX), g);
+            }
+          else
+            {
+              uintmax_t g = gid;
+              error (0, 0, _("cannot find name for group ID %"PRIuMAX), g);
+            }
           ok = false;
         }
     }

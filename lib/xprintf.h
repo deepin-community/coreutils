@@ -1,5 +1,5 @@
 /* printf wrappers that fail immediately for non-file-related errors
-   Copyright (C) 2007-2022 Free Software Foundation, Inc.
+   Copyright (C) 2007-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -16,6 +16,11 @@
 
 #ifndef _XPRINTF_H
 #define _XPRINTF_H
+
+/* This file uses _GL_ATTRIBUTE_FORMAT.  */
+#if !_GL_CONFIG_H_INCLUDED
+ #error "Please include config.h first."
+#endif
 
 #include <stdarg.h>
 #include <stdio.h>

@@ -1,5 +1,5 @@
 /* Reformat numbers like 11505426432 to the more human-readable 11G
-   Copyright (C) 2012-2022 Free Software Foundation, Inc.
+   Copyright (C) 2012-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -24,8 +24,6 @@
 #include "mbsalign.h"
 #include "argmatch.h"
 #include "c-ctype.h"
-#include "die.h"
-#include "error.h"
 #include "quote.h"
 #include "system.h"
 #include "xstrtol.h"
@@ -73,7 +71,7 @@ enum scale_type
 
 static char const *const scale_from_args[] =
 {
-  "none", "auto", "si", "iec", "iec-i", NULL
+  "none", "auto", "si", "iec", "iec-i", nullptr
 };
 
 static enum scale_type const scale_from_types[] =
@@ -83,7 +81,7 @@ static enum scale_type const scale_from_types[] =
 
 static char const *const scale_to_args[] =
 {
-  "none", "si", "iec", "iec-i", NULL
+  "none", "si", "iec", "iec-i", nullptr
 };
 
 static enum scale_type const scale_to_types[] =
@@ -103,7 +101,7 @@ enum round_type
 
 static char const *const round_args[] =
 {
-  "up", "down", "from-zero", "towards-zero", "nearest", NULL
+  "up", "down", "from-zero", "towards-zero", "nearest", nullptr
 };
 
 static enum round_type const round_types[] =
@@ -122,7 +120,7 @@ enum inval_type
 
 static char const *const inval_args[] =
 {
-  "abort", "fail", "warn", "ignore", NULL
+  "abort", "fail", "warn", "ignore", nullptr
 };
 
 static enum inval_type const inval_types[] =
@@ -132,25 +130,25 @@ static enum inval_type const inval_types[] =
 
 static struct option const longopts[] =
 {
-  {"from", required_argument, NULL, FROM_OPTION},
-  {"from-unit", required_argument, NULL, FROM_UNIT_OPTION},
-  {"to", required_argument, NULL, TO_OPTION},
-  {"to-unit", required_argument, NULL, TO_UNIT_OPTION},
-  {"round", required_argument, NULL, ROUND_OPTION},
-  {"padding", required_argument, NULL, PADDING_OPTION},
-  {"suffix", required_argument, NULL, SUFFIX_OPTION},
-  {"grouping", no_argument, NULL, GROUPING_OPTION},
-  {"delimiter", required_argument, NULL, 'd'},
-  {"field", required_argument, NULL, FIELD_OPTION},
-  {"debug", no_argument, NULL, DEBUG_OPTION},
-  {"-debug", no_argument, NULL, DEV_DEBUG_OPTION},
-  {"header", optional_argument, NULL, HEADER_OPTION},
-  {"format", required_argument, NULL, FORMAT_OPTION},
-  {"invalid", required_argument, NULL, INVALID_OPTION},
-  {"zero-terminated", no_argument, NULL, 'z'},
+  {"from", required_argument, nullptr, FROM_OPTION},
+  {"from-unit", required_argument, nullptr, FROM_UNIT_OPTION},
+  {"to", required_argument, nullptr, TO_OPTION},
+  {"to-unit", required_argument, nullptr, TO_UNIT_OPTION},
+  {"round", required_argument, nullptr, ROUND_OPTION},
+  {"padding", required_argument, nullptr, PADDING_OPTION},
+  {"suffix", required_argument, nullptr, SUFFIX_OPTION},
+  {"grouping", no_argument, nullptr, GROUPING_OPTION},
+  {"delimiter", required_argument, nullptr, 'd'},
+  {"field", required_argument, nullptr, FIELD_OPTION},
+  {"debug", no_argument, nullptr, DEBUG_OPTION},
+  {"-debug", no_argument, nullptr, DEV_DEBUG_OPTION},
+  {"header", optional_argument, nullptr, HEADER_OPTION},
+  {"format", required_argument, nullptr, FORMAT_OPTION},
+  {"invalid", required_argument, nullptr, INVALID_OPTION},
+  {"zero-terminated", no_argument, nullptr, 'z'},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
-  {NULL, 0, NULL, 0}
+  {nullptr, 0, nullptr, 0}
 };
 
 /* If delimiter has this value, blanks separate fields.  */
@@ -161,27 +159,27 @@ enum { DELIMITER_DEFAULT = CHAR_MAX + 1 };
 enum { MAX_UNSCALED_DIGITS = LDBL_DIG };
 
 /* Maximum number of digits we can work with.
-   This is equivalent to 999Y.
+   This is equivalent to 999Q.
    NOTE: 'long double' can handle more than that, but there's
-         no official suffix assigned beyond Yotta (1000^8).  */
-enum { MAX_ACCEPTABLE_DIGITS = 27 };
+         no official suffix assigned beyond Quetta (1000^10).  */
+enum { MAX_ACCEPTABLE_DIGITS = 33 };
 
 static enum scale_type scale_from = scale_none;
 static enum scale_type scale_to = scale_none;
 static enum round_type round_style = round_from_zero;
 static enum inval_type inval_style = inval_abort;
-static char const *suffix = NULL;
+static char const *suffix = nullptr;
 static uintmax_t from_unit_size = 1;
 static uintmax_t to_unit_size = 1;
 static int grouping = 0;
-static char *padding_buffer = NULL;
+static char *padding_buffer = nullptr;
 static size_t padding_buffer_size = 0;
 static long int padding_width = 0;
 static long int zero_padding_width = 0;
 static long int user_precision = -1;
-static char const *format_str = NULL;
-static char *format_str_prefix = NULL;
-static char *format_str_suffix = NULL;
+static char const *format_str = nullptr;
+static char *format_str_prefix = nullptr;
+static char *format_str_suffix = nullptr;
 
 /* By default, any conversion error will terminate the program.  */
 static int conv_exit_code = EXIT_CONVERSION_WARNINGS;
@@ -229,11 +227,13 @@ default_scale_base (enum scale_type scale)
     }
 }
 
-static inline int
+static char const zero_and_valid_suffixes[] = "0KMGTPEZYRQ";
+static char const *valid_suffixes = 1 + zero_and_valid_suffixes;
+
+static inline bool
 valid_suffix (const char suf)
 {
-  static char const *valid_suffixes = "KMGTPEZY";
-  return (strchr (valid_suffixes, suf) != NULL);
+  return strchr (valid_suffixes, suf) != nullptr;
 }
 
 static inline int
@@ -265,13 +265,19 @@ suffix_power (const char suf)
     case 'Y':                  /* yotta or 2**80.  */
       return 8;
 
+    case 'R':                  /* ronna or 2**90.  */
+      return 9;
+
+    case 'Q':                  /* quetta or 2**100.  */
+      return 10;
+
     default:                   /* should never happen. assert?  */
       return 0;
     }
 }
 
 static inline char const *
-suffix_power_char (unsigned int power)
+suffix_power_char (int power)
 {
   switch (power)
     {
@@ -302,6 +308,12 @@ suffix_power_char (unsigned int power)
     case 8:
       return "Y";
 
+    case 9:
+      return "R";
+
+    case 10:
+      return "Q";
+
     default:
       return "(error)";
     }
@@ -309,7 +321,7 @@ suffix_power_char (unsigned int power)
 
 /* Similar to 'powl(3)' but without requiring 'libm'.  */
 static long double
-powerld (long double base, unsigned int x)
+powerld (long double base, int x)
 {
   long double result = base;
   if (x == 0)
@@ -335,9 +347,9 @@ absld (long double val)
      Similar to "frexpl(3)" but without requiring 'libm',
      allowing only integer scale, limited functionality and error checking.  */
 static long double
-expld (long double val, unsigned int base, unsigned int /*output */ *x)
+expld (long double val, int base, int /*output */ *x)
 {
-  unsigned int power = 0;
+  int power = 0;
 
   if (val >= -LDBL_MAX && val <= LDBL_MAX)
     {
@@ -460,7 +472,7 @@ enum simple_strtod_error
    Returns:
       SSE_OK - valid number.
       SSE_OK_PRECISION_LOSS - if more than 18 digits were used.
-      SSE_OVERFLOW          - if more than 27 digits (999Y) were used.
+      SSE_OVERFLOW          - if more than 33 digits (999Q) were used.
       SSE_INVALID_NUMBER    - if no digits were found.  */
 static enum simple_strtod_error
 simple_strtod_int (char const *input_str,
@@ -469,7 +481,7 @@ simple_strtod_int (char const *input_str,
   enum simple_strtod_error e = SSE_OK;
 
   long double val = 0;
-  unsigned int digits = 0;
+  int digits = 0;
   bool found_digit = false;
 
   if (*input_str == '-')
@@ -525,7 +537,7 @@ simple_strtod_int (char const *input_str,
    Returns:
       SSE_OK - valid number.
       SSE_OK_PRECISION_LOSS - if more than 18 digits were used.
-      SSE_OVERFLOW          - if more than 27 digits (999Y) were used.
+      SSE_OVERFLOW          - if more than 33 digits (999Q) were used.
       SSE_INVALID_NUMBER    - if no digits were found.  */
 static enum simple_strtod_error
 simple_strtod_float (char const *input_str,
@@ -593,12 +605,12 @@ simple_strtod_float (char const *input_str,
 
    TODO:
      support locale'd grouping
-     accept scentific and hex floats (probably use strtold directly)
+     accept scientific and hex floats (probably use strtold directly)
 
    Returns:
       SSE_OK - valid number.
       SSE_OK_PRECISION_LOSS - if more than LDBL_DIG digits were used.
-      SSE_OVERFLOW          - if more than 27 digits (999Y) were used.
+      SSE_OVERFLOW          - if more than 33 digits (999Q) were used.
       SSE_INVALID_NUMBER    - if no digits were found.
       SSE_VALID_BUT_FORBIDDEN_SUFFIX
       SSE_INVALID_SUFFIX
@@ -681,14 +693,14 @@ simple_strtod_human (char const *input_str,
 static void
 simple_strtod_fatal (enum simple_strtod_error err, char const *input_str)
 {
-  char const *msgid = NULL;
+  char const *msgid = nullptr;
 
   switch (err)
     {
     case SSE_OK_PRECISION_LOSS:
     case SSE_OK:
       /* should never happen - this function isn't called when OK.  */
-      abort ();
+      unreachable ();
 
     case SSE_OVERFLOW:
       msgid = N_("value too large to be converted: %s");
@@ -724,9 +736,10 @@ double_to_human (long double val, int precision,
 {
   int num_size;
   char fmt[64];
-  verify (sizeof (fmt) > (INT_BUFSIZE_BOUND (zero_padding_width)
-                          + INT_BUFSIZE_BOUND (precision)
-                          + 10 /* for %.Lf  etc.  */));
+  static_assert ((INT_BUFSIZE_BOUND (zero_padding_width)
+                  + INT_BUFSIZE_BOUND (precision)
+                  + 10 /* for %.Lf  etc.  */)
+                 < sizeof fmt);
 
   char *pfmt = fmt;
   *pfmt++ = '%';
@@ -753,8 +766,8 @@ double_to_human (long double val, int precision,
 
       num_size = snprintf (buf, buf_size, fmt, precision, val);
       if (num_size < 0 || num_size >= (int) buf_size)
-        die (EXIT_FAILURE, 0,
-             _("failed to prepare value '%Lf' for printing"), val);
+        error (EXIT_FAILURE, 0,
+               _("failed to prepare value '%Lf' for printing"), val);
       return;
     }
 
@@ -762,12 +775,12 @@ double_to_human (long double val, int precision,
   double scale_base = default_scale_base (scale);
 
   /* Normalize val to scale. */
-  unsigned int power = 0;
+  int power = 0;
   val = expld (val, scale_base, &power);
-  devmsg ("  scaled value to %Lf * %0.f ^ %u\n", val, scale_base, power);
+  devmsg ("  scaled value to %Lf * %0.f ^ %d\n", val, scale_base, power);
 
   /* Perform rounding. */
-  unsigned int power_adjust = 0;
+  int power_adjust = 0;
   if (user_precision != -1)
     power_adjust = MIN (power * 3, user_precision);
   else if (absld (val) < 10)
@@ -795,7 +808,7 @@ double_to_human (long double val, int precision,
   int show_decimal_point = (val != 0) && (absld (val) < 10) && (power > 0);
   /* && (absld (val) > simple_round_floor (val))) */
 
-  devmsg ("  after rounding, value=%Lf * %0.f ^ %u\n", val, scale_base, power);
+  devmsg ("  after rounding, value=%Lf * %0.f ^ %d\n", val, scale_base, power);
 
   stpcpy (pfmt, ".*Lf%s");
 
@@ -805,8 +818,8 @@ double_to_human (long double val, int precision,
   num_size = snprintf (buf, buf_size - 1, fmt, prec, val,
                        suffix_power_char (power));
   if (num_size < 0 || num_size >= (int) buf_size - 1)
-    die (EXIT_FAILURE, 0,
-         _("failed to prepare value '%Lf' for printing"), val);
+    error (EXIT_FAILURE, 0,
+           _("failed to prepare value '%Lf' for printing"), val);
 
   if (scale == scale_IEC_I && power > 0)
     strncat (buf, "i", buf_size - num_size - 1);
@@ -825,11 +838,11 @@ unit_to_umax (char const *n_string)
 {
   strtol_error s_err;
   char const *c_string = n_string;
-  char *t_string = NULL;
+  char *t_string = nullptr;
   size_t n_len = strlen (n_string);
-  char *end = NULL;
+  char *end = nullptr;
   uintmax_t n;
-  char const *suffixes = "KMGTPEZY";
+  char const *suffixes = valid_suffixes;
 
   /* Adjust suffixes so K=1000, Ki=1024, KiB=invalid.  */
   if (n_len && ! c_isdigit (n_string[n_len - 1]))
@@ -844,7 +857,7 @@ unit_to_umax (char const *n_string)
         {
           *++end = 'B';
           *++end = '\0';
-          suffixes = "KMGTPEZY0";
+          suffixes = zero_and_valid_suffixes;
         }
 
       c_string = t_string;
@@ -855,7 +868,7 @@ unit_to_umax (char const *n_string)
   if (s_err != LONGINT_OK || *end || n == 0)
     {
       free (t_string);
-      die (EXIT_FAILURE, 0, _("invalid unit size: %s"), quote (n_string));
+      error (EXIT_FAILURE, 0, _("invalid unit size: %s"), quote (n_string));
     }
 
   free (t_string);
@@ -1049,14 +1062,14 @@ parse_format_string (char const *fmt)
   size_t prefix_len = 0;
   size_t suffix_pos;
   long int pad = 0;
-  char *endptr = NULL;
+  char *endptr = nullptr;
   bool zero_padding = false;
 
   for (i = 0; !(fmt[i] == '%' && fmt[i + 1] != '%'); i += (fmt[i] == '%') + 1)
     {
       if (!fmt[i])
-        die (EXIT_FAILURE, 0,
-             _("format %s has no %% directive"), quote (fmt));
+        error (EXIT_FAILURE, 0,
+               _("format %s has no %% directive"), quote (fmt));
       prefix_len++;
     }
 
@@ -1082,8 +1095,8 @@ parse_format_string (char const *fmt)
   errno = 0;
   pad = strtol (fmt + i, &endptr, 10);
   if (errno == ERANGE || pad < -LONG_MAX)
-    die (EXIT_FAILURE, 0,
-         _("invalid format %s (width overflow)"), quote (fmt));
+    error (EXIT_FAILURE, 0,
+           _("invalid format %s (width overflow)"), quote (fmt));
 
   if (endptr != (fmt + i) && pad != 0)
     {
@@ -1107,7 +1120,7 @@ parse_format_string (char const *fmt)
   i = endptr - fmt;
 
   if (fmt[i] == '\0')
-    die (EXIT_FAILURE, 0, _("format %s ends in %%"), quote (fmt));
+    error (EXIT_FAILURE, 0, _("format %s ends in %%"), quote (fmt));
 
   if (fmt[i] == '.')
     {
@@ -1122,23 +1135,23 @@ parse_format_string (char const *fmt)
              negative precision is only supported (and ignored)
              when used with '.*f'.  glibc at least will malform
              output when passed a direct negative precision.  */
-          die (EXIT_FAILURE, 0,
-               _("invalid precision in format %s"), quote (fmt));
+          error (EXIT_FAILURE, 0,
+                 _("invalid precision in format %s"), quote (fmt));
         }
       i = endptr - fmt;
     }
 
   if (fmt[i] != 'f')
-    die (EXIT_FAILURE, 0, _("invalid format %s,"
-                            " directive must be %%[0]['][-][N][.][N]f"),
+    error (EXIT_FAILURE, 0, _("invalid format %s,"
+                              " directive must be %%[0]['][-][N][.][N]f"),
          quote (fmt));
   i++;
   suffix_pos = i;
 
   for (; fmt[i] != '\0'; i += (fmt[i] == '%') + 1)
     if (fmt[i] == '%' && fmt[i + 1] != '%')
-      die (EXIT_FAILURE, 0, _("format %s has too many %% directives"),
-           quote (fmt));
+      error (EXIT_FAILURE, 0, _("format %s has too many %% directives"),
+             quote (fmt));
 
   if (prefix_len)
     format_str_prefix = ximemdup0 (fmt, prefix_len);
@@ -1167,7 +1180,7 @@ static enum simple_strtod_error
 parse_human_number (char const *str, long double /*output */ *value,
                     size_t *precision)
 {
-  char *ptr = NULL;
+  char *ptr = nullptr;
 
   enum simple_strtod_error e =
     simple_strtod_human (str, &ptr, value, precision, scale_from);
@@ -1199,7 +1212,7 @@ prepare_padded_number (const long double val, size_t precision)
   size_t precision_used = user_precision == -1 ? precision : user_precision;
 
   /* Can't reliably print too-large values without auto-scaling. */
-  unsigned int x;
+  int x;
   expld (val, 10, &x);
 
   if (scale_to == scale_none
@@ -1223,7 +1236,7 @@ prepare_padded_number (const long double val, size_t precision)
     {
       if (inval_style != inval_ignore)
         error (conv_exit_code, 0, _("value too large to be printed: '%Lg'"
-                                    " (cannot handle values > 999Y)"), val);
+                                    " (cannot handle values > 999Q)"), val);
       return 0;
     }
 
@@ -1288,12 +1301,11 @@ process_suffixed_number (char *text, long double *result,
   char *p = text;
   while (*p && isblank (to_uchar (*p)))
     ++p;
-  const unsigned int skip_count = text - p;
 
   /* setup auto-padding.  */
   if (auto_padding)
     {
-      if (skip_count > 0 || field > 1)
+      if (text < p || field > 1)
         {
           padding_width = strlen (text);
           setup_padding_buffer (padding_width);
@@ -1454,7 +1466,7 @@ main (int argc, char **argv)
 #endif
 
   decimal_point = nl_langinfo (RADIXCHAR);
-  if (decimal_point == NULL || strlen (decimal_point) == 0)
+  if (decimal_point == nullptr || strlen (decimal_point) == 0)
     decimal_point = ".";
   decimal_point_length = strlen (decimal_point);
 
@@ -1462,7 +1474,7 @@ main (int argc, char **argv)
 
   while (true)
     {
-      int c = getopt_long (argc, argv, "d:z", longopts, NULL);
+      int c = getopt_long (argc, argv, "d:z", longopts, nullptr);
 
       if (c == -1)
         break;
@@ -1496,10 +1508,10 @@ main (int argc, char **argv)
           break;
 
         case PADDING_OPTION:
-          if (xstrtol (optarg, NULL, 10, &padding_width, "") != LONGINT_OK
+          if (xstrtol (optarg, nullptr, 10, &padding_width, "") != LONGINT_OK
               || padding_width == 0 || padding_width < -LONG_MAX)
-            die (EXIT_FAILURE, 0, _("invalid padding value %s"),
-                 quote (optarg));
+            error (EXIT_FAILURE, 0, _("invalid padding value %s"),
+                   quote (optarg));
           if (padding_width < 0)
             {
               padding_alignment = MBS_ALIGN_LEFT;
@@ -1511,15 +1523,15 @@ main (int argc, char **argv)
 
         case FIELD_OPTION:
           if (n_frp)
-            die (EXIT_FAILURE, 0, _("multiple field specifications"));
+            error (EXIT_FAILURE, 0, _("multiple field specifications"));
           set_fields (optarg, SETFLD_ALLOW_DASH);
           break;
 
         case 'd':
           /* Interpret -d '' to mean 'use the NUL byte as the delimiter.'  */
           if (optarg[0] != '\0' && optarg[1] != '\0')
-            die (EXIT_FAILURE, 0,
-                 _("the delimiter must be a single character"));
+            error (EXIT_FAILURE, 0,
+                   _("the delimiter must be a single character"));
           delimiter = optarg[0];
           break;
 
@@ -1543,10 +1555,10 @@ main (int argc, char **argv)
         case HEADER_OPTION:
           if (optarg)
             {
-              if (xstrtoumax (optarg, NULL, 10, &header, "") != LONGINT_OK
+              if (xstrtoumax (optarg, nullptr, 10, &header, "") != LONGINT_OK
                   || header == 0)
-                die (EXIT_FAILURE, 0, _("invalid header value %s"),
-                     quote (optarg));
+                error (EXIT_FAILURE, 0, _("invalid header value %s"),
+                       quote (optarg));
             }
           else
             {
@@ -1571,15 +1583,15 @@ main (int argc, char **argv)
         }
     }
 
-  if (format_str != NULL && grouping)
-    die (EXIT_FAILURE, 0, _("--grouping cannot be combined with --format"));
+  if (format_str != nullptr && grouping)
+    error (EXIT_FAILURE, 0, _("--grouping cannot be combined with --format"));
 
   if (debug && ! locale_ok)
     error (0, 0, _("failed to set locale"));
 
   /* Warn about no-op.  */
   if (debug && scale_from == scale_none && scale_to == scale_none
-      && !grouping && (padding_width == 0) && (format_str == NULL))
+      && !grouping && (padding_width == 0) && (format_str == nullptr))
     error (0, 0, _("no conversion option specified"));
 
   if (format_str)
@@ -1588,7 +1600,7 @@ main (int argc, char **argv)
   if (grouping)
     {
       if (scale_to != scale_none)
-        die (EXIT_FAILURE, 0, _("grouping cannot be combined with --to"));
+        error (EXIT_FAILURE, 0, _("grouping cannot be combined with --to"));
       if (debug && (strlen (nl_langinfo (THOUSEP)) == 0))
         error (0, 0, _("grouping has no effect in this locale"));
     }
@@ -1610,7 +1622,7 @@ main (int argc, char **argv)
     }
   else
     {
-      char *line = NULL;
+      char *line = nullptr;
       size_t line_allocated = 0;
       ssize_t len;
 
@@ -1628,7 +1640,7 @@ main (int argc, char **argv)
         }
 
       if (ferror (stdin))
-        error (0, errno, _("error reading input"));
+        error (EXIT_FAILURE, errno, _("error reading input"));
     }
 
   if (debug && !valid_numbers)

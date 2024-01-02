@@ -1,5 +1,5 @@
 /* unexpand - convert blanks to tabs
-   Copyright (C) 1989-2022 Free Software Foundation, Inc.
+   Copyright (C) 1989-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -39,8 +39,6 @@
 #include <getopt.h>
 #include <sys/types.h>
 #include "system.h"
-#include "die.h"
-
 #include "expand-common.h"
 
 /* The official name of this program (e.g., no 'g' prefix).  */
@@ -59,12 +57,12 @@ enum
 
 static struct option const longopts[] =
 {
-  {"tabs", required_argument, NULL, 't'},
-  {"all", no_argument, NULL, 'a'},
-  {"first-only", no_argument, NULL, CONVERT_FIRST_ONLY_OPTION},
+  {"tabs", required_argument, nullptr, 't'},
+  {"all", no_argument, nullptr, 'a'},
+  {"first-only", no_argument, nullptr, CONVERT_FIRST_ONLY_OPTION},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
-  {NULL, 0, NULL, 0}
+  {nullptr, 0, nullptr, 0}
 };
 
 void
@@ -105,7 +103,7 @@ static void
 unexpand (void)
 {
   /* Input stream.  */
-  FILE *fp = next_file (NULL);
+  FILE *fp = next_file (nullptr);
 
   /* The array of pending blanks.  In non-POSIX locales, blanks can
      include characters other than spaces, so the blanks must be
@@ -177,7 +175,7 @@ unexpand (void)
                   if (convert)
                     {
                       if (next_tab_column < column)
-                        die (EXIT_FAILURE, 0, _("input line is too long"));
+                        error (EXIT_FAILURE, 0, _("input line is too long"));
 
                       if (c == '\t')
                         {
@@ -222,7 +220,7 @@ unexpand (void)
                 {
                   column++;
                   if (!column)
-                    die (EXIT_FAILURE, 0, _("input line is too long"));
+                    error (EXIT_FAILURE, 0, _("input line is too long"));
                 }
 
               if (pending)
@@ -230,7 +228,7 @@ unexpand (void)
                   if (pending > 1 && one_blank_before_tab_stop)
                     pending_blank[0] = '\t';
                   if (fwrite (pending_blank, 1, pending, stdout) != pending)
-                    die (EXIT_FAILURE, errno, _("write error"));
+                    write_error ();
                   pending = 0;
                   one_blank_before_tab_stop = false;
                 }
@@ -246,7 +244,7 @@ unexpand (void)
             }
 
           if (putchar (c) < 0)
-            die (EXIT_FAILURE, errno, _("write error"));
+            write_error ();
         }
       while (c != '\n');
     }
@@ -271,7 +269,7 @@ main (int argc, char **argv)
 
   atexit (close_stdout);
 
-  while ((c = getopt_long (argc, argv, ",0123456789at:", longopts, NULL))
+  while ((c = getopt_long (argc, argv, ",0123456789at:", longopts, nullptr))
          != -1)
     {
       switch (c)
@@ -302,7 +300,7 @@ main (int argc, char **argv)
               have_tabval = true;
             }
           if (!DECIMAL_DIGIT_ACCUMULATE (tabval, c - '0', uintmax_t))
-            die (EXIT_FAILURE, 0, _("tab stop value is too large"));
+            error (EXIT_FAILURE, 0, _("tab stop value is too large"));
           break;
         }
     }
@@ -315,7 +313,7 @@ main (int argc, char **argv)
 
   finalize_tab_stops ();
 
-  set_file_list ((optind < argc) ? &argv[optind] : NULL);
+  set_file_list ((optind < argc) ? &argv[optind] : nullptr);
 
   unexpand ();
 

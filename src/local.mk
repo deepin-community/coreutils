@@ -1,7 +1,7 @@
 # Make coreutils programs.                             -*-Makefile-*-
 # This is included by the top-level Makefile.am.
 
-## Copyright (C) 1990-2022 Free Software Foundation, Inc.
+## Copyright (C) 1990-2023 Free Software Foundation, Inc.
 
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -43,7 +43,6 @@ noinst_HEADERS =		\
   src/chown-core.h		\
   src/copy.h			\
   src/cp-hash.h			\
-  src/die.h			\
   src/dircolors.h		\
   src/expand-common.h		\
   src/find-mount-point.h	\
@@ -51,6 +50,7 @@ noinst_HEADERS =		\
   src/fs-is-local.h		\
   src/group-list.h		\
   src/ioblksize.h		\
+  src/iopoll.h			\
   src/longlong.h		\
   src/ls.h			\
   src/operand2sig.h		\
@@ -59,6 +59,7 @@ noinst_HEADERS =		\
   src/set-fields.h		\
   src/statx.h			\
   src/system.h			\
+  src/temp-stream.h		\
   src/uname.h
 
 EXTRA_DIST +=		\
@@ -90,8 +91,8 @@ remove_ldadd =
 # must precede $(LIBINTL) in order to ensure we use GNU getopt.
 # But libcoreutils.a must also follow $(LIBINTL), since libintl uses
 # replacement functions defined in libcoreutils.a.
-# Similarly for $(LIB_MBRTOWC).
-LDADD = src/libver.a lib/libcoreutils.a $(LIBINTL) $(LIB_MBRTOWC) \
+# Similarly for $(MBRTOWC_LIB).
+LDADD = src/libver.a lib/libcoreutils.a $(LIBINTL) $(MBRTOWC_LIB) \
   lib/libcoreutils.a
 
 # First, list all programs, to make listing per-program libraries easier.
@@ -226,10 +227,10 @@ src_mv_LDADD += $(remove_ldadd)
 src_rm_LDADD += $(remove_ldadd)
 
 # for eaccess, euidaccess
-copy_ldadd += $(LIB_EACCESS)
-remove_ldadd += $(LIB_EACCESS)
-src_sort_LDADD += $(LIB_EACCESS)
-src_test_LDADD += $(LIB_EACCESS)
+copy_ldadd += $(EUIDACCESS_LIBGEN)
+remove_ldadd += $(EUIDACCESS_LIBGEN)
+src_sort_LDADD += $(EUIDACCESS_LIBGEN)
+src_test_LDADD += $(EUIDACCESS_LIBGEN)
 
 # for selinux use
 copy_ldadd += $(LIB_SELINUX)
@@ -252,19 +253,21 @@ src_stat_LDADD += $(LIB_SELINUX)
 src_stat_LDADD += $(LIB_NVPAIR)
 
 # for gettime, settime, tempname, utimecmp, utimens
-copy_ldadd += $(LIB_CLOCK_GETTIME)
-src_date_LDADD += $(LIB_CLOCK_GETTIME)
-src_ginstall_LDADD += $(LIB_CLOCK_GETTIME)
-src_ln_LDADD += $(LIB_CLOCK_GETTIME)
-src_ls_LDADD += $(LIB_CLOCK_GETTIME)
-src_mktemp_LDADD += $(LIB_CLOCK_GETTIME)
-src_pr_LDADD += $(LIB_CLOCK_GETTIME)
-src_tac_LDADD += $(LIB_CLOCK_GETTIME)
+copy_ldadd += $(CLOCK_TIME_LIB)
+src_date_LDADD += $(CLOCK_TIME_LIB)
+src_ginstall_LDADD += $(CLOCK_TIME_LIB)
+src_ln_LDADD += $(CLOCK_TIME_LIB)
+src_ls_LDADD += $(CLOCK_TIME_LIB)
+src_mktemp_LDADD += $(CLOCK_TIME_LIB)
+src_pr_LDADD += $(CLOCK_TIME_LIB)
+src_sort_LDADD += $(CLOCK_TIME_LIB)
+src_split_LDADD += $(CLOCK_TIME_LIB)
+src_tac_LDADD += $(CLOCK_TIME_LIB)
 src_timeout_LDADD += $(LIB_TIMER_TIME)
-src_touch_LDADD += $(LIB_CLOCK_GETTIME)
+src_touch_LDADD += $(CLOCK_TIME_LIB)
 
 # for gethrxtime
-src_dd_LDADD += $(LIB_GETHRXTIME)
+src_dd_LDADD += $(GETHRXTIME_LIB)
 
 # for cap_get_file
 src_ls_LDADD += $(LIB_CAP)
@@ -275,9 +278,9 @@ src_shred_LDADD += $(LIB_FDATASYNC)
 src_sync_LDADD += $(LIB_FDATASYNC)
 
 # for xnanosleep
-src_sleep_LDADD += $(LIB_NANOSLEEP)
-src_sort_LDADD += $(LIB_NANOSLEEP)
-src_tail_LDADD += $(LIB_NANOSLEEP)
+src_sleep_LDADD += $(NANOSLEEP_LIB)
+src_sort_LDADD += $(NANOSLEEP_LIB)
+src_tail_LDADD += $(NANOSLEEP_LIB)
 
 # for various GMP functions
 src_expr_LDADD += $(LIBGMP)
@@ -288,15 +291,13 @@ src_uptime_LDADD += $(GETLOADAVG_LIBS)
 
 # for various ACL functions
 copy_ldadd += $(LIB_ACL)
-src_ls_LDADD += $(LIB_HAS_ACL)
+src_ls_LDADD += $(FILE_HAS_ACL_LIB)
 
 # for various xattr functions
 copy_ldadd += $(LIB_XATTR)
 
-# for print_unicode_char, proper_name_utf8
-src_factor_LDADD += $(LIBICONV)
+# for print_unicode_char
 src_printf_LDADD += $(LIBICONV)
-src_ptx_LDADD += $(LIBICONV)
 
 # for libcrypto hash routines
 src_md5sum_LDADD += $(LIB_CRYPTO)
@@ -316,6 +317,12 @@ src_who_LDADD += $(GETADDRINFO_LIB)
 src_hostname_LDADD += $(GETHOSTNAME_LIB)
 src_uname_LDADD += $(GETHOSTNAME_LIB)
 
+# for read_utmp
+src_pinky_LDADD += $(READUTMP_LIB)
+src_uptime_LDADD += $(READUTMP_LIB)
+src_users_LDADD += $(READUTMP_LIB)
+src_who_LDADD += $(READUTMP_LIB)
+
 # for strsignal
 src_kill_LDADD += $(LIBTHREAD)
 
@@ -323,7 +330,7 @@ src_kill_LDADD += $(LIBTHREAD)
 src_sort_LDADD += $(LIBPMULTITHREAD)
 
 # for pthread_sigmask
-src_sort_LDADD += $(LIB_PTHREAD_SIGMASK)
+src_sort_LDADD += $(PTHREAD_SIGMASK_LIB)
 
 # Get the release year from lib/version-etc.c.
 RELEASE_YEAR = \
@@ -394,6 +401,12 @@ src_arch_SOURCES = src/uname.c src/uname-arch.c
 
 src_cut_SOURCES = src/cut.c src/set-fields.c
 src_numfmt_SOURCES = src/numfmt.c src/set-fields.c
+
+src_split_SOURCES = src/split.c src/temp-stream.c
+src_tac_SOURCES = src/tac.c src/temp-stream.c
+
+src_tail_SOURCES = src/tail.c src/iopoll.c
+src_tee_SOURCES = src/tee.c src/iopoll.c
 
 src_sum_SOURCES = src/sum.c src/sum.h src/digest.c
 src_sum_CPPFLAGS = -DHASH_ALGO_SUM=1 $(AM_CPPFLAGS)

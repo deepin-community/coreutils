@@ -1,5 +1,5 @@
 /* cksum -- calculate and print POSIX checksums and sizes of files
-   Copyright (C) 1992-2022 Free Software Foundation, Inc.
+   Copyright (C) 1992-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -109,15 +109,16 @@ main (void)
       uint32_t crc = 0;
 
       crc = (crc << 8) ^ crctab[0][((crc >> 24) ^ (i & 0xFF)) & 0xFF];
-      for (unsigned int offset = 1; offset < 8; offset++)
+      for (idx_t offset = 1; offset < 8; offset++)
         {
           crc = (crc << 8) ^ crctab[0][((crc >> 24) ^ 0x00) & 0xFF];
           crctab[offset][i] = crc;
         }
     }
 
-  printf ("#include <stdint.h>\n\n");
-  printf ("uint_fast32_t const crctab[8][256] = {\n");
+  printf ("#include <config.h>\n");
+  printf ("#include <stdint.h>\n");
+  printf ("\nuint_fast32_t const crctab[8][256] = {\n");
   for (int y = 0; y < 8; y++)
     {
       printf ("{\n  0x%08x", crctab[y][0]);
@@ -136,58 +137,27 @@ main (void)
 
 #else /* !CRCTAB */
 
-# include "die.h"
-# include "error.h"
-
 # include "cksum.h"
-# if USE_PCLMUL_CRC32
-#  include "cpuid.h"
-# else
-#  define cksum_pclmul cksum_slice8
-# endif /* USE_PCLMUL_CRC32 */
 
 /* Number of bytes to read at once.  */
 # define BUFLEN (1 << 16)
 
-
-static bool
-cksum_slice8 (FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out);
-static bool
-  (*cksum_fp)(FILE *, uint_fast32_t *, uintmax_t *);
-
+# if USE_PCLMUL_CRC32
 static bool
 pclmul_supported (void)
 {
-# if USE_PCLMUL_CRC32
-  unsigned int eax = 0;
-  unsigned int ebx = 0;
-  unsigned int ecx = 0;
-  unsigned int edx = 0;
-
-  if (! __get_cpuid (1, &eax, &ebx, &ecx, &edx))
-    {
-      if (cksum_debug)
-        error (0, 0, "%s", _("failed to get cpuid"));
-      return false;
-    }
-
-  if (! (ecx & bit_PCLMUL) || ! (ecx & bit_AVX))
-    {
-      if (cksum_debug)
-        error (0, 0, "%s", _("pclmul support not detected"));
-      return false;
-    }
+  bool pclmul_enabled = (0 < __builtin_cpu_supports ("pclmul")
+                         && 0 < __builtin_cpu_supports ("avx"));
 
   if (cksum_debug)
-    error (0, 0, "%s", _("using pclmul hardware support"));
+    error (0, 0, "%s",
+           (pclmul_enabled
+            ? _("using pclmul hardware support")
+            : _("pclmul support not detected")));
 
-  return true;
-# else
-  if (cksum_debug)
-    error (0, 0, "%s", _("using generic hardware support"));
-  return false;
-# endif /* USE_PCLMUL_CRC32 */
+  return pclmul_enabled;
 }
+# endif /* USE_PCLMUL_CRC32 */
 
 static bool
 cksum_slice8 (FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out)
@@ -210,12 +180,6 @@ cksum_slice8 (FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out)
           return false;
         }
       length += bytes_read;
-
-      if (bytes_read == 0)
-        {
-          if (ferror (fp))
-            return false;
-        }
 
       /* Process multiples of 8 bytes */
       datap = (uint32_t *)buf;
@@ -246,7 +210,7 @@ cksum_slice8 (FILE *fp, uint_fast32_t *crc_out, uintmax_t *length_out)
   *crc_out = crc;
   *length_out = length;
 
-  return true;
+  return !ferror (fp);
 }
 
 /* Calculate the checksum and length in bytes of stream STREAM.
@@ -258,13 +222,13 @@ crc_sum_stream (FILE *stream, void *resstream, uintmax_t *length)
   uintmax_t total_bytes = 0;
   uint_fast32_t crc = 0;
 
+# if USE_PCLMUL_CRC32
+  static bool (*cksum_fp) (FILE *, uint_fast32_t *, uintmax_t *);
   if (! cksum_fp)
-    {
-       if (pclmul_supported ())
-         cksum_fp = cksum_pclmul;
-       else
-         cksum_fp = cksum_slice8;
-    }
+    cksum_fp = pclmul_supported () ? cksum_pclmul : cksum_slice8;
+# else
+  bool (*cksum_fp) (FILE *, uint_fast32_t *, uintmax_t *) = cksum_slice8;
+# endif
 
   if (! cksum_fp (stream, &crc, &total_bytes))
     return -1;
@@ -285,9 +249,17 @@ crc_sum_stream (FILE *stream, void *resstream, uintmax_t *length)
    If ARGS is true, also print the FILE name.  */
 
 void
-output_crc (char const *file, int binary_file, void const *digest,
+output_crc (char const *file, int binary_file, void const *digest, bool raw,
             bool tagged, unsigned char delim, bool args, uintmax_t length)
 {
+  if (raw)
+    {
+      /* Output in network byte order (big endian).  */
+      uint32_t out_int = SWAP (*(uint32_t *)digest);
+      fwrite (&out_int, 1, 32/8, stdout);
+      return;
+    }
+
   char length_buf[INT_BUFSIZE_BOUND (uintmax_t)];
   printf ("%u %s", *(unsigned int *)digest, umaxtostr (length, length_buf));
   if (args)

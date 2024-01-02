@@ -1,5 +1,5 @@
 /* Creating and controlling threads.
-   Copyright (C) 2005-2022 Free Software Foundation, Inc.
+   Copyright (C) 2005-2023 Free Software Foundation, Inc.
 
    This file is free software: you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as
@@ -139,9 +139,11 @@ gl_thread_self (void)
             /* Memory allocation failed.  There is not much we can do.  Have to
                busy-loop, waiting for the availability of memory.  */
             {
-              struct timespec ts;
-              ts.tv_sec = 1;
-              ts.tv_nsec = 0;
+              struct timespec ts =
+                {
+                  .tv_sec = 1,
+                  .tv_nsec = 0
+                };
               thrd_sleep (&ts, NULL);
             }
           }

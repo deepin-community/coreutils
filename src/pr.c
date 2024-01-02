@@ -1,5 +1,5 @@
 /* pr -- convert text files for printing.
-   Copyright (C) 1988-2022 Free Software Foundation, Inc.
+   Copyright (C) 1988-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -97,7 +97,7 @@
    adapted to other UNIXes. A violation of downward compatibility has to
    be accepted.
    Some NEW CAPITAL LETTER options ( -J, -S, -W) has been introduced to
-   turn off unexpected interferences of small letter options (-s and -w
+   turn off unexpected interference of small letter options (-s and -w
    together with the three column options).
    -N option and the second argument LAST_PAGE of +FIRST_PAGE offer more
    flexibility; The detailed handling of form feeds set in the input
@@ -143,7 +143,7 @@
                 (a most frequently used form) still work as usual.
 
    -c, --show-control-chars
-                Print unprintable characters as control prefixes.
+                Print nonprintable characters as control prefixes.
                 Control-g is printed as ^G (use hat notation) and
                 octal backslash notation.
 
@@ -272,7 +272,7 @@
                 by form feeds set in the input files.
 
    -v, --show-nonprinting
-                Print unprintable characters as escape sequences. Use
+                Print nonprintable characters as escape sequences. Use
                 octal backslash notation. Control-G becomes \007.
 
    -w PAGE_WIDTH, --width=PAGE_WIDTH
@@ -310,10 +310,9 @@
 #include <config.h>
 
 #include <getopt.h>
+#include <stdckdint.h>
 #include <sys/types.h>
 #include "system.h"
-#include "die.h"
-#include "error.h"
 #include "fadvise.h"
 #include "hard-locale.h"
 #include "mbswidth.h"
@@ -664,11 +663,11 @@ static int number_width;
 /* Buffer sprintf uses to format a line number. */
 static char *number_buff;
 
-/* (-v) True means unprintable characters are printed as escape sequences.
+/* (-v) True means nonprintable characters are printed as escape sequences.
    control-g becomes \007. */
 static bool use_esc_sequence = false;
 
-/* (-c) True means unprintable characters are printed as control prefixes.
+/* (-c) True means nonprintable characters are printed as control prefixes.
    control-g becomes ^G. */
 static bool use_cntrl_prefix = false;
 
@@ -743,39 +742,39 @@ static char const short_options[] =
 
 static struct option const long_options[] =
 {
-  {"pages", required_argument, NULL, PAGES_OPTION},
-  {"columns", required_argument, NULL, COLUMNS_OPTION},
-  {"across", no_argument, NULL, 'a'},
-  {"show-control-chars", no_argument, NULL, 'c'},
-  {"double-space", no_argument, NULL, 'd'},
-  {"date-format", required_argument, NULL, 'D'},
-  {"expand-tabs", optional_argument, NULL, 'e'},
-  {"form-feed", no_argument, NULL, 'f'},
-  {"header", required_argument, NULL, 'h'},
-  {"output-tabs", optional_argument, NULL, 'i'},
-  {"join-lines", no_argument, NULL, 'J'},
-  {"length", required_argument, NULL, 'l'},
-  {"merge", no_argument, NULL, 'm'},
-  {"number-lines", optional_argument, NULL, 'n'},
-  {"first-line-number", required_argument, NULL, 'N'},
-  {"indent", required_argument, NULL, 'o'},
-  {"no-file-warnings", no_argument, NULL, 'r'},
-  {"separator", optional_argument, NULL, 's'},
-  {"sep-string", optional_argument, NULL, 'S'},
-  {"omit-header", no_argument, NULL, 't'},
-  {"omit-pagination", no_argument, NULL, 'T'},
-  {"show-nonprinting", no_argument, NULL, 'v'},
-  {"width", required_argument, NULL, 'w'},
-  {"page-width", required_argument, NULL, 'W'},
+  {"pages", required_argument, nullptr, PAGES_OPTION},
+  {"columns", required_argument, nullptr, COLUMNS_OPTION},
+  {"across", no_argument, nullptr, 'a'},
+  {"show-control-chars", no_argument, nullptr, 'c'},
+  {"double-space", no_argument, nullptr, 'd'},
+  {"date-format", required_argument, nullptr, 'D'},
+  {"expand-tabs", optional_argument, nullptr, 'e'},
+  {"form-feed", no_argument, nullptr, 'f'},
+  {"header", required_argument, nullptr, 'h'},
+  {"output-tabs", optional_argument, nullptr, 'i'},
+  {"join-lines", no_argument, nullptr, 'J'},
+  {"length", required_argument, nullptr, 'l'},
+  {"merge", no_argument, nullptr, 'm'},
+  {"number-lines", optional_argument, nullptr, 'n'},
+  {"first-line-number", required_argument, nullptr, 'N'},
+  {"indent", required_argument, nullptr, 'o'},
+  {"no-file-warnings", no_argument, nullptr, 'r'},
+  {"separator", optional_argument, nullptr, 's'},
+  {"sep-string", optional_argument, nullptr, 'S'},
+  {"omit-header", no_argument, nullptr, 't'},
+  {"omit-pagination", no_argument, nullptr, 'T'},
+  {"show-nonprinting", no_argument, nullptr, 'v'},
+  {"width", required_argument, nullptr, 'w'},
+  {"page-width", required_argument, nullptr, 'W'},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
-  {NULL, 0, NULL, 0}
+  {nullptr, 0, nullptr, 0}
 };
 
-static void
+static _Noreturn void
 integer_overflow (void)
 {
-  die (EXIT_FAILURE, 0, _("integer overflow"));
+  error (EXIT_FAILURE, 0, _("integer overflow"));
 }
 
 /* Return the number of columns that have either an open file or
@@ -865,7 +864,7 @@ main (int argc, char **argv)
   char **file_names;
 
   /* Accumulate the digits of old-style options like -99.  */
-  char *column_count_string = NULL;
+  char *column_count_string = nullptr;
   size_t n_digits = 0;
   size_t n_alloc = 0;
 
@@ -880,7 +879,7 @@ main (int argc, char **argv)
   n_files = 0;
   file_names = (argc > 1
                 ? xnmalloc (argc - 1, sizeof (char *))
-                : NULL);
+                : nullptr);
 
   while (true)
     {
@@ -914,11 +913,11 @@ main (int argc, char **argv)
         case PAGES_OPTION:	/* --pages=FIRST_PAGE[:LAST_PAGE] */
           {			/* dominates old opt +... */
             if (! optarg)
-              die (EXIT_FAILURE, 0,
-                   _("'--pages=FIRST_PAGE[:LAST_PAGE]' missing argument"));
+              error (EXIT_FAILURE, 0,
+                     _("'--pages=FIRST_PAGE[:LAST_PAGE]' missing argument"));
             else if (! first_last_page (oi, 0, optarg))
-              die (EXIT_FAILURE, 0, _("invalid page range %s"),
-                   quote (optarg));
+              error (EXIT_FAILURE, 0, _("invalid page range %s"),
+                     quote (optarg));
             break;
           }
 
@@ -930,7 +929,7 @@ main (int argc, char **argv)
                short-named option syntax, e.g., -9, ensure that this
                long-name-specified value overrides it.  */
             free (column_count_string);
-            column_count_string = NULL;
+            column_count_string = nullptr;
             n_alloc = 0;
             break;
           }
@@ -1070,12 +1069,12 @@ main (int argc, char **argv)
     first_page_number = 1;
 
   if (parallel_files && explicit_columns)
-    die (EXIT_FAILURE, 0,
-         _("cannot specify number of columns when printing in parallel"));
+    error (EXIT_FAILURE, 0,
+           _("cannot specify number of columns when printing in parallel"));
 
   if (parallel_files && print_across_flag)
-    die (EXIT_FAILURE, 0,
-       _("cannot specify both printing across and printing in parallel"));
+    error (EXIT_FAILURE, 0,
+           _("cannot specify both printing across and printing in parallel"));
 
 /* Translate some old short options to new/long options.
    To meet downward compatibility with other UNIX pr utilities
@@ -1130,7 +1129,7 @@ main (int argc, char **argv)
   if (n_files == 0)
     {
       /* No file arguments specified;  read from standard input.  */
-      print_files (0, NULL);
+      print_files (0, nullptr);
     }
   else
     {
@@ -1146,7 +1145,7 @@ main (int argc, char **argv)
   cleanup ();
 
   if (have_read_stdin && fclose (stdin) == EOF)
-    die (EXIT_FAILURE, errno, _("standard input"));
+    error (EXIT_FAILURE, errno, _("standard input"));
   main_exit (failed_opens ? EXIT_FAILURE : EXIT_SUCCESS);
 }
 
@@ -1168,15 +1167,28 @@ getoptnum (char const *n_str, int min, int *num, char const *err)
 static void
 getoptarg (char *arg, char switch_char, char *character, int *number)
 {
+  if (!*arg)
+    {
+      error (0, 0, _("'-%c': Invalid argument: %s"), switch_char, quote (arg));
+      usage (EXIT_FAILURE);
+    }
+
   if (!ISDIGIT (*arg))
     *character = *arg++;
   if (*arg)
     {
       long int tmp_long;
-      if (xstrtol (arg, NULL, 10, &tmp_long, "") != LONGINT_OK
-          || tmp_long <= 0 || INT_MAX < tmp_long)
+      strtol_error e = xstrtol (arg, nullptr, 10, &tmp_long, "");
+      if (e == LONGINT_OK)
         {
-          error (0, INT_MAX < tmp_long ?  EOVERFLOW : errno,
+          if (tmp_long <= 0)
+            e = LONGINT_INVALID;
+          else if (INT_MAX < tmp_long)
+            e = LONGINT_OVERFLOW;
+        }
+      if (e != LONGINT_OK)
+        {
+          error (0, e & LONGINT_OVERFLOW ? EOVERFLOW : 0,
              _("'-%c' extra characters or invalid number in the argument: %s"),
                  switch_char, quote (arg));
           usage (EXIT_FAILURE);
@@ -1202,7 +1214,7 @@ init_parameters (int number_of_files)
     lines_per_body = lines_per_page;
 
   if (double_space)
-    lines_per_body = lines_per_body / 2;
+    lines_per_body = MAX (1, lines_per_body / 2);
 
   /* If input is stdin, cannot print parallel files.  BSD dumps core
      on this. */
@@ -1273,15 +1285,15 @@ init_parameters (int number_of_files)
     }
 
   int sep_chars, useful_chars;
-  if (INT_MULTIPLY_WRAPV (columns - 1, col_sep_length, &sep_chars))
+  if (ckd_mul (&sep_chars, columns - 1, col_sep_length))
     sep_chars = INT_MAX;
-  if (INT_SUBTRACT_WRAPV (chars_per_line - chars_used_by_number, sep_chars,
-                          &useful_chars))
+  if (ckd_sub (&useful_chars, chars_per_line - chars_used_by_number,
+               sep_chars))
     useful_chars = 0;
   chars_per_column = useful_chars / columns;
 
   if (chars_per_column < 1)
-    die (EXIT_FAILURE, 0, _("page width too narrow"));
+    error (EXIT_FAILURE, 0, _("page width too narrow"));
 
   if (numbered_lines)
     {
@@ -1479,7 +1491,7 @@ open_file (char *name, COLUMN *p)
       p->name = name;
       p->fp = fopen (name, "r");
     }
-  if (p->fp == NULL)
+  if (p->fp == nullptr)
     {
       failed_opens = true;
       if (!ignore_failed_opens)
@@ -1515,7 +1527,7 @@ close_file (COLUMN *p)
   else if (fclose (p->fp) != 0 && !err)
     err = errno;
   if (err)
-    die (EXIT_FAILURE, err, "%s", quotef (p->name));
+    error (EXIT_FAILURE, err, "%s", quotef (p->name));
 
   if (!parallel_files)
     {
@@ -1632,7 +1644,7 @@ print_files (int number_of_files, char **av)
 static void
 init_header (char const *filename, int desc)
 {
-  char *buf = NULL;
+  char *buf = nullptr;
   struct stat st;
   struct timespec t;
   int ns;
@@ -1655,7 +1667,7 @@ init_header (char const *filename, int desc)
   if (localtime_rz (localtz, &t.tv_sec, &tm))
     {
       size_t bufsize
-        = nstrftime (NULL, SIZE_MAX, date_format, &tm, localtz, ns) + 1;
+        = nstrftime (nullptr, SIZE_MAX, date_format, &tm, localtz, ns) + 1;
       buf = xmalloc (bufsize);
       nstrftime (buf, bufsize, date_format, &tm, localtz, ns);
     }
@@ -1897,11 +1909,10 @@ static void
 init_store_cols (void)
 {
   int total_lines, total_lines_1, chars_per_column_1, chars_if_truncate;
-  if (INT_MULTIPLY_WRAPV (lines_per_body, columns, &total_lines)
-      || INT_ADD_WRAPV (total_lines, 1, &total_lines_1)
-      || INT_ADD_WRAPV (chars_per_column, 1, &chars_per_column_1)
-      || INT_MULTIPLY_WRAPV (total_lines, chars_per_column_1,
-                             &chars_if_truncate))
+  if (ckd_mul (&total_lines, lines_per_body, columns)
+      || ckd_add (&total_lines_1, total_lines, 1)
+      || ckd_add (&chars_per_column_1, chars_per_column, 1)
+      || ckd_mul (&chars_if_truncate, total_lines, chars_per_column_1))
     integer_overflow ();
 
   free (line_vector);
@@ -2370,7 +2381,7 @@ print_header (void)
   print_white_space ();
 
   if (page_number == 0)
-    die (EXIT_FAILURE, 0, _("page number overflow"));
+    error (EXIT_FAILURE, 0, _("page number overflow"));
 
   /* The translator must ensure that formatting the translation of
      "Page %"PRIuMAX does not generate more than (sizeof page_text - 1)
@@ -2619,7 +2630,7 @@ print_stored (COLUMN *p)
    sequences or control prefixes.
 
    Note: the width of a clump is not necessarily equal to the number of
-   characters in clump_buff.  (e.g, the width of '\b' is -1, while the
+   characters in clump_buff.  (e.g., the width of '\b' is -1, while the
    number of characters is 1.) */
 
 static int

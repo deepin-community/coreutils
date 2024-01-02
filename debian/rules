@@ -19,7 +19,7 @@ BIN_PROGS = cat chgrp chmod chown cp date dd df dir echo false ln ls mkdir \
 d=debian/coreutils
 
 override_dh_auto_configure:
-	dh_auto_configure -- --enable-install-program=arch 
+	dh_auto_configure -- --enable-install-program=arch --with-openssl=auto-gpl-compat
 
 %:
 	dh $@ --with autoreconf
