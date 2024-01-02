@@ -1,5 +1,5 @@
 /* seq - print sequence of numbers to standard output.
-   Copyright (C) 1994-2022 Free Software Foundation, Inc.
+   Copyright (C) 1994-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -22,9 +22,7 @@
 #include <sys/types.h>
 
 #include "system.h"
-#include "die.h"
 #include "cl-strtod.h"
-#include "error.h"
 #include "quote.h"
 #include "xstrtod.h"
 
@@ -62,12 +60,12 @@ static char const terminator[] = "\n";
 
 static struct option const long_options[] =
 {
-  { "equal-width", no_argument, NULL, 'w'},
-  { "format", required_argument, NULL, 'f'},
-  { "separator", required_argument, NULL, 's'},
+  { "equal-width", no_argument, nullptr, 'w'},
+  { "format", required_argument, nullptr, 'f'},
+  { "separator", required_argument, nullptr, 's'},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
-  { NULL, 0, NULL, 0}
+  { nullptr, 0, nullptr, 0}
 };
 
 void
@@ -150,7 +148,7 @@ scan_arg (char const *arg)
 {
   operand ret;
 
-  if (! xstrtold (arg, NULL, &ret.value, cl_strtold))
+  if (! xstrtold (arg, nullptr, &ret.value, cl_strtold))
     {
       error (0, 0, _("invalid floating point argument: %s"), quote (arg));
       usage (EXIT_FAILURE);
@@ -197,7 +195,7 @@ scan_arg (char const *arg)
         e = strchr (arg, 'E');
       if (e)
         {
-          long exponent = MAX (strtol (e + 1, NULL, 10), -LONG_MAX);
+          long exponent = MAX (strtol (e + 1, nullptr, 10), -LONG_MAX);
           ret.precision += exponent < 0 ? -exponent
                                         : - MIN (ret.precision, exponent);
           /* Don't account for e.... in the width since this is not output.  */
@@ -244,8 +242,8 @@ long_double_format (char const *fmt, struct layout *layout)
   for (i = 0; ! (fmt[i] == '%' && fmt[i + 1] != '%'); i += (fmt[i] == '%') + 1)
     {
       if (!fmt[i])
-        die (EXIT_FAILURE, 0,
-             _("format %s has no %% directive"), quote (fmt));
+        error (EXIT_FAILURE, 0,
+               _("format %s has no %% directive"), quote (fmt));
       prefix_len++;
     }
 
@@ -262,15 +260,15 @@ long_double_format (char const *fmt, struct layout *layout)
   has_L = (fmt[i] == 'L');
   i += has_L;
   if (fmt[i] == '\0')
-    die (EXIT_FAILURE, 0, _("format %s ends in %%"), quote (fmt));
+    error (EXIT_FAILURE, 0, _("format %s ends in %%"), quote (fmt));
   if (! strchr ("efgaEFGA", fmt[i]))
-    die (EXIT_FAILURE, 0,
-         _("format %s has unknown %%%c directive"), quote (fmt), fmt[i]);
+    error (EXIT_FAILURE, 0,
+           _("format %s has unknown %%%c directive"), quote (fmt), fmt[i]);
 
   for (i++; ; i += (fmt[i] == '%') + 1)
     if (fmt[i] == '%' && fmt[i + 1] != '%')
-      die (EXIT_FAILURE, 0, _("format %s has too many %% directives"),
-           quote (fmt));
+      error (EXIT_FAILURE, 0, _("format %s has too many %% directives"),
+             quote (fmt));
     else if (fmt[i])
       suffix_len++;
     else
@@ -285,14 +283,6 @@ long_double_format (char const *fmt, struct layout *layout)
         layout->suffix_len = suffix_len;
         return ldfmt;
       }
-}
-
-static void
-io_error (void)
-{
-  /* FIXME: consider option to silently ignore errno=EPIPE */
-  clearerr (stdout);
-  die (EXIT_FAILURE, errno, _("write error"));
 }
 
 /* Actually print the sequence of numbers in the specified range, with the
@@ -313,7 +303,7 @@ print_numbers (char const *fmt, struct layout layout,
         {
           long double x0 = x;
           if (printf (fmt, x) < 0)
-            io_error ();
+            write_error ();
           if (out_of_range)
             break;
           x = first + i * step;
@@ -341,10 +331,11 @@ print_numbers (char const *fmt, struct layout layout,
                 xalloc_die ();
               x_str[x_strlen - layout.suffix_len] = '\0';
 
-              if (xstrtold (x_str + layout.prefix_len, NULL, &x_val, cl_strtold)
+              if (xstrtold (x_str + layout.prefix_len, nullptr,
+                            &x_val, cl_strtold)
                   && x_val == last)
                 {
-                  char *x0_str = NULL;
+                  char *x0_str = nullptr;
                   int x0_strlen = asprintf (&x0_str, fmt, x0);
                   if (x0_strlen < 0)
                     xalloc_die ();
@@ -359,11 +350,11 @@ print_numbers (char const *fmt, struct layout layout,
             }
 
           if (fputs (separator, stdout) == EOF)
-            io_error ();
+            write_error ();
         }
 
       if (fputs (terminator, stdout) == EOF)
-        io_error ();
+        write_error ();
     }
 }
 
@@ -476,7 +467,7 @@ seq_fast (char const *a, char const *b, uintmax_t step)
 #define INITIAL_ALLOC_DIGITS 31
   size_t inc_size = MAX (MAX (p_len + 1, q_len), INITIAL_ALLOC_DIGITS);
   /* Ensure we only increase by at most 1 digit at buffer boundaries.  */
-  verify (SEQ_FAST_STEP_LIMIT_DIGITS < INITIAL_ALLOC_DIGITS - 1);
+  static_assert (SEQ_FAST_STEP_LIMIT_DIGITS < INITIAL_ALLOC_DIGITS - 1);
 
   /* Copy input strings (incl NUL) to end of new buffers.  */
   char *p0 = xmalloc (inc_size + 1);
@@ -489,7 +480,7 @@ seq_fast (char const *a, char const *b, uintmax_t step)
       q = memcpy (q0 + inc_size - q_len, b, q_len + 1);
     }
   else
-    q = q0 = NULL;
+    q = q0 = nullptr;
 
   bool ok = inf || cmp (p, p_len, q, q_len) <= 0;
   if (ok)
@@ -540,7 +531,7 @@ seq_fast (char const *a, char const *b, uintmax_t step)
           if (buf_end - (p_len + 1) < bufp)
             {
               if (fwrite (buf, bufp - buf, 1, stdout) != 1)
-                io_error ();
+                write_error ();
               bufp = buf;
             }
         }
@@ -548,7 +539,7 @@ seq_fast (char const *a, char const *b, uintmax_t step)
       /* Write any remaining buffered output, and the terminator.  */
       *bufp++ = *terminator;
       if (fwrite (buf, bufp - buf, 1, stdout) != 1)
-        io_error ();
+        write_error ();
     }
 
   if (ok)
@@ -577,7 +568,7 @@ main (int argc, char **argv)
   struct layout layout = { 0, 0 };
 
   /* The printf(3) format used for output.  */
-  char const *format_str = NULL;
+  char const *format_str = nullptr;
 
   initialize_main (&argc, &argv);
   set_program_name (argv[0]);
@@ -602,7 +593,7 @@ main (int argc, char **argv)
           break;
         }
 
-      optc = getopt_long (argc, argv, "+f:s:w", long_options, NULL);
+      optc = getopt_long (argc, argv, "+f:s:w", long_options, nullptr);
       if (optc == -1)
         break;
 
@@ -629,7 +620,7 @@ main (int argc, char **argv)
         }
     }
 
-  unsigned int n_args = argc - optind;
+  int n_args = argc - optind;
   if (n_args < 1)
     {
       error (0, 0, _("missing operand"));
@@ -645,7 +636,7 @@ main (int argc, char **argv)
   if (format_str)
     format_str = long_double_format (format_str, &layout);
 
-  if (format_str != NULL && equal_width)
+  if (format_str != nullptr && equal_width)
     {
       error (0, 0, _("format string may not be specified"
                      " when printing equal width strings"));
@@ -662,7 +653,7 @@ main (int argc, char **argv)
   bool fast_step_ok = false;
   if (n_args != 3
       || (all_digits_p (argv[optind + 1])
-          && xstrtold (argv[optind + 1], NULL, &step.value, cl_strtold)
+          && xstrtold (argv[optind + 1], nullptr, &step.value, cl_strtold)
           && 0 < step.value && step.value <= SEQ_FAST_STEP_LIMIT))
     fast_step_ok = true;
 
@@ -724,7 +715,7 @@ main (int argc, char **argv)
       /* Upon any failure, let the more general code deal with it.  */
     }
 
-  if (format_str == NULL)
+  if (format_str == nullptr)
     format_str = get_default_format (first, step, last);
 
   print_numbers (format_str, layout, first.value, step.value, last.value);

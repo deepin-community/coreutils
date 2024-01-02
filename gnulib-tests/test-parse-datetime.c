@@ -1,5 +1,5 @@
 /* Test of parse_datetime() function.
-   Copyright (C) 2008-2022 Free Software Foundation, Inc.
+   Copyright (C) 2008-2023 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -144,6 +144,16 @@ main (_GL_UNUSED int argc, char **argv)
   /* ISO 8601 extended date and time of day representation,
      ' ' separator, local time zone */
   p = "2011-05-01 11:55:18";
+  expected.tv_sec = ref_time - gmtoff;
+  expected.tv_nsec = 0;
+  ASSERT (parse_datetime (&result, p, 0));
+  LOG (p, expected, result);
+  ASSERT (expected.tv_sec == result.tv_sec
+          && expected.tv_nsec == result.tv_nsec);
+
+  /* ISO 8601 extended date and time of day representation,
+     ' ' separator, 'J' (local) time zone */
+  p = "2011-05-01 11:55:18J";
   expected.tv_sec = ref_time - gmtoff;
   expected.tv_nsec = 0;
   ASSERT (parse_datetime (&result, p, 0));

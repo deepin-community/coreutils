@@ -1,5 +1,5 @@
 /* long-options.h -- declaration for --help- and --version-handling function.
-   Copyright (C) 1993-1994, 1998-1999, 2003, 2009-2022 Free Software
+   Copyright (C) 1993-1994, 1998-1999, 2003, 2009-2023 Free Software
    Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
@@ -19,8 +19,6 @@
 
 #ifndef LONG_OPTIONS_H_
 # define LONG_OPTIONS_H_ 1
-
-# include <stdbool.h>
 
 void parse_long_options (int _argc,
                          char **_argv,

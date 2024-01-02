@@ -1,6 +1,6 @@
 #!/bin/sh
 # Test suite for update-copyright.
-# Copyright (C) 2009-2022 Free Software Foundation, Inc.
+# Copyright (C) 2009-2023 Free Software Foundation, Inc.
 # This file is part of the GNUlib Library.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -28,7 +28,7 @@ PATH=$abs_aux_dir:$PATH
 export PATH
 
 TMP_BASE=update-copyright.test
-trap 'rm -f $TMP_BASE*' 0 1 2 3 15
+trap 'rm -f $TMP_BASE*' EXIT HUP INT QUIT TERM
 
 ## --------------------------------- ##
 ## Skip if user does not have perl.  ##
@@ -68,7 +68,7 @@ echo a > $TMP-in
 # Skip this test if Perl is too old.  FIXME: 5.8.0 is just a guess.
 # We have a report that 5.6.1 is inadequate and that 5.8.0 works.
 perl -e 'require 5.8.0' || {
-  echo '$0: skipping this test; Perl version is too old' 1>&2
+  echo "$0: skipping this test; Perl version is too old" 1>&2
   exit 77
 }
 
@@ -81,152 +81,160 @@ export UPDATE_COPYRIGHT_MAX_LINE_LENGTH
 ## ----------------------------- ##
 
 TMP=$TMP_BASE-ex
-cat > $TMP.1 <<EOF
+cat > $TMP-1 <<EOF
 Copyright @copyright{} 1990-2005, 2007-2009 Free Software
 Foundation, Inc.
 EOF
-cat > $TMP.2 <<EOF
+cat > $TMP-2 <<EOF
 # Copyright (C) 1990-2005, 2007-2009 Free Software
 # Foundation, Inc.
 EOF
-cat > $TMP.3 <<EOF
+cat > $TMP-3 <<EOF
 /*
  * Copyright &copy; 90,2005,2007-2009
  * Free Software Foundation, Inc.
  */
 EOF
-cat > $TMP.4 <<EOF
+cat > $TMP-4 <<EOF
 ## Copyright (C) 1990-2005, 2007-2009 Free Software
 #  Foundation, Inc.
 EOF
-cat > $TMP.5 <<EOF
+cat > $TMP-5 <<EOF
 Copyright (C) 1990-2005, 2007-2009 Acme, Inc.
 EOF
-cat > $TMP.6 <<EOF
+cat > $TMP-6 <<EOF
 ## Copyright (C) 1990-2005, 2007-2009 Free Software
 #  Foundation, Inc.
 
 Copyright (C) 1990-2005, 2007-2009 Free Software Foundation,
 Inc.
 EOF
-cat > $TMP.7 <<EOF
+cat > $TMP-7 <<EOF
 Copyright (C) 1990-2005, 2007-2009 Acme, Inc.
 
 # Copyright (C) 1990-2005, 2007-2009 Free Software
 # Foundation, Inc.
+EOF
+cat > $TMP-8 <<EOF
+Copyright (C) 2008 Free Software Foundation, Inc.
+Copyright (C) 2008 Free Software Foundation, Inc.
 EOF
 
 UPDATE_COPYRIGHT_YEAR=2009 \
-  update-copyright $TMP.? 1> $TMP-stdout 2> $TMP-stderr
+  update-copyright $TMP-? 1> $TMP-stdout 2> $TMP-stderr
 compare /dev/null $TMP-stdout || exit 1
 compare - $TMP-stderr <<EOF || exit 1
-$TMP.4: warning: copyright statement not found
-$TMP.5: warning: copyright statement not found
+$TMP-4: warning: copyright statement not found
+$TMP-5: warning: copyright statement not found
 EOF
-compare - $TMP.1 <<EOF || exit 1
+compare - $TMP-1 <<EOF || exit 1
 Copyright @copyright{} 1990-2005, 2007-2009 Free Software
 Foundation, Inc.
 EOF
-compare - $TMP.2 <<EOF || exit 1
+compare - $TMP-2 <<EOF || exit 1
 # Copyright (C) 1990-2005, 2007-2009 Free Software
 # Foundation, Inc.
 EOF
-compare - $TMP.3 <<EOF || exit 1
+compare - $TMP-3 <<EOF || exit 1
 /*
  * Copyright &copy; 90,2005,2007-2009
  * Free Software Foundation, Inc.
  */
 EOF
-compare - $TMP.4 <<EOF || exit 1
+compare - $TMP-4 <<EOF || exit 1
 ## Copyright (C) 1990-2005, 2007-2009 Free Software
 #  Foundation, Inc.
 EOF
-compare - $TMP.5 <<EOF || exit 1
+compare - $TMP-5 <<EOF || exit 1
 Copyright (C) 1990-2005, 2007-2009 Acme, Inc.
 EOF
-compare - $TMP.6 <<EOF || exit 1
+compare - $TMP-6 <<EOF || exit 1
 ## Copyright (C) 1990-2005, 2007-2009 Free Software
 #  Foundation, Inc.
 
 Copyright (C) 1990-2005, 2007-2009 Free Software Foundation,
 Inc.
 EOF
-compare - $TMP.7 <<EOF || exit 1
+compare - $TMP-7 <<EOF || exit 1
 Copyright (C) 1990-2005, 2007-2009 Acme, Inc.
 
 # Copyright (C) 1990-2005, 2007-2009 Free Software
 # Foundation, Inc.
 EOF
+compare - $TMP-8 <<EOF || exit 1
+Copyright (C) 2008, 2009 Free Software Foundation, Inc.
+Copyright (C) 2008, 2009 Free Software Foundation, Inc.
+EOF
 
 UPDATE_COPYRIGHT_YEAR=2010 UPDATE_COPYRIGHT_USE_INTERVALS=1 \
-  update-copyright $TMP.? 1> $TMP-stdout 2> $TMP-stderr
+  update-copyright $TMP-? 1> $TMP-stdout 2> $TMP-stderr
 compare /dev/null $TMP-stdout || exit 1
 compare - $TMP-stderr <<EOF || exit 1
-$TMP.4: warning: copyright statement not found
-$TMP.5: warning: copyright statement not found
+$TMP-4: warning: copyright statement not found
+$TMP-5: warning: copyright statement not found
 EOF
-compare - $TMP.1 <<EOF || exit 1
+compare - $TMP-1 <<EOF || exit 1
 Copyright @copyright{} 1990-2005, 2007-2010 Free Software Foundation,
 Inc.
 EOF
-compare - $TMP.2 <<EOF || exit 1
+compare - $TMP-2 <<EOF || exit 1
 # Copyright (C) 1990-2005, 2007-2010 Free Software Foundation, Inc.
 EOF
-compare - $TMP.3 <<EOF || exit 1
+compare - $TMP-3 <<EOF || exit 1
 /*
  * Copyright &copy; 1990, 2005, 2007-2010 Free Software Foundation, Inc.
  */
 EOF
-compare - $TMP.4 <<EOF || exit 1
+compare - $TMP-4 <<EOF || exit 1
 ## Copyright (C) 1990-2005, 2007-2009 Free Software
 #  Foundation, Inc.
 EOF
-compare - $TMP.5 <<EOF || exit 1
+compare - $TMP-5 <<EOF || exit 1
 Copyright (C) 1990-2005, 2007-2009 Acme, Inc.
 EOF
-compare - $TMP.6 <<EOF || exit 1
+compare - $TMP-6 <<EOF || exit 1
 ## Copyright (C) 1990-2005, 2007-2009 Free Software
 #  Foundation, Inc.
 
 Copyright (C) 1990-2005, 2007-2010 Free Software Foundation, Inc.
 EOF
-compare - $TMP.7 <<EOF || exit 1
+compare - $TMP-7 <<EOF || exit 1
 Copyright (C) 1990-2005, 2007-2009 Acme, Inc.
 
 # Copyright (C) 1990-2005, 2007-2010 Free Software Foundation, Inc.
 EOF
 
 UPDATE_COPYRIGHT_YEAR=2010 UPDATE_COPYRIGHT_FORCE=1 \
-  update-copyright $TMP.? 1> $TMP-stdout 2> $TMP-stderr
+  update-copyright $TMP-? 1> $TMP-stdout 2> $TMP-stderr
 compare /dev/null $TMP-stdout || exit 1
 compare - $TMP-stderr <<EOF || exit 1
-$TMP.4: warning: copyright statement not found
-$TMP.5: warning: copyright statement not found
+$TMP-4: warning: copyright statement not found
+$TMP-5: warning: copyright statement not found
 EOF
-compare - $TMP.1 <<EOF || exit 1
+compare - $TMP-1 <<EOF || exit 1
 Copyright @copyright{} 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010
 Free Software Foundation, Inc.
 EOF
-compare - $TMP.2 <<EOF || exit 1
+compare - $TMP-2 <<EOF || exit 1
 # Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
 # 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010 Free
 # Software Foundation, Inc.
 EOF
-compare - $TMP.3 <<EOF || exit 1
+compare - $TMP-3 <<EOF || exit 1
 /*
  * Copyright &copy; 1990, 2005, 2007, 2008, 2009, 2010 Free Software
  * Foundation, Inc.
  */
 EOF
-compare - $TMP.4 <<EOF || exit 1
+compare - $TMP-4 <<EOF || exit 1
 ## Copyright (C) 1990-2005, 2007-2009 Free Software
 #  Foundation, Inc.
 EOF
-compare - $TMP.5 <<EOF || exit 1
+compare - $TMP-5 <<EOF || exit 1
 Copyright (C) 1990-2005, 2007-2009 Acme, Inc.
 EOF
-compare - $TMP.6 <<EOF || exit 1
+compare - $TMP-6 <<EOF || exit 1
 ## Copyright (C) 1990-2005, 2007-2009 Free Software
 #  Foundation, Inc.
 
@@ -234,12 +242,49 @@ Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010 Free
 Software Foundation, Inc.
 EOF
-compare - $TMP.7 <<EOF || exit 1
+compare - $TMP-7 <<EOF || exit 1
 Copyright (C) 1990-2005, 2007-2009 Acme, Inc.
 
 # Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
 # 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010 Free
 # Software Foundation, Inc.
+EOF
+
+rm $TMP*
+
+## ------------------------ ##
+## Examples from man pages  ##
+## ------------------------ ##
+
+TMP=$TMP_BASE-man
+cat > $TMP.1 <<EOF
+'\" Copyright (C) 1998-2009 Free Software Foundation, Inc.
+EOF
+cat > $TMP.2 <<EOF
+Copyright \(co 1998-2009 Free Software Foundation, Inc.
+EOF
+cat > $TMP.3 <<EOF
+Copyright \(co 1998\(en2009 Free Software Foundation, Inc.
+EOF
+cat > $TMP.4 <<EOF
+Copyright \(co 2009 Free Software Foundation, Inc.
+EOF
+
+UPDATE_COPYRIGHT_YEAR=2010 UPDATE_COPYRIGHT_USE_INTERVALS=1 \
+  update-copyright $TMP.? 1> $TMP-stdout 2> $TMP-stderr
+compare /dev/null $TMP-stdout || exit 1
+compare /dev/null $TMP-stderr || exit 1
+compare - $TMP.1 <<EOF || exit 1
+'\" Copyright (C) 1998\(en2010 Free Software Foundation, Inc.
+EOF
+compare - $TMP.2 <<EOF || exit 1
+Copyright \(co 1998\(en2010 Free Software Foundation, Inc.
+EOF
+compare - $TMP.3 <<EOF || exit 1
+Copyright \(co 1998\(en2010 Free Software Foundation, Inc.
+EOF
+compare - $TMP.4 <<EOF || exit 1
+Copyright \(co 2009\(en2010 Free Software Foundation, Inc.
 EOF
 
 rm $TMP*

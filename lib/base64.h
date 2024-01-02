@@ -1,5 +1,5 @@
 /* base64.h -- Encode binary data using printable characters.
-   Copyright (C) 2004-2006, 2009-2022 Free Software Foundation, Inc.
+   Copyright (C) 2004-2006, 2009-2023 Free Software Foundation, Inc.
    Written by Simon Josefsson.
 
    This file is free software: you can redistribute it and/or modify
@@ -18,11 +18,13 @@
 #ifndef BASE64_H
 # define BASE64_H
 
+/* This file uses _GL_ATTRIBUTE_CONST.  */
+#if !_GL_CONFIG_H_INCLUDED
+ #error "Please include config.h first."
+#endif
+
 /* Get idx_t.  */
 # include <idx.h>
-
-/* Get bool. */
-# include <stdbool.h>
 
 # ifdef __cplusplus
 extern "C" {

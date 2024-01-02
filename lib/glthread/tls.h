@@ -1,5 +1,5 @@
 /* Thread-local storage in multithreaded situations.
-   Copyright (C) 2005, 2007-2022 Free Software Foundation, Inc.
+   Copyright (C) 2005, 2007-2023 Free Software Foundation, Inc.
 
    This file is free software: you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as
@@ -42,6 +42,11 @@
 
 #ifndef _TLS_H
 #define _TLS_H
+
+/* This file uses HAVE_THREADS_H.  */
+#if !_GL_CONFIG_H_INCLUDED
+ #error "Please include config.h first."
+#endif
 
 #include <errno.h>
 #include <stdlib.h>

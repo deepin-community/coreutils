@@ -1,5 +1,5 @@
-/* expand-common - common functionality for expand/unexapnd
-   Copyright (C) 1989-2022 Free Software Foundation, Inc.
+/* expand-common - common functionality for expand/unexpand
+   Copyright (C) 1989-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -16,12 +16,9 @@
 
 #include <config.h>
 
-#include <assert.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include "system.h"
-#include "die.h"
-#include "error.h"
 #include "fadvise.h"
 #include "quote.h"
 
@@ -34,7 +31,7 @@ bool convert_entire_line = false;
 /* If nonzero, the size of all tab stops.  If zero, use 'tab_list' instead.  */
 static uintmax_t tab_size = 0;
 
-/* If nonzero, the size of all tab stops after the last specifed.  */
+/* If nonzero, the size of all tab stops after the last specified.  */
 static uintmax_t extend_size = 0;
 
 /* If nonzero, an increment for additional tab stops after the last specified.*/
@@ -46,7 +43,7 @@ size_t max_column_width;
 /* Array of the explicit column numbers of the tab stops;
    after 'tab_list' is exhausted, each additional tab is replaced
    by a space.  The first column is column 0.  */
-static uintmax_t *tab_list = NULL;
+static uintmax_t *tab_list = nullptr;
 
 /* The number of allocated entries in 'tab_list'.  */
 static size_t n_tabs_allocated = 0;
@@ -56,12 +53,12 @@ static size_t n_tabs_allocated = 0;
 static size_t first_free_tab = 0;
 
 /* Null-terminated array of input filenames.  */
-static char **file_list = NULL;
+static char **file_list = nullptr;
 
 /* Default for 'file_list' if no files are given on the command line.  */
 static char *stdin_argv[] =
 {
-  (char *) "-", NULL
+  (char *) "-", nullptr
 };
 
 /* True if we have ever read standard input.  */
@@ -86,7 +83,7 @@ add_tab_stop (uintmax_t tabval)
   if (max_column_width < column_width)
     {
       if (SIZE_MAX < column_width)
-        die (EXIT_FAILURE, 0, _("tabs are too far apart"));
+        error (EXIT_FAILURE, 0, _("tabs are too far apart"));
       max_column_width = column_width;
     }
 }
@@ -134,7 +131,7 @@ parse_tab_stops (char const *stops)
   uintmax_t tabval = 0;
   bool extend_tabval = false;
   bool increment_tabval = false;
-  char const *num_start = NULL;
+  char const *num_start = nullptr;
   bool ok = true;
 
   for (; *stops; stops++)
@@ -240,14 +237,14 @@ validate_tab_stops (uintmax_t const *tabs, size_t entries)
   for (size_t i = 0; i < entries; i++)
     {
       if (tabs[i] == 0)
-        die (EXIT_FAILURE, 0, _("tab size cannot be 0"));
+        error (EXIT_FAILURE, 0, _("tab size cannot be 0"));
       if (tabs[i] <= prev_tab)
-        die (EXIT_FAILURE, 0, _("tab sizes must be ascending"));
+        error (EXIT_FAILURE, 0, _("tab sizes must be ascending"));
       prev_tab = tabs[i];
     }
 
   if (increment_size && extend_size)
-    die (EXIT_FAILURE, 0, _("'/' specifier is mutually exclusive with '+'"));
+    error (EXIT_FAILURE, 0, _("'/' specifier is mutually exclusive with '+'"));
 }
 
 /* Called after all command-line options have been parsed,
@@ -324,10 +321,10 @@ set_file_list (char **list)
     file_list = list;
 }
 
-/* Close the old stream pointer FP if it is non-NULL,
+/* Close the old stream pointer FP if it is non-null,
    and return a new one opened to read the next input file.
    Open a filename of '-' as the standard input.
-   Return NULL if there are no more input files.  */
+   Return nullptr if there are no more input files.  */
 
 extern FILE *
 next_file (FILE *fp)
@@ -337,7 +334,6 @@ next_file (FILE *fp)
 
   if (fp)
     {
-      assert (prev_file);
       int err = errno;
       if (!ferror (fp))
         err = 0;
@@ -352,7 +348,7 @@ next_file (FILE *fp)
         }
     }
 
-  while ((file = *file_list++) != NULL)
+  while ((file = *file_list++) != nullptr)
     {
       if (STREQ (file, "-"))
         {
@@ -370,7 +366,7 @@ next_file (FILE *fp)
       error (0, errno, "%s", quotef (file));
       exit_status = EXIT_FAILURE;
     }
-  return NULL;
+  return nullptr;
 }
 
 /* */
@@ -378,7 +374,7 @@ extern void
 cleanup_file_list_stdin (void)
 {
     if (have_read_stdin && fclose (stdin) != 0)
-      die (EXIT_FAILURE, errno, "-");
+      error (EXIT_FAILURE, errno, "-");
 }
 
 

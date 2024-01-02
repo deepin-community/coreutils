@@ -1,5 +1,5 @@
 /* read-file.h -- read file contents into a string
-   Copyright (C) 2006, 2009-2022 Free Software Foundation, Inc.
+   Copyright (C) 2006, 2009-2023 Free Software Foundation, Inc.
    Written by Simon Josefsson.
 
    This file is free software: you can redistribute it and/or modify
@@ -17,6 +17,11 @@
 
 #ifndef READ_FILE_H
 #define READ_FILE_H
+
+/* This file uses _GL_ATTRIBUTE_MALLOC.  */
+#if !_GL_CONFIG_H_INCLUDED
+ #error "Please include config.h first."
+#endif
 
 /* Get size_t, free().  */
 #include <stdlib.h>

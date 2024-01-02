@@ -1,6 +1,6 @@
 /* Convert string to double in the current locale, falling back on the C locale.
 
-   Copyright 2019-2022 Free Software Foundation, Inc.
+   Copyright 2019-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -46,7 +46,7 @@
    Parse the initial prefix of NPTR as a floating-point number in the
    current locale or in the C locale (preferring the locale that
    yields the longer parse, or the current locale if there is a tie).
-   If ENDPTR is not NULL, set *ENDPTR to the first unused byte, or to
+   If ENDPTR is non-null, set *ENDPTR to the first unused byte, or to
    NPTR if the prefix cannot be parsed.
 
    If successful, return a number without changing errno.

@@ -1,6 +1,6 @@
 /* Save the list of files in a directory in a string.
 
-   Copyright (C) 1997, 1999, 2001, 2003, 2005, 2009-2022 Free Software
+   Copyright (C) 1997, 1999, 2001, 2003, 2005, 2009-2023 Free Software
    Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
@@ -20,6 +20,11 @@
 
 #ifndef _GL_SAVEDIR_H
 #define _GL_SAVEDIR_H
+
+/* This file uses _GL_ATTRIBUTE_MALLOC.  */
+#if !_GL_CONFIG_H_INCLUDED
+ #error "Please include config.h first."
+#endif
 
 #include <dirent.h>
 #include <stdlib.h>

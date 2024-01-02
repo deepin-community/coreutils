@@ -1,5 +1,5 @@
 /* pwd - print current directory
-   Copyright (C) 1994-2022 Free Software Foundation, Inc.
+   Copyright (C) 1994-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,8 +20,6 @@
 #include <sys/types.h>
 
 #include "system.h"
-#include "die.h"
-#include "error.h"
 #include "quote.h"
 #include "root-dev-ino.h"
 #include "xgetcwd.h"
@@ -40,11 +38,11 @@ struct file_name
 
 static struct option const longopts[] =
 {
-  {"logical", no_argument, NULL, 'L'},
-  {"physical", no_argument, NULL, 'P'},
+  {"logical", no_argument, nullptr, 'L'},
+  {"physical", no_argument, nullptr, 'P'},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
-  {NULL, 0, NULL, 0}
+  {nullptr, 0, nullptr, 0}
 };
 
 void
@@ -160,18 +158,18 @@ find_dir_entry (struct stat *dot_sb, struct file_name *file_name,
   bool found;
 
   dirp = opendir ("..");
-  if (dirp == NULL)
-    die (EXIT_FAILURE, errno, _("cannot open directory %s"),
-         quote (nth_parent (parent_height)));
+  if (dirp == nullptr)
+    error (EXIT_FAILURE, errno, _("cannot open directory %s"),
+           quote (nth_parent (parent_height)));
 
   fd = dirfd (dirp);
   if ((0 <= fd ? fchdir (fd) : chdir ("..")) < 0)
-    die (EXIT_FAILURE, errno, _("failed to chdir to %s"),
-         quote (nth_parent (parent_height)));
+    error (EXIT_FAILURE, errno, _("failed to chdir to %s"),
+           quote (nth_parent (parent_height)));
 
   if ((0 <= fd ? fstat (fd, &parent_sb) : stat (".", &parent_sb)) < 0)
-    die (EXIT_FAILURE, errno, _("failed to stat %s"),
-         quote (nth_parent (parent_height)));
+    error (EXIT_FAILURE, errno, _("failed to stat %s"),
+           quote (nth_parent (parent_height)));
 
   /* If parent and child directory are on different devices, then we
      can't rely on d_ino for useful i-node numbers; use lstat instead.  */
@@ -185,7 +183,7 @@ find_dir_entry (struct stat *dot_sb, struct file_name *file_name,
       ino_t ino;
 
       errno = 0;
-      if ((dp = readdir_ignoring_dot_and_dotdot (dirp)) == NULL)
+      if ((dp = readdir_ignoring_dot_and_dotdot (dirp)) == nullptr)
         {
           if (errno)
             {
@@ -195,7 +193,7 @@ find_dir_entry (struct stat *dot_sb, struct file_name *file_name,
               errno = e;
 
               /* Arrange to give a diagnostic after exiting this loop.  */
-              dirp = NULL;
+              dirp = nullptr;
             }
           break;
         }
@@ -225,18 +223,18 @@ find_dir_entry (struct stat *dot_sb, struct file_name *file_name,
         }
     }
 
-  if (dirp == NULL || closedir (dirp) != 0)
+  if (dirp == nullptr || closedir (dirp) != 0)
     {
       /* Note that this diagnostic serves for both readdir
          and closedir failures.  */
-      die (EXIT_FAILURE, errno, _("reading directory %s"),
-           quote (nth_parent (parent_height)));
+      error (EXIT_FAILURE, errno, _("reading directory %s"),
+             quote (nth_parent (parent_height)));
     }
 
   if ( ! found)
-    die (EXIT_FAILURE, 0,
-         _("couldn't find directory entry in %s with matching i-node"),
-         quote (nth_parent (parent_height)));
+    error (EXIT_FAILURE, 0,
+           _("couldn't find directory entry in %s with matching i-node"),
+           quote (nth_parent (parent_height)));
 
   *dot_sb = parent_sb;
 }
@@ -272,12 +270,12 @@ robust_getcwd (struct file_name *file_name)
   struct dev_ino *root_dev_ino = get_root_dev_ino (&dev_ino_buf);
   struct stat dot_sb;
 
-  if (root_dev_ino == NULL)
-    die (EXIT_FAILURE, errno, _("failed to get attributes of %s"),
-         quoteaf ("/"));
+  if (root_dev_ino == nullptr)
+    error (EXIT_FAILURE, errno, _("failed to get attributes of %s"),
+           quoteaf ("/"));
 
   if (stat (".", &dot_sb) < 0)
-    die (EXIT_FAILURE, errno, _("failed to stat %s"), quoteaf ("."));
+    error (EXIT_FAILURE, errno, _("failed to stat %s"), quoteaf ("."));
 
   while (true)
     {
@@ -295,7 +293,7 @@ robust_getcwd (struct file_name *file_name)
 
 
 /* Return PWD from the environment if it is acceptable for 'pwd -L'
-   output, otherwise NULL.  */
+   output, otherwise nullptr.  */
 static char *
 logical_getcwd (void)
 {
@@ -306,20 +304,20 @@ logical_getcwd (void)
 
   /* Textual validation first.  */
   if (!wd || wd[0] != '/')
-    return NULL;
+    return nullptr;
   p = wd;
   while ((p = strstr (p, "/.")))
     {
       if (!p[2] || p[2] == '/'
           || (p[2] == '.' && (!p[3] || p[3] == '/')))
-        return NULL;
+        return nullptr;
       p++;
     }
 
   /* System call validation.  */
   if (stat (wd, &st1) == 0 && stat (".", &st2) == 0 && SAME_INODE (st1, st2))
     return wd;
-  return NULL;
+  return nullptr;
 }
 
 
@@ -330,7 +328,7 @@ main (int argc, char **argv)
   /* POSIX requires a default of -L, but most scripts expect -P.
      Currently shells default to -L, while stand-alone
      pwd implementations default to -P.  */
-  bool logical = (getenv ("POSIXLY_CORRECT") != NULL);
+  bool logical = (getenv ("POSIXLY_CORRECT") != nullptr);
 
   initialize_main (&argc, &argv);
   set_program_name (argv[0]);
@@ -342,7 +340,7 @@ main (int argc, char **argv)
 
   while (true)
     {
-      int c = getopt_long (argc, argv, "LP", longopts, NULL);
+      int c = getopt_long (argc, argv, "LP", longopts, nullptr);
       if (c == -1)
         break;
       switch (c)
@@ -377,7 +375,7 @@ main (int argc, char **argv)
     }
 
   wd = xgetcwd ();
-  if (wd != NULL)
+  if (wd != nullptr)
     {
       puts (wd);
       free (wd);

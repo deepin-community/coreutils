@@ -1,5 +1,5 @@
 /* uniq -- remove duplicate lines from a sorted file
-   Copyright (C) 1986-2022 Free Software Foundation, Inc.
+   Copyright (C) 1986-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -24,8 +24,6 @@
 #include "system.h"
 #include "argmatch.h"
 #include "linebuffer.h"
-#include "die.h"
-#include "error.h"
 #include "fadvise.h"
 #include "posixver.h"
 #include "stdio--.h"
@@ -70,7 +68,7 @@ enum countmode
 static enum countmode countmode;
 
 /* Which lines to output: unique lines, the first of a group of
-   repeated lines, and the second and subsequented of a group of
+   repeated lines, and the second and subsequent of a group of
    repeated lines.  */
 static bool output_unique;
 static bool output_first_repeated;
@@ -93,7 +91,7 @@ enum delimit_method
 
 static char const *const delimit_method_string[] =
 {
-  "none", "prepend", "separate", NULL
+  "none", "prepend", "separate", nullptr
 };
 
 static enum delimit_method const delimit_method_map[] =
@@ -109,7 +107,7 @@ enum grouping_method
   /* No grouping, when "--group" isn't used */
   GM_NONE,
 
-  /* Delimiter preceges all groups.  --group=prepend */
+  /* Delimiter precedes all groups.  --group=prepend */
   GM_PREPEND,
 
   /* Delimiter follows all groups.   --group=append */
@@ -124,7 +122,7 @@ enum grouping_method
 
 static char const *const grouping_method_string[] =
 {
-  "prepend", "append", "separate", "both", NULL
+  "prepend", "append", "separate", "both", nullptr
 };
 
 static enum grouping_method const grouping_method_map[] =
@@ -141,19 +139,19 @@ enum
 
 static struct option const longopts[] =
 {
-  {"count", no_argument, NULL, 'c'},
-  {"repeated", no_argument, NULL, 'd'},
-  {"all-repeated", optional_argument, NULL, 'D'},
-  {"group", optional_argument, NULL, GROUP_OPTION},
-  {"ignore-case", no_argument, NULL, 'i'},
-  {"unique", no_argument, NULL, 'u'},
-  {"skip-fields", required_argument, NULL, 'f'},
-  {"skip-chars", required_argument, NULL, 's'},
-  {"check-chars", required_argument, NULL, 'w'},
-  {"zero-terminated", no_argument, NULL, 'z'},
+  {"count", no_argument, nullptr, 'c'},
+  {"repeated", no_argument, nullptr, 'd'},
+  {"all-repeated", optional_argument, nullptr, 'D'},
+  {"group", optional_argument, nullptr, GROUP_OPTION},
+  {"ignore-case", no_argument, nullptr, 'i'},
+  {"unique", no_argument, nullptr, 'u'},
+  {"skip-fields", required_argument, nullptr, 'f'},
+  {"skip-chars", required_argument, nullptr, 's'},
+  {"check-chars", required_argument, nullptr, 'w'},
+  {"zero-terminated", no_argument, nullptr, 'z'},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
-  {NULL, 0, NULL, 0}
+  {nullptr, 0, nullptr, 0}
 };
 
 void
@@ -236,14 +234,14 @@ size_opt (char const *opt, char const *msgid)
 {
   uintmax_t size;
 
-  switch (xstrtoumax (opt, NULL, 10, &size, ""))
+  switch (xstrtoumax (opt, nullptr, 10, &size, ""))
     {
     case LONGINT_OK:
     case LONGINT_OVERFLOW:
       break;
 
     default:
-      die (EXIT_FAILURE, 0, "%s: %s", opt, _(msgid));
+      error (EXIT_FAILURE, 0, "%s: %s", opt, _(msgid));
     }
 
   return MIN (size, SIZE_MAX);
@@ -311,7 +309,9 @@ writeline (struct linebuffer const *line,
   if (countmode == count_occurrences)
     printf ("%7" PRIuMAX " ", linecount + 1);
 
-  fwrite (line->buffer, sizeof (char), line->length, stdout);
+  if (fwrite (line->buffer, sizeof (char), line->length, stdout)
+      != line->length)
+    write_error ();
 }
 
 /* Process input file INFILE with output to OUTFILE.
@@ -324,9 +324,9 @@ check_file (char const *infile, char const *outfile, char delimiter)
   struct linebuffer *thisline, *prevline;
 
   if (! (STREQ (infile, "-") || freopen (infile, "r", stdin)))
-    die (EXIT_FAILURE, errno, "%s", quotef (infile));
+    error (EXIT_FAILURE, errno, "%s", quotef (infile));
   if (! (STREQ (outfile, "-") || freopen (outfile, "w", stdout)))
-    die (EXIT_FAILURE, errno, "%s", quotef (outfile));
+    error (EXIT_FAILURE, errno, "%s", quotef (outfile));
 
   fadvise (stdin, FADVISE_SEQUENTIAL);
 
@@ -353,7 +353,7 @@ check_file (char const *infile, char const *outfile, char delimiter)
   */
   if (output_unique && output_first_repeated && countmode == count_none)
     {
-      char *prevfield = NULL;
+      char *prevfield = nullptr;
       size_t prevlen;
       bool first_group_printed = false;
 
@@ -380,8 +380,9 @@ check_file (char const *infile, char const *outfile, char delimiter)
 
           if (new_group || grouping != GM_NONE)
             {
-              fwrite (thisline->buffer, sizeof (char),
-                      thisline->length, stdout);
+              if (fwrite (thisline->buffer, sizeof (char), thisline->length,
+                  stdout) != thisline->length)
+                write_error ();
 
               SWAP_LINES (prevline, thisline);
               prevfield = thisfield;
@@ -423,7 +424,7 @@ check_file (char const *infile, char const *outfile, char delimiter)
           if (match_count == UINTMAX_MAX)
             {
               if (count_occurrences)
-                die (EXIT_FAILURE, 0, _("too many repeated lines"));
+                error (EXIT_FAILURE, 0, _("too many repeated lines"));
               match_count--;
             }
 
@@ -459,7 +460,7 @@ check_file (char const *infile, char const *outfile, char delimiter)
 
  closefiles:
   if (ferror (stdin) || fclose (stdin) != 0)
-    die (EXIT_FAILURE, 0, _("error reading %s"), quoteaf (infile));
+    error (EXIT_FAILURE, errno, _("error reading %s"), quoteaf (infile));
 
   /* stdout is handled via the atexit-invoked close_stdout function.  */
 
@@ -478,7 +479,7 @@ int
 main (int argc, char **argv)
 {
   int optc = 0;
-  bool posixly_correct = (getenv ("POSIXLY_CORRECT") != NULL);
+  bool posixly_correct = (getenv ("POSIXLY_CORRECT") != nullptr);
   enum Skip_field_option_type skip_field_option_type = SFO_NONE;
   unsigned int nfiles = 0;
   char const *file[2];
@@ -511,7 +512,8 @@ main (int argc, char **argv)
       if (optc == -1
           || (posixly_correct && nfiles != 0)
           || ((optc = getopt_long (argc, argv,
-                                   "-0123456789Dcdf:is:uw:z", longopts, NULL))
+                                   "-0123456789Dcdf:is:uw:z",
+                                   longopts, nullptr))
               == -1))
         {
           if (argc <= optind)
@@ -530,7 +532,7 @@ main (int argc, char **argv)
             uintmax_t size;
             if (optarg[0] == '+'
                 && ! strict_posix2 ()
-                && xstrtoumax (optarg, NULL, 10, &size, "") == LONGINT_OK
+                && xstrtoumax (optarg, nullptr, 10, &size, "") == LONGINT_OK
                 && size <= SIZE_MAX)
               skip_chars = size;
             else if (nfiles == 2)
@@ -577,7 +579,7 @@ main (int argc, char **argv)
         case 'D':
           output_unique = false;
           output_later_repeated = true;
-          if (optarg == NULL)
+          if (optarg == nullptr)
             delimit_groups = DM_NONE;
           else
             delimit_groups = XARGMATCH ("--all-repeated", optarg,
@@ -587,7 +589,7 @@ main (int argc, char **argv)
           break;
 
         case GROUP_OPTION:
-          if (optarg == NULL)
+          if (optarg == nullptr)
             grouping = GM_SEPARATE;
           else
             grouping = XARGMATCH ("--group", optarg,

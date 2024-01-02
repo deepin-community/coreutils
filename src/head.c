@@ -1,5 +1,5 @@
 /* head -- output first part of file(s)
-   Copyright (C) 1989-2022 Free Software Foundation, Inc.
+   Copyright (C) 1989-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -31,8 +31,7 @@
 
 #include "system.h"
 
-#include "die.h"
-#include "error.h"
+#include "assure.h"
 #include "full-read.h"
 #include "quote.h"
 #include "safe-read.h"
@@ -87,17 +86,17 @@ enum
 
 static struct option const long_options[] =
 {
-  {"bytes", required_argument, NULL, 'c'},
-  {"lines", required_argument, NULL, 'n'},
-  {"-presume-input-pipe", no_argument, NULL,
+  {"bytes", required_argument, nullptr, 'c'},
+  {"lines", required_argument, nullptr, 'n'},
+  {"-presume-input-pipe", no_argument, nullptr,
    PRESUME_INPUT_PIPE_OPTION}, /* do not document */
-  {"quiet", no_argument, NULL, 'q'},
-  {"silent", no_argument, NULL, 'q'},
-  {"verbose", no_argument, NULL, 'v'},
-  {"zero-terminated", no_argument, NULL, 'z'},
+  {"quiet", no_argument, nullptr, 'q'},
+  {"silent", no_argument, nullptr, 'q'},
+  {"verbose", no_argument, nullptr, 'v'},
+  {"zero-terminated", no_argument, nullptr, 'z'},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
-  {NULL, 0, NULL, 0}
+  {nullptr, 0, nullptr, 0}
 };
 
 void
@@ -140,7 +139,7 @@ With more than one FILE, precede each with a header giving the file name.\n\
 \n\
 NUM may have a multiplier suffix:\n\
 b 512, kB 1000, K 1024, MB 1000*1000, M 1024*1024,\n\
-GB 1000*1000*1000, G 1024*1024*1024, and so on for T, P, E, Z, Y.\n\
+GB 1000*1000*1000, G 1024*1024*1024, and so on for T, P, E, Z, Y, R, Q.\n\
 Binary prefixes can be used, too: KiB=K, MiB=M, and so on.\n\
 "), stdout);
       emit_ancillary_info (PROGRAM_NAME);
@@ -160,7 +159,7 @@ diagnose_copy_fd_failure (enum Copy_fd_status err, char const *filename)
       error (0, errno, _("%s: file has shrunk too much"), quotef (filename));
       break;
     default:
-      abort ();
+      affirm (false);
     }
 }
 
@@ -182,8 +181,9 @@ xwrite_stdout (char const *buffer, size_t n_bytes)
   if (n_bytes > 0 && fwrite (buffer, 1, n_bytes, stdout) < n_bytes)
     {
       clearerr (stdout); /* To avoid redundant close_stdout diagnostic.  */
-      die (EXIT_FAILURE, errno, _("error writing %s"),
-           quoteaf ("standard output"));
+      fpurge (stdout);
+      error (EXIT_FAILURE, errno, _("error writing %s"),
+             quoteaf ("standard output"));
     }
 }
 
@@ -272,8 +272,8 @@ elide_tail_bytes_pipe (char const *filename, int fd, uintmax_t n_elide_0,
   if (SIZE_MAX < n_elide_0 + READ_BUFSIZE)
     {
       char umax_buf[INT_BUFSIZE_BOUND (n_elide_0)];
-      die (EXIT_FAILURE, 0, _("%s: number of bytes is too large"),
-           umaxtostr (n_elide_0, umax_buf));
+      error (EXIT_FAILURE, 0, _("%s: number of bytes is too large"),
+             umaxtostr (n_elide_0, umax_buf));
     }
 
   /* Two cases to consider...
@@ -354,7 +354,7 @@ elide_tail_bytes_pipe (char const *filename, int fd, uintmax_t n_elide_0,
       size_t n_read;
       bool buffered_enough;
       size_t i, i_next;
-      char **b = NULL;
+      char **b = nullptr;
       /* Round n_elide up to a multiple of READ_BUFSIZE.  */
       size_t rem = READ_BUFSIZE - (n_elide % READ_BUFSIZE);
       size_t n_elide_round = n_elide + rem;
@@ -514,7 +514,7 @@ elide_tail_lines_pipe (char const *filename, int fd, uintmax_t n_elide,
 
   first = last = xmalloc (sizeof (LBUFFER));
   first->nbytes = first->nlines = 0;
-  first->next = NULL;
+  first->next = nullptr;
   tmp = xmalloc (sizeof (LBUFFER));
 
   /* Always read into a fresh buffer.
@@ -535,7 +535,7 @@ elide_tail_lines_pipe (char const *filename, int fd, uintmax_t n_elide,
 
       tmp->nbytes = n_read;
       tmp->nlines = 0;
-      tmp->next = NULL;
+      tmp->next = nullptr;
 
       /* Count the number of newlines just read.  */
       {
@@ -690,7 +690,7 @@ elide_tail_lines_seekable (char const *pretty_filename, int fd,
             {
               char const *nl;
               nl = memrchr (buffer, line_end, n);
-              if (nl == NULL)
+              if (nl == nullptr)
                 break;
               n = nl - buffer;
             }
@@ -910,7 +910,7 @@ head_file (char const *filename, uintmax_t n_units, bool count_lines,
 static uintmax_t
 string_to_integer (bool count_lines, char const *n_string)
 {
-  return xdectoumax (n_string, 0, UINTMAX_MAX, "bkKmMGTPEZY0",
+  return xdectoumax (n_string, 0, UINTMAX_MAX, "bkKmMGTPEZYRQ0",
                      count_lines ? _("invalid number of lines")
                                  : _("invalid number of bytes"), 0);
 }
@@ -936,7 +936,7 @@ main (int argc, char **argv)
 
   /* Initializer for file_list if no file-arguments
      were specified on the command line.  */
-  static char const *const default_file_list[] = {"-", NULL};
+  static char const *const default_file_list[] = {"-", nullptr};
   char const *const *file_list;
 
   initialize_main (&argc, &argv);
@@ -1021,7 +1021,8 @@ main (int argc, char **argv)
       argc--;
     }
 
-  while ((c = getopt_long (argc, argv, "c:n:qvz0123456789", long_options, NULL))
+  while ((c = getopt_long (argc, argv, "c:n:qvz0123456789",
+                           long_options, nullptr))
          != -1)
     {
       switch (c)
@@ -1076,8 +1077,8 @@ main (int argc, char **argv)
   if ( ! count_lines && elide_from_end && OFF_T_MAX < n_units)
     {
       char umax_buf[INT_BUFSIZE_BOUND (n_units)];
-      die (EXIT_FAILURE, EOVERFLOW, "%s: %s", _("invalid number of bytes"),
-           quote (umaxtostr (n_units, umax_buf)));
+      error (EXIT_FAILURE, EOVERFLOW, "%s: %s", _("invalid number of bytes"),
+             quote (umaxtostr (n_units, umax_buf)));
     }
 
   file_list = (optind < argc
@@ -1090,7 +1091,7 @@ main (int argc, char **argv)
     ok &= head_file (file_list[i], n_units, count_lines, elide_from_end);
 
   if (have_read_stdin && close (STDIN_FILENO) < 0)
-    die (EXIT_FAILURE, errno, "-");
+    error (EXIT_FAILURE, errno, "-");
 
   return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }

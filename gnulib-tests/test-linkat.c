@@ -1,5 +1,5 @@
 /* Tests of linkat.
-   Copyright (C) 2009-2022 Free Software Foundation, Inc.
+   Copyright (C) 2009-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -25,7 +25,6 @@ SIGNATURE_CHECK (linkat, int, (int, char const *, int, char const *, int));
 
 #include <fcntl.h>
 #include <errno.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -138,6 +137,11 @@ main (void)
   ASSERT (close (dfd1) == 0);
   dfd1 = AT_FDCWD;
   ASSERT (test_link (do_link, false) == result);
+
+  /* Skip the rest of the test if the file system does not support hard links
+     and symlinks.  */
+  if (result)
+    return result;
 
   /* Create locations to manipulate.  */
   ASSERT (mkdir (BASE "sub1", 0700) == 0);

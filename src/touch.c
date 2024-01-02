@@ -1,5 +1,5 @@
 /* touch -- change modification and access times of files
-   Copyright (C) 1987-2022 Free Software Foundation, Inc.
+   Copyright (C) 1987-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -21,12 +21,10 @@
 #include <stdio.h>
 #include <getopt.h>
 #include <sys/types.h>
-#include <assert.h>
 
 #include "system.h"
 #include "argmatch.h"
-#include "die.h"
-#include "error.h"
+#include "assure.h"
 #include "fd-reopen.h"
 #include "parse-datetime.h"
 #include "posixtm.h"
@@ -83,20 +81,20 @@ enum
 
 static struct option const longopts[] =
 {
-  {"time", required_argument, NULL, TIME_OPTION},
-  {"no-create", no_argument, NULL, 'c'},
-  {"date", required_argument, NULL, 'd'},
-  {"reference", required_argument, NULL, 'r'},
-  {"no-dereference", no_argument, NULL, 'h'},
+  {"time", required_argument, nullptr, TIME_OPTION},
+  {"no-create", no_argument, nullptr, 'c'},
+  {"date", required_argument, nullptr, 'd'},
+  {"reference", required_argument, nullptr, 'r'},
+  {"no-dereference", no_argument, nullptr, 'h'},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
-  {NULL, 0, NULL, 0}
+  {nullptr, 0, nullptr, 0}
 };
 
 /* Valid arguments to the '--time' option. */
 static char const *const time_args[] =
 {
-  "atime", "access", "use", "mtime", "modify", NULL
+  "atime", "access", "use", "mtime", "modify", nullptr
 };
 
 /* The bits in 'change_times' that those arguments set. */
@@ -105,15 +103,15 @@ static int const time_masks[] =
   CH_ATIME, CH_ATIME, CH_ATIME, CH_MTIME, CH_MTIME
 };
 
-/* Store into *RESULT the result of interpreting FLEX_DATE as a date,
-   relative to NOW.  If NOW is null, use the current time.  */
+/* The interpretation of FLEX_DATE as a date, relative to NOW.  */
 
-static void
-get_reldate (struct timespec *result,
-             char const *flex_date, struct timespec const *now)
+static struct timespec
+date_relative (char const *flex_date, struct timespec now)
 {
-  if (! parse_datetime (result, flex_date, now))
-    die (EXIT_FAILURE, 0, _("invalid date format %s"), quote (flex_date));
+  struct timespec result;
+  if (! parse_datetime (&result, flex_date, &now))
+    error (EXIT_FAILURE, 0, _("invalid date format %s"), quote (flex_date));
+  return result;
 }
 
 /* Update the time of file FILE according to the options given.
@@ -144,19 +142,19 @@ touch (char const *file)
         newtime[0].tv_nsec = UTIME_OMIT;
       else
         {
-          assert (change_times == CH_ATIME);
+          affirm (change_times == CH_ATIME);
           newtime[1].tv_nsec = UTIME_OMIT;
         }
     }
 
   if (amtime_now)
     {
-      /* Pass NULL to futimens so it will not fail if we have
+      /* Pass nullptr to futimens so it will not fail if we have
          write access to the file, but don't own it.  */
-      t = NULL;
+      t = nullptr;
     }
 
-  char const *file_opt = fd == STDOUT_FILENO ? NULL : file;
+  char const *file_opt = fd == STDOUT_FILENO ? nullptr : file;
   int atflag = no_dereference ? AT_SYMLINK_NOFOLLOW : 0;
   int utime_errno = (fdutimensat (fd, AT_FDCWD, file_opt, t, atflag) == 0
                      ? 0 : errno);
@@ -263,7 +261,7 @@ main (int argc, char **argv)
   int c;
   bool date_set = false;
   bool ok = true;
-  char const *flex_date = NULL;
+  char const *flex_date = nullptr;
 
   initialize_main (&argc, &argv);
   set_program_name (argv[0]);
@@ -276,7 +274,7 @@ main (int argc, char **argv)
   change_times = 0;
   no_create = use_ref = false;
 
-  while ((c = getopt_long (argc, argv, "acd:fhmr:t:", longopts, NULL)) != -1)
+  while ((c = getopt_long (argc, argv, "acd:fhmr:t:", longopts, nullptr)) != -1)
     {
       switch (c)
         {
@@ -311,8 +309,8 @@ main (int argc, char **argv)
         case 't':
           if (! posixtime (&newtime[0].tv_sec, optarg,
                            PDS_LEADING_YEAR | PDS_CENTURY | PDS_SECONDS))
-            die (EXIT_FAILURE, 0, _("invalid date format %s"),
-                 quote (optarg));
+            error (EXIT_FAILURE, 0, _("invalid date format %s"),
+                   quote (optarg));
           newtime[0].tv_nsec = 0;
           newtime[1] = newtime[0];
           date_set = true;
@@ -348,27 +346,25 @@ main (int argc, char **argv)
          might be an object-like macro.  */
       if (no_dereference ? lstat (ref_file, &ref_stats)
           : stat (ref_file, &ref_stats))
-        die (EXIT_FAILURE, errno,
-             _("failed to get attributes of %s"), quoteaf (ref_file));
+        error (EXIT_FAILURE, errno,
+               _("failed to get attributes of %s"), quoteaf (ref_file));
       newtime[0] = get_stat_atime (&ref_stats);
       newtime[1] = get_stat_mtime (&ref_stats);
       date_set = true;
       if (flex_date)
         {
           if (change_times & CH_ATIME)
-            get_reldate (&newtime[0], flex_date, &newtime[0]);
+            newtime[0] = date_relative (flex_date, newtime[0]);
           if (change_times & CH_MTIME)
-            get_reldate (&newtime[1], flex_date, &newtime[1]);
+            newtime[1] = date_relative (flex_date, newtime[1]);
         }
     }
   else
     {
       if (flex_date)
         {
-          struct timespec now;
-          gettime (&now);
-          get_reldate (&newtime[0], flex_date, &now);
-          newtime[1] = newtime[0];
+          struct timespec now = current_timespec ();
+          newtime[1] = newtime[0] = date_relative (flex_date, now);
           date_set = true;
 
           /* If neither -a nor -m is specified, treat "-d now" as if
@@ -383,7 +379,7 @@ main (int argc, char **argv)
               struct timespec notnow, notnow1;
               notnow.tv_sec = now.tv_sec ^ 1;
               notnow.tv_nsec = now.tv_nsec;
-              get_reldate (&notnow1, flex_date, &notnow);
+              notnow1 = date_relative (flex_date, notnow);
               if (notnow1.tv_sec == notnow.tv_sec
                   && notnow1.tv_nsec == notnow.tv_nsec)
                 date_set = false;
@@ -406,7 +402,7 @@ main (int argc, char **argv)
           struct tm const *tm = localtime (&newtime[0].tv_sec);
 
           /* Technically, it appears that even a deliberate attempt to cause
-             the above localtime to return NULL will always fail because our
+             the above localtime to return nullptr will always fail because our
              posixtime implementation rejects all dates for which localtime
              would fail.  However, skip the warning if it ever fails.  */
           if (tm)

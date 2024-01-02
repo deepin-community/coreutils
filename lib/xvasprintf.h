@@ -1,5 +1,5 @@
 /* vasprintf and asprintf with out-of-memory checking.
-   Copyright (C) 2002-2004, 2006-2022 Free Software Foundation, Inc.
+   Copyright (C) 2002-2004, 2006-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -16,6 +16,11 @@
 
 #ifndef _XVASPRINTF_H
 #define _XVASPRINTF_H
+
+/* This file uses _GL_ATTRIBUTE_FORMAT, _GL_ATTRIBUTE_MALLOC.  */
+#if !_GL_CONFIG_H_INCLUDED
+ #error "Please include config.h first."
+#endif
 
 /* Get va_list.  */
 #include <stdarg.h>

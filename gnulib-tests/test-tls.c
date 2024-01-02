@@ -1,5 +1,5 @@
 /* Test of thread-local storage in multithreaded situations.
-   Copyright (C) 2005, 2008-2022 Free Software Foundation, Inc.
+   Copyright (C) 2005, 2008-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -403,7 +403,7 @@ test_tls_dtorcheck2 (void)
 #undef THREAD_COUNT
 
 
-/* --- Test thread-local storage with with races between init and destroy --- */
+/* --- Test thread-local storage with races between init and destroy --- */
 
 /* Number of simultaneous threads.  */
 #define THREAD_COUNT 10

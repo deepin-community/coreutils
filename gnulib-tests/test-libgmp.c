@@ -1,5 +1,5 @@
 /* Test of libgmp or its mini-gmp substitute.
-   Copyright (C) 2020-2022 Free Software Foundation, Inc.
+   Copyright (C) 2020-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -22,14 +22,12 @@
 #include <limits.h>
 #include <string.h>
 
-#include "verify.h"
-
 #include "macros.h"
 
 #ifndef MINI_GMP_LIMB_TYPE
 /* Verify that the gmp.h header file was generated for the same
    machine word size as we are using.  */
-verify (GMP_NUMB_BITS == sizeof (mp_limb_t) * CHAR_BIT);
+static_assert (GMP_NUMB_BITS == sizeof (mp_limb_t) * CHAR_BIT);
 #endif
 
 int

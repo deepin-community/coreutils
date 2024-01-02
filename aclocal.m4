@@ -1,4 +1,4 @@
-# generated automatically by aclocal 1.16.4 -*- Autoconf -*-
+# generated automatically by aclocal 1.16.5 -*- Autoconf -*-
 
 # Copyright (C) 1996-2021 Free Software Foundation, Inc.
 
@@ -14,8 +14,8 @@
 m4_ifndef([AC_CONFIG_MACRO_DIRS], [m4_defun([_AM_CONFIG_MACRO_DIRS], [])m4_defun([AC_CONFIG_MACRO_DIRS], [_AM_CONFIG_MACRO_DIRS($@)])])
 m4_ifndef([AC_AUTOCONF_VERSION],
   [m4_copy([m4_PACKAGE_VERSION], [AC_AUTOCONF_VERSION])])dnl
-m4_if(m4_defn([AC_AUTOCONF_VERSION]), [2.71],,
-[m4_warning([this file was generated for autoconf 2.71.
+m4_if(m4_defn([AC_AUTOCONF_VERSION]), [2.72c.32-cb6fb],,
+[m4_warning([this file was generated for autoconf 2.72c.32-cb6fb.
 You have another version of autoconf.  It may work, but is not guaranteed to.
 If you have problems, you may need to regenerate the build system entirely.
 To do so, use the procedure documented by the package, typically 'autoreconf'.])])
@@ -35,7 +35,7 @@ AC_DEFUN([AM_AUTOMAKE_VERSION],
 [am__api_version='1.16'
 dnl Some users find AM_AUTOMAKE_VERSION and mistake it for a way to
 dnl require some minimum version.  Point them to the right macro.
-m4_if([$1], [1.16.4], [],
+m4_if([$1], [1.16.5], [],
       [AC_FATAL([Do not call $0, use AM_INIT_AUTOMAKE([$1]).])])dnl
 ])
 
@@ -51,7 +51,7 @@ m4_define([_AM_AUTOCONF_VERSION], [])
 # Call AM_AUTOMAKE_VERSION and AM_AUTOMAKE_VERSION so they can be traced.
 # This function is AC_REQUIREd by AM_INIT_AUTOMAKE.
 AC_DEFUN([AM_SET_CURRENT_AUTOMAKE_VERSION],
-[AM_AUTOMAKE_VERSION([1.16.4])dnl
+[AM_AUTOMAKE_VERSION([1.16.5])dnl
 m4_ifndef([AC_AUTOCONF_VERSION],
   [m4_copy([m4_PACKAGE_VERSION], [AC_AUTOCONF_VERSION])])dnl
 _AM_AUTOCONF_VERSION(m4_defn([AC_AUTOCONF_VERSION]))])
@@ -465,6 +465,10 @@ m4_defn([AC_PROG_CC])
 # release and drop the old call support.
 AC_DEFUN([AM_INIT_AUTOMAKE],
 [AC_PREREQ([2.65])dnl
+m4_ifdef([_$0_ALREADY_INIT],
+  [m4_fatal([$0 expanded multiple times
+]m4_defn([_$0_ALREADY_INIT]))],
+  [m4_define([_$0_ALREADY_INIT], m4_expansion_stack)])dnl
 dnl Autoconf wants to disallow AM_ names.  We explicitly allow
 dnl the ones we care about.
 m4_pattern_allow([^AM_[A-Z]+FLAGS$])dnl
@@ -1190,22 +1194,26 @@ m4_include([m4/alignalloc.m4])
 m4_include([m4/alloca.m4])
 m4_include([m4/arpa_inet_h.m4])
 m4_include([m4/assert.m4])
+m4_include([m4/assert_h.m4])
 m4_include([m4/atoll.m4])
 m4_include([m4/autobuild.m4])
 m4_include([m4/backupfile.m4])
 m4_include([m4/base32.m4])
 m4_include([m4/base64.m4])
 m4_include([m4/bison.m4])
-m4_include([m4/boottime.m4])
 m4_include([m4/btowc.m4])
+m4_include([m4/build-to-host.m4])
 m4_include([m4/builtin-expect.m4])
 m4_include([m4/byteswap.m4])
+m4_include([m4/c-bool.m4])
 m4_include([m4/c-strtod.m4])
+m4_include([m4/c32rtomb.m4])
 m4_include([m4/calloc.m4])
 m4_include([m4/canon-host.m4])
 m4_include([m4/canonicalize.m4])
 m4_include([m4/chdir-long.m4])
 m4_include([m4/check-decl.m4])
+m4_include([m4/chmod.m4])
 m4_include([m4/chown.m4])
 m4_include([m4/clock_time.m4])
 m4_include([m4/close.m4])
@@ -1228,6 +1236,7 @@ m4_include([m4/eealloc.m4])
 m4_include([m4/environ.m4])
 m4_include([m4/errno_h.m4])
 m4_include([m4/error.m4])
+m4_include([m4/error_h.m4])
 m4_include([m4/euidaccess.m4])
 m4_include([m4/explicit_bzero.m4])
 m4_include([m4/exponentd.m4])
@@ -1337,6 +1346,7 @@ m4_include([m4/isnand.m4])
 m4_include([m4/isnanf.m4])
 m4_include([m4/isnanl.m4])
 m4_include([m4/iswblank.m4])
+m4_include([m4/iswctype.m4])
 m4_include([m4/iswdigit.m4])
 m4_include([m4/iswxdigit.m4])
 m4_include([m4/jm-macros.m4])
@@ -1378,6 +1388,7 @@ m4_include([m4/math_h.m4])
 m4_include([m4/mbchar.m4])
 m4_include([m4/mbiter.m4])
 m4_include([m4/mbrlen.m4])
+m4_include([m4/mbrtoc32.m4])
 m4_include([m4/mbrtowc.m4])
 m4_include([m4/mbsinit.m4])
 m4_include([m4/mbslen.m4])
@@ -1391,6 +1402,7 @@ m4_include([m4/memchr.m4])
 m4_include([m4/memcoll.m4])
 m4_include([m4/mempcpy.m4])
 m4_include([m4/memrchr.m4])
+m4_include([m4/memset_explicit.m4])
 m4_include([m4/mgetgroups.m4])
 m4_include([m4/minmax.m4])
 m4_include([m4/mkancesdirs.m4])
@@ -1420,6 +1432,7 @@ m4_include([m4/nls.m4])
 m4_include([m4/nocrash.m4])
 m4_include([m4/nproc.m4])
 m4_include([m4/nstrftime.m4])
+m4_include([m4/nullptr.m4])
 m4_include([m4/obstack.m4])
 m4_include([m4/off_t.m4])
 m4_include([m4/open-cloexec.m4])
@@ -1516,7 +1529,6 @@ m4_include([m4/stat-time.m4])
 m4_include([m4/stat.m4])
 m4_include([m4/stdalign.m4])
 m4_include([m4/stdarg.m4])
-m4_include([m4/stdbool.m4])
 m4_include([m4/stddef_h.m4])
 m4_include([m4/stdint.m4])
 m4_include([m4/stdint_h.m4])
@@ -1551,10 +1563,13 @@ m4_include([m4/sys_types_h.m4])
 m4_include([m4/sys_uio_h.m4])
 m4_include([m4/sys_utsname_h.m4])
 m4_include([m4/sys_wait_h.m4])
+m4_include([m4/systemd.m4])
+m4_include([m4/tcgetattr.m4])
 m4_include([m4/tempname.m4])
 m4_include([m4/termios_h.m4])
 m4_include([m4/thread.m4])
 m4_include([m4/threadlib.m4])
+m4_include([m4/time.m4])
 m4_include([m4/time_h.m4])
 m4_include([m4/time_r.m4])
 m4_include([m4/time_rz.m4])
@@ -1566,9 +1581,13 @@ m4_include([m4/tm_gmtoff.m4])
 m4_include([m4/tmpdir.m4])
 m4_include([m4/tmpfile.m4])
 m4_include([m4/tzset.m4])
+m4_include([m4/uchar_h.m4])
 m4_include([m4/uname.m4])
 m4_include([m4/ungetc.m4])
+m4_include([m4/unicase_h.m4])
 m4_include([m4/unicodeio.m4])
+m4_include([m4/unictype_h.m4])
+m4_include([m4/uninorm_h.m4])
 m4_include([m4/unistd-safer.m4])
 m4_include([m4/unistd_h.m4])
 m4_include([m4/unlink-busy.m4])
@@ -1576,7 +1595,6 @@ m4_include([m4/unlink.m4])
 m4_include([m4/unlinkat.m4])
 m4_include([m4/unlinkdir.m4])
 m4_include([m4/unlocked-io.m4])
-m4_include([m4/uptime.m4])
 m4_include([m4/userspec.m4])
 m4_include([m4/usleep.m4])
 m4_include([m4/utime.m4])
@@ -1599,6 +1617,7 @@ m4_include([m4/wcrtomb.m4])
 m4_include([m4/wcswidth.m4])
 m4_include([m4/wctob.m4])
 m4_include([m4/wctomb.m4])
+m4_include([m4/wctype.m4])
 m4_include([m4/wctype_h.m4])
 m4_include([m4/wcwidth.m4])
 m4_include([m4/wint_t.m4])
@@ -1614,7 +1633,6 @@ m4_include([m4/xsize.m4])
 m4_include([m4/xstrtod.m4])
 m4_include([m4/xstrtol.m4])
 m4_include([m4/xvasprintf.m4])
-m4_include([m4/year2038.m4])
 m4_include([m4/yesno.m4])
 m4_include([m4/yield.m4])
 m4_include([m4/zzgnulib.m4])

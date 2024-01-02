@@ -1,5 +1,5 @@
 /* Replacement <selinux/selinux.h> for platforms that lack it.
-   Copyright (C) 2008-2022 Free Software Foundation, Inc.
+   Copyright (C) 2008-2023 Free Software Foundation, Inc.
 
    This file is free software: you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as
@@ -19,7 +19,7 @@
 #endif
 @PRAGMA_COLUMNS@
 
-#if HAVE_SELINUX_SELINUX_H
+#if @HAVE_SELINUX_SELINUX_H@
 
 #@INCLUDE_NEXT@ @NEXT_SELINUX_SELINUX_H@
 
@@ -27,12 +27,15 @@
 # if !defined _@GUARD_PREFIX@_SELINUX_SELINUX_H
 #  define _@GUARD_PREFIX@_SELINUX_SELINUX_H
 
+/* This file uses _GL_INLINE_HEADER_BEGIN, _GL_INLINE,
+   _GL_ATTRIBUTE_MAYBE_UNUSED.  */
+#  if !_GL_CONFIG_H_INCLUDED
+#   error "Please include config.h first."
+#  endif
+
 #  include <sys/types.h>
 #  include <errno.h>
 
-#  ifndef _GL_INLINE_HEADER_BEGIN
-    #error "Please include config.h first."
-#  endif
 _GL_INLINE_HEADER_BEGIN
 #  ifndef SE_SELINUX_INLINE
 #   define SE_SELINUX_INLINE _GL_INLINE
@@ -126,5 +129,5 @@ matchpathcon_init_prefix (_GL_ATTRIBUTE_MAYBE_UNUSED char const *path,
 
 _GL_INLINE_HEADER_END
 
-# endif
+# endif /* _@GUARD_PREFIX@_SELINUX_SELINUX_H */
 #endif

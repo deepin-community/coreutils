@@ -1,5 +1,5 @@
 /* mv -- move or rename files
-   Copyright (C) 1986-2022 Free Software Foundation, Inc.
+   Copyright (C) 1986-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,15 +20,14 @@
 #include <stdio.h>
 #include <getopt.h>
 #include <sys/types.h>
-#include <assert.h>
 #include <selinux/label.h>
 
 #include "system.h"
+#include "argmatch.h"
+#include "assure.h"
 #include "backupfile.h"
 #include "copy.h"
 #include "cp-hash.h"
-#include "die.h"
-#include "error.h"
 #include "filenamecat.h"
 #include "remove.h"
 #include "renameatu.h"
@@ -48,25 +47,40 @@
    non-character as a pseudo short option, starting with CHAR_MAX + 1.  */
 enum
 {
-  STRIP_TRAILING_SLASHES_OPTION = CHAR_MAX + 1
+  DEBUG_OPTION = CHAR_MAX + 1,
+  NO_COPY_OPTION,
+  STRIP_TRAILING_SLASHES_OPTION
 };
+
+static char const *const update_type_string[] =
+{
+  "all", "none", "older", nullptr
+};
+static enum Update_type const update_type[] =
+{
+  UPDATE_ALL, UPDATE_NONE, UPDATE_OLDER,
+};
+ARGMATCH_VERIFY (update_type_string, update_type);
 
 static struct option const long_options[] =
 {
-  {"backup", optional_argument, NULL, 'b'},
-  {"context", no_argument, NULL, 'Z'},
-  {"force", no_argument, NULL, 'f'},
-  {"interactive", no_argument, NULL, 'i'},
-  {"no-clobber", no_argument, NULL, 'n'},
-  {"no-target-directory", no_argument, NULL, 'T'},
-  {"strip-trailing-slashes", no_argument, NULL, STRIP_TRAILING_SLASHES_OPTION},
-  {"suffix", required_argument, NULL, 'S'},
-  {"target-directory", required_argument, NULL, 't'},
-  {"update", no_argument, NULL, 'u'},
-  {"verbose", no_argument, NULL, 'v'},
+  {"backup", optional_argument, nullptr, 'b'},
+  {"context", no_argument, nullptr, 'Z'},
+  {"debug", no_argument, nullptr, DEBUG_OPTION},
+  {"force", no_argument, nullptr, 'f'},
+  {"interactive", no_argument, nullptr, 'i'},
+  {"no-clobber", no_argument, nullptr, 'n'},
+  {"no-copy", no_argument, nullptr, NO_COPY_OPTION},
+  {"no-target-directory", no_argument, nullptr, 'T'},
+  {"strip-trailing-slashes", no_argument, nullptr,
+   STRIP_TRAILING_SLASHES_OPTION},
+  {"suffix", required_argument, nullptr, 'S'},
+  {"target-directory", required_argument, nullptr, 't'},
+  {"update", optional_argument, nullptr, 'u'},
+  {"verbose", no_argument, nullptr, 'v'},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
-  {NULL, 0, NULL, 0}
+  {nullptr, 0, nullptr, 0}
 };
 
 static void
@@ -93,9 +107,9 @@ rm_option_init (struct rm_options *x)
   {
     static struct dev_ino dev_ino_buf;
     x->root_dev_ino = get_root_dev_ino (&dev_ino_buf);
-    if (x->root_dev_ino == NULL)
-      die (EXIT_FAILURE, errno, _("failed to get attributes of %s"),
-           quoteaf ("/"));
+    if (x->root_dev_ino == nullptr)
+      error (EXIT_FAILURE, errno, _("failed to get attributes of %s"),
+             quoteaf ("/"));
   }
 
   x->preserve_all_root = false;
@@ -123,7 +137,7 @@ cp_option_init (struct cp_options *x)
   x->preserve_timestamps = true;
   x->explicit_no_preserve_mode= false;
   x->preserve_security_context = selinux_enabled;
-  x->set_security_context = NULL;
+  x->set_security_context = nullptr;
   x->reduce_diagnostics = false;
   x->data_copy_required = true;
   x->require_preserve = false;  /* FIXME: maybe make this an option */
@@ -140,8 +154,8 @@ cp_option_init (struct cp_options *x)
   x->open_dangling_dest_symlink = false;
   x->update = false;
   x->verbose = false;
-  x->dest_info = NULL;
-  x->src_info = NULL;
+  x->dest_info = nullptr;
+  x->src_info = nullptr;
 }
 
 /* Move SOURCE onto DEST aka DEST_DIRFD+DEST_RELNAME.
@@ -166,7 +180,7 @@ do_move (char const *source, char const *dest,
           /* In general, when copy returns with copy_into_self set, SOURCE is
              the same as, or a parent of DEST.  In this case we know it's a
              parent.  It doesn't make sense to move a directory into itself, and
-             besides in some situations doing so would give highly nonintuitive
+             besides in some situations doing so would give highly unintuitive
              results.  Run this 'mkdir b; touch a c; mv * b' in an empty
              directory.  Here's the result of running echo $(find b -print):
              b b/a b/b b/b/a b/c.  Notice that only file 'a' was copied
@@ -174,14 +188,14 @@ do_move (char const *source, char const *dest,
              copied-into-self directory, DEST ('b/b' in the example),
              and failing.  */
 
-          dir_to_remove = NULL;
+          dir_to_remove = nullptr;
           ok = false;
         }
       else if (rename_succeeded)
         {
           /* No need to remove anything.  SOURCE was successfully
              renamed to DEST.  Or the user declined to rename a file.  */
-          dir_to_remove = NULL;
+          dir_to_remove = nullptr;
         }
       else
         {
@@ -210,7 +224,7 @@ do_move (char const *source, char const *dest,
           dir_to_remove = source;
         }
 
-      if (dir_to_remove != NULL)
+      if (dir_to_remove != nullptr)
         {
           struct rm_options rm_options;
           enum RM_status status;
@@ -219,10 +233,10 @@ do_move (char const *source, char const *dest,
           rm_option_init (&rm_options);
           rm_options.verbose = x->verbose;
           dir[0] = dir_to_remove;
-          dir[1] = NULL;
+          dir[1] = nullptr;
 
           status = rm ((void *) dir, &rm_options);
-          assert (VALID_STATUS (status));
+          affirm (VALID_STATUS (status));
           if (status == RM_ERROR)
             ok = false;
         }
@@ -254,12 +268,18 @@ Rename SOURCE to DEST, or move SOURCE(s) to DIRECTORY.\n\
       --backup[=CONTROL]       make a backup of each existing destination file\
 \n\
   -b                           like --backup but does not accept an argument\n\
+"), stdout);
+      fputs (_("\
+      --debug                  explain how a file is copied.  Implies -v\n\
+"), stdout);
+      fputs (_("\
   -f, --force                  do not prompt before overwriting\n\
   -i, --interactive            prompt before overwrite\n\
   -n, --no-clobber             do not overwrite an existing file\n\
 If you specify more than one of -i, -f, -n, only the final one takes effect.\n\
 "), stdout);
       fputs (_("\
+      --no-copy                do not copy if renaming fails\n\
       --strip-trailing-slashes  remove any trailing slashes from each SOURCE\n\
                                  argument\n\
   -S, --suffix=SUFFIX          override the usual backup suffix\n\
@@ -267,15 +287,20 @@ If you specify more than one of -i, -f, -n, only the final one takes effect.\n\
       fputs (_("\
   -t, --target-directory=DIRECTORY  move all SOURCE arguments into DIRECTORY\n\
   -T, --no-target-directory    treat DEST as a normal file\n\
-  -u, --update                 move only when the SOURCE file is newer\n\
-                                 than the destination file or when the\n\
-                                 destination file is missing\n\
+"), stdout);
+      fputs (_("\
+  --update[=UPDATE]            control which existing files are updated;\n\
+                                 UPDATE={all,none,older(default)}.  See below\n\
+  -u                           equivalent to --update[=older]\n\
+"), stdout);
+      fputs (_("\
   -v, --verbose                explain what is being done\n\
   -Z, --context                set SELinux security context of destination\n\
                                  file to default type\n\
 "), stdout);
       fputs (HELP_OPTION_DESCRIPTION, stdout);
       fputs (VERSION_OPTION_DESCRIPTION, stdout);
+      emit_update_parameters_note ();
       emit_backup_suffix_note ();
       emit_ancillary_info (PROGRAM_NAME);
     }
@@ -288,11 +313,11 @@ main (int argc, char **argv)
   int c;
   bool ok;
   bool make_backups = false;
-  char const *backup_suffix = NULL;
-  char *version_control_string = NULL;
+  char const *backup_suffix = nullptr;
+  char *version_control_string = nullptr;
   struct cp_options x;
   bool remove_trailing_slashes = false;
-  char const *target_directory = NULL;
+  char const *target_directory = nullptr;
   bool no_target_directory = false;
   int n_files;
   char **file;
@@ -311,7 +336,7 @@ main (int argc, char **argv)
   /* Try to disable the ability to unlink a directory.  */
   priv_set_remove_linkdir ();
 
-  while ((c = getopt_long (argc, argv, "bfint:uvS:TZ", long_options, NULL))
+  while ((c = getopt_long (argc, argv, "bfint:uvS:TZ", long_options, nullptr))
          != -1)
     {
       switch (c)
@@ -330,19 +355,48 @@ main (int argc, char **argv)
         case 'n':
           x.interactive = I_ALWAYS_NO;
           break;
+        case DEBUG_OPTION:
+          x.debug = x.verbose = true;
+          break;
+        case NO_COPY_OPTION:
+          x.no_copy = true;
+          break;
         case STRIP_TRAILING_SLASHES_OPTION:
           remove_trailing_slashes = true;
           break;
         case 't':
           if (target_directory)
-            die (EXIT_FAILURE, 0, _("multiple target directories specified"));
+            error (EXIT_FAILURE, 0, _("multiple target directories specified"));
           target_directory = optarg;
           break;
         case 'T':
           no_target_directory = true;
           break;
         case 'u':
-          x.update = true;
+          if (optarg == nullptr)
+            x.update = true;
+          else if (x.interactive != I_ALWAYS_NO)  /* -n takes precedence.  */
+            {
+              enum Update_type update_opt;
+              update_opt = XARGMATCH ("--update", optarg,
+                                      update_type_string, update_type);
+              if (update_opt == UPDATE_ALL)
+                {
+                  /* Default mv operation.  */
+                  x.update = false;
+                  x.interactive = I_UNSPECIFIED;
+                }
+              else if (update_opt == UPDATE_NONE)
+                {
+                  x.update = false;
+                  x.interactive = I_ALWAYS_SKIP;
+                }
+              else if (update_opt == UPDATE_OLDER)
+                {
+                  x.update = true;
+                  x.interactive = I_UNSPECIFIED;
+                }
+            }
           break;
         case 'v':
           x.verbose = true;
@@ -357,7 +411,8 @@ main (int argc, char **argv)
           if (selinux_enabled)
             {
               x.preserve_security_context = false;
-              x.set_security_context = selabel_open (SELABEL_CTX_FILE, NULL, 0);
+              x.set_security_context = selabel_open (SELABEL_CTX_FILE,
+                                                     nullptr, 0);
               if (! x.set_security_context)
                 error (0, errno, _("warning: ignoring --context"));
             }
@@ -388,9 +443,9 @@ main (int argc, char **argv)
   if (no_target_directory)
     {
       if (target_directory)
-        die (EXIT_FAILURE, 0,
-             _("cannot combine --target-directory (-t) "
-               "and --no-target-directory (-T)"));
+        error (EXIT_FAILURE, 0,
+               _("cannot combine --target-directory (-t) "
+                 "and --no-target-directory (-T)"));
       if (2 < n_files)
         {
           error (0, 0, _("extra operand %s"), quoteaf (file[2]));
@@ -401,8 +456,8 @@ main (int argc, char **argv)
     {
       target_dirfd = target_directory_operand (target_directory, &sb);
       if (! target_dirfd_valid (target_dirfd))
-        die (EXIT_FAILURE, errno, _("target directory %s"),
-             quoteaf (target_directory));
+        error (EXIT_FAILURE, errno, _("target directory %s"),
+               quoteaf (target_directory));
     }
   else
     {
@@ -437,7 +492,7 @@ main (int argc, char **argv)
                   || (O_PATHSEARCH == O_SEARCH && err == EACCES
                       && (sb.st_mode != 0 || stat (lastfile, &sb) == 0)
                       && S_ISDIR (sb.st_mode)))
-                die (EXIT_FAILURE, err, _("target %s"), quoteaf (lastfile));
+                error (EXIT_FAILURE, err, _("target %s"), quoteaf (lastfile));
             }
         }
     }

@@ -1,5 +1,5 @@
-# pthread_h.m4 serial 8
-dnl Copyright (C) 2009-2022 Free Software Foundation, Inc.
+# pthread_h.m4 serial 9
+dnl Copyright (C) 2009-2023 Free Software Foundation, Inc.
 dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
 dnl with or without modifications, as long as this notice is preserved.
@@ -20,7 +20,7 @@ AC_DEFUN_ONCE([gl_PTHREAD_H],
     dnl ignore the <pthread.h> from the mingw-w64 winpthreads library.
     m4_ifdef([gl_][THREADLIB], [
       AC_REQUIRE([gl_][THREADLIB])
-      if { case "$host_os" in mingw*) true;; *) false;; esac; } \
+      if { case "$host_os" in mingw* | windows*) true;; *) false;; esac; } \
          && test $gl_threads_api = windows; then
         HAVE_PTHREAD_H=0
       fi

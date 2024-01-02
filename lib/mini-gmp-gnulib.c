@@ -1,6 +1,6 @@
 /* Tailor mini-gmp.c for Gnulib-using applications.
 
-   Copyright 2018-2022 Free Software Foundation, Inc.
+   Copyright 2018-2023 Free Software Foundation, Inc.
 
    This file is free software.
    It is dual-licensed under "the GNU LGPLv3+ or the GNU GPLv2+".
@@ -40,7 +40,8 @@
 #endif
 
 /* Pacify GCC -Wunused-variable for variables used only in 'assert' calls.  */
-#if defined NDEBUG && 4 < __GNUC__ + (6 <= __GNUC_MINOR__)
+#if (defined NDEBUG \
+     && (4 < __GNUC__ + (6 <= __GNUC_MINOR__) || defined __clang__))
 # pragma GCC diagnostic ignored "-Wunused-variable"
 #endif
 

@@ -1,5 +1,5 @@
 /* printf - format and print data
-   Copyright (C) 1990-2022 Free Software Foundation, Inc.
+   Copyright (C) 1990-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -57,8 +57,6 @@
 
 #include "system.h"
 #include "cl-strtod.h"
-#include "die.h"
-#include "error.h"
 #include "quote.h"
 #include "unicodeio.h"
 #include "xprintf.h"
@@ -267,7 +265,7 @@ print_esc (char const *escstart, bool octal_0)
            ++esc_length, ++p)
         esc_value = esc_value * 16 + hextobin (*p);
       if (esc_length == 0)
-        die (EXIT_FAILURE, 0, _("missing hexadecimal number in escape"));
+        error (EXIT_FAILURE, 0, _("missing hexadecimal number in escape"));
       putchar (esc_value);
     }
   else if (isodigit (*p))
@@ -294,20 +292,15 @@ print_esc (char const *escstart, bool octal_0)
            --esc_length, ++p)
         {
           if (! isxdigit (to_uchar (*p)))
-            die (EXIT_FAILURE, 0, _("missing hexadecimal number in escape"));
+            error (EXIT_FAILURE, 0, _("missing hexadecimal number in escape"));
           uni_value = uni_value * 16 + hextobin (*p);
         }
 
-      /* A universal character name shall not specify a character short
-         identifier in the range 00000000 through 00000020, 0000007F through
-         0000009F, or 0000D800 through 0000DFFF inclusive. A universal
-         character name shall not designate a character in the required
-         character set.  */
-      if ((uni_value <= 0x9f
-           && uni_value != 0x24 && uni_value != 0x40 && uni_value != 0x60)
-          || (uni_value >= 0xd800 && uni_value <= 0xdfff))
-        die (EXIT_FAILURE, 0, _("invalid universal character name \\%c%0*x"),
-             esc_char, (esc_char == 'u' ? 4 : 8), uni_value);
+      /* Error for invalid code points 0000D800 through 0000DFFF inclusive.
+         Note print_unicode_char() would print the literal \u.. in this case. */
+      if (uni_value >= 0xd800 && uni_value <= 0xdfff)
+        error (EXIT_FAILURE, 0, _("invalid universal character name \\%c%0*x"),
+               esc_char, (esc_char == 'u' ? 4 : 8), uni_value);
 
       print_unicode_char (stdout, uni_value, 0);
     }
@@ -579,8 +572,8 @@ print_formatted (char const *format, int argc, char **argv)
                   if (INT_MIN <= width && width <= INT_MAX)
                     field_width = width;
                   else
-                    die (EXIT_FAILURE, 0, _("invalid field width: %s"),
-                         quote (*argv));
+                    error (EXIT_FAILURE, 0, _("invalid field width: %s"),
+                           quote (*argv));
                   ++argv;
                   --argc;
                 }
@@ -614,8 +607,8 @@ print_formatted (char const *format, int argc, char **argv)
                           precision = -1;
                         }
                       else if (INT_MAX < prec)
-                        die (EXIT_FAILURE, 0, _("invalid precision: %s"),
-                             quote (*argv));
+                        error (EXIT_FAILURE, 0, _("invalid precision: %s"),
+                               quote (*argv));
                       else
                         precision = prec;
                       ++argv;
@@ -639,10 +632,11 @@ print_formatted (char const *format, int argc, char **argv)
 
           {
             unsigned char conversion = *f;
+            int speclen = MIN (f + 1 - direc_start, INT_MAX);
             if (! ok[conversion])
-              die (EXIT_FAILURE, 0,
-                   _("%.*s: invalid conversion specification"),
-                   (int) (f + 1 - direc_start), direc_start);
+              error (EXIT_FAILURE, 0,
+                     _("%.*s: invalid conversion specification"),
+                     speclen, direc_start);
           }
 
           print_direc (direc_start, direc_length, *f,
@@ -679,7 +673,7 @@ main (int argc, char **argv)
 
   exit_status = EXIT_SUCCESS;
 
-  posixly_correct = (getenv ("POSIXLY_CORRECT") != NULL);
+  posixly_correct = (getenv ("POSIXLY_CORRECT") != nullptr);
 
   /* We directly parse options, rather than use parse_long_options, in
      order to avoid accepting abbreviations.  */
@@ -691,7 +685,7 @@ main (int argc, char **argv)
       if (STREQ (argv[1], "--version"))
         {
           version_etc (stdout, PROGRAM_NAME, PACKAGE_NAME, Version, AUTHORS,
-                       (char *) NULL);
+                       (char *) nullptr);
           return EXIT_SUCCESS;
         }
     }

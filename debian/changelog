@@ -1,3 +1,25 @@
+coreutils (9.4-2) unstable; urgency=low
+
+  * link against libssl if gpl compatible version available; add to
+    build-depends for linux-amd64 only at this time (will add others later as
+    makes sense)
+
+ -- Michael Stone <mstone@debian.org>  Fri, 10 Nov 2023 08:33:49 -0500
+
+coreutils (9.4-1) unstable; urgency=low
+
+  * New upstream version (Closes: #1017354)
+    - corrects cksum crashes due to missing cpu features (Closes: #1037264)
+    - corrects copy dir-relative operations (Closes: #1035531)
+    - corrects copy backup operations (Closes: #1035530)
+  * Drop old 61_whoips.patch and who --ips option; it no longer applies
+    cleanly after who.c refactoring, and it isn't clear the patch is still
+    useful given how system logging has changed since the patch was written
+  * Drop 63_dd-appenderrors.patch as documentation has been updated for ages
+  * Update copyright file
+
+ -- Michael Stone <mstone@debian.org>  Thu, 09 Nov 2023 14:18:41 -0500
+
 coreutils (9.1-1) unstable; urgency=low
 
   * New upstream version (Closes: #1017354)

@@ -20,13 +20,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <errno.h>
 
 #include <ctype.h>
 #include <unistd.h>
 #include <getopt.h>
-#include <stdbool.h>
 
 #include "blake2.h"
 
@@ -270,12 +268,12 @@ int main( int argc, char **argv )
   while( 1 )
   {
     int option_index = 0;
-    char *end = NULL;
+    char *end = nullptr;
     unsigned long outbits;
     static struct option long_options[] = {
       { "help",  no_argument, 0,  0  },
       { "tag",   no_argument, 0,  0  },
-      { NULL, 0, NULL, 0 }
+      { nullptr, 0, nullptr, 0 }
     };
 
     c = getopt_long( argc, argv, "a:l:", long_options, &option_index );
@@ -352,7 +350,7 @@ int main( int argc, char **argv )
 
   for( i = optind; i < argc; ++i )
   {
-    FILE *f = NULL;
+    FILE *f = nullptr;
     if( argv[i][0] == '-' && argv[i][1] == '\0' )
       f = stdin;
     else

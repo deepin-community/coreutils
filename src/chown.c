@@ -1,5 +1,5 @@
 /* chown -- change user and group ownership of files
-   Copyright (C) 1989-2022 Free Software Foundation, Inc.
+   Copyright (C) 1989-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -23,8 +23,6 @@
 
 #include "system.h"
 #include "chown-core.h"
-#include "die.h"
-#include "error.h"
 #include "fts_.h"
 #include "quote.h"
 #include "root-dev-ino.h"
@@ -54,20 +52,20 @@ enum
 
 static struct option const long_options[] =
 {
-  {"recursive", no_argument, NULL, 'R'},
-  {"changes", no_argument, NULL, 'c'},
-  {"dereference", no_argument, NULL, DEREFERENCE_OPTION},
-  {"from", required_argument, NULL, FROM_OPTION},
-  {"no-dereference", no_argument, NULL, 'h'},
-  {"no-preserve-root", no_argument, NULL, NO_PRESERVE_ROOT},
-  {"preserve-root", no_argument, NULL, PRESERVE_ROOT},
-  {"quiet", no_argument, NULL, 'f'},
-  {"silent", no_argument, NULL, 'f'},
-  {"reference", required_argument, NULL, REFERENCE_FILE_OPTION},
-  {"verbose", no_argument, NULL, 'v'},
+  {"recursive", no_argument, nullptr, 'R'},
+  {"changes", no_argument, nullptr, 'c'},
+  {"dereference", no_argument, nullptr, DEREFERENCE_OPTION},
+  {"from", required_argument, nullptr, FROM_OPTION},
+  {"no-dereference", no_argument, nullptr, 'h'},
+  {"no-preserve-root", no_argument, nullptr, NO_PRESERVE_ROOT},
+  {"preserve-root", no_argument, nullptr, PRESERVE_ROOT},
+  {"quiet", no_argument, nullptr, 'f'},
+  {"silent", no_argument, nullptr, 'f'},
+  {"reference", required_argument, nullptr, REFERENCE_FILE_OPTION},
+  {"verbose", no_argument, nullptr, 'v'},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
-  {NULL, 0, NULL, 0}
+  {nullptr, 0, nullptr, 0}
 };
 
 void
@@ -113,8 +111,8 @@ With --reference, change the owner and group of each FILE to those of RFILE.\n\
       --preserve-root    fail to operate recursively on '/'\n\
 "), stdout);
       fputs (_("\
-      --reference=RFILE  use RFILE's owner and group rather than\n\
-                         specifying OWNER:GROUP values\n\
+      --reference=RFILE  use RFILE's owner and group rather than specifying\n\
+                         OWNER:GROUP values.  RFILE is always dereferenced.\n\
 "), stdout);
       fputs (_("\
   -R, --recursive        operate on files and directories recursively\n\
@@ -187,7 +185,7 @@ main (int argc, char **argv)
 
   chopt_init (&chopt);
 
-  while ((optc = getopt_long (argc, argv, "HLPRcfhv", long_options, NULL))
+  while ((optc = getopt_long (argc, argv, "HLPRcfhv", long_options, nullptr))
          != -1)
     {
       switch (optc)
@@ -230,7 +228,7 @@ main (int argc, char **argv)
             bool warn;
             char const *e = parse_user_spec_warn (optarg,
                                                   &required_uid, &required_gid,
-                                                  NULL, NULL, &warn);
+                                                  nullptr, nullptr, &warn);
             if (e)
               error (warn ? 0 : EXIT_FAILURE, 0, "%s: %s", e, quote (optarg));
             break;
@@ -264,8 +262,8 @@ main (int argc, char **argv)
       if (bit_flags == FTS_PHYSICAL)
         {
           if (dereference == 1)
-            die (EXIT_FAILURE, 0,
-                 _("-R --dereference requires either -H or -L"));
+            error (EXIT_FAILURE, 0,
+                   _("-R --dereference requires either -H or -L"));
           dereference = 0;
         }
     }
@@ -288,8 +286,8 @@ main (int argc, char **argv)
     {
       struct stat ref_stats;
       if (stat (reference_file, &ref_stats))
-        die (EXIT_FAILURE, errno, _("failed to get attributes of %s"),
-             quoteaf (reference_file));
+        error (EXIT_FAILURE, errno, _("failed to get attributes of %s"),
+               quoteaf (reference_file));
 
       uid = ref_stats.st_uid;
       gid = ref_stats.st_gid;
@@ -318,9 +316,9 @@ main (int argc, char **argv)
     {
       static struct dev_ino dev_ino_buf;
       chopt.root_dev_ino = get_root_dev_ino (&dev_ino_buf);
-      if (chopt.root_dev_ino == NULL)
-        die (EXIT_FAILURE, errno, _("failed to get attributes of %s"),
-             quoteaf ("/"));
+      if (chopt.root_dev_ino == nullptr)
+        error (EXIT_FAILURE, errno, _("failed to get attributes of %s"),
+               quoteaf ("/"));
     }
 
   bit_flags |= FTS_DEFER_STAT;

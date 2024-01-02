@@ -1,5 +1,5 @@
 /* yes - output a string repeatedly until killed
-   Copyright (C) 1991-2022 Free Software Foundation, Inc.
+   Copyright (C) 1991-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -22,7 +22,6 @@
 
 #include "system.h"
 
-#include "error.h"
 #include "full-write.h"
 #include "long-options.h"
 
@@ -68,7 +67,7 @@ main (int argc, char **argv)
 
   parse_gnu_standard_options_only (argc, argv, PROGRAM_NAME, PACKAGE_NAME,
                                    Version, true, usage, AUTHORS,
-                                   (char const *) NULL);
+                                   (char const *) nullptr);
 
   char **operands = argv + optind;
   char **operand_lim = argv + argc;

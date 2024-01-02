@@ -1,6 +1,6 @@
 /* Invoke freopen, but avoid some glitches.
 
-   Copyright (C) 2009-2022 Free Software Foundation, Inc.
+   Copyright (C) 2009-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -25,8 +25,12 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <stdbool.h>
 #include <unistd.h>
+
+/* GCC 13 misunderstands the dup2 trickery in this file.  */
+#if 13 <= __GNUC__
+# pragma GCC diagnostic ignored "-Wanalyzer-fd-leak"
+#endif
 
 /* Guarantee that FD is open; all smaller FDs must already be open.
    Return true if successful.  */

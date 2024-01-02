@@ -1,6 +1,6 @@
 /* A more useful interface to strtol.
 
-   Copyright (C) 1995-1996, 1998-2001, 2003-2007, 2009-2022 Free Software
+   Copyright (C) 1995-1996, 1998-2001, 2003-2007, 2009-2023 Free Software
    Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
@@ -37,6 +37,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
+#include <stdckdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -51,7 +52,7 @@ static strtol_error
 bkm_scale (__strtol_t *x, int scale_factor)
 {
   __strtol_t scaled;
-  if (INT_MULTIPLY_WRAPV (*x, scale_factor, &scaled))
+  if (ckd_mul (&scaled, *x, scale_factor))
     {
       *x = *x < 0 ? TYPE_MINIMUM (__strtol_t) : TYPE_MAXIMUM (__strtol_t);
       return LONGINT_OVERFLOW;
@@ -140,7 +141,7 @@ __xstrtol (const char *s, char **ptr, int strtol_base,
       switch (**p)
         {
         case 'E': case 'G': case 'g': case 'k': case 'K': case 'M': case 'm':
-        case 'P': case 'T': case 't': case 'Y': case 'Z':
+        case 'P': case 'Q': case 'R': case 'T': case 't': case 'Y': case 'Z':
 
           /* The "valid suffix" '0' is a special flag meaning that
              an optional second suffix is allowed, which can change
@@ -203,6 +204,14 @@ __xstrtol (const char *s, char **ptr, int strtol_base,
 
         case 'P': /* peta or pebi */
           overflow = bkm_scale_by_power (&tmp, base, 5);
+          break;
+
+        case 'Q': /* quetta or 2**100 */
+          overflow = bkm_scale_by_power (&tmp, base, 10);
+          break;
+
+        case 'R': /* ronna or 2**90 */
+          overflow = bkm_scale_by_power (&tmp, base, 9);
           break;
 
         case 'T': /* tera or tebi */

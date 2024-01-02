@@ -1,5 +1,5 @@
 /* kill -- send a signal to a process
-   Copyright (C) 2002-2022 Free Software Foundation, Inc.
+   Copyright (C) 2002-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,13 +17,13 @@
 /* Written by Paul Eggert.  */
 
 #include <config.h>
+#include <stdckdint.h>
 #include <stdio.h>
 #include <getopt.h>
 #include <sys/types.h>
 #include <signal.h>
 
 #include "system.h"
-#include "error.h"
 #include "sig2str.h"
 #include "operand2sig.h"
 #include "quote.h"
@@ -59,12 +59,12 @@ static char const short_options[] =
 
 static struct option const long_options[] =
 {
-  {"list", no_argument, NULL, 'l'},
-  {"signal", required_argument, NULL, 's'},
-  {"table", no_argument, NULL, 't'},
+  {"list", no_argument, nullptr, 'l'},
+  {"signal", required_argument, nullptr, 's'},
+  {"table", no_argument, nullptr, 't'},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
-  {NULL, 0, NULL, 0}
+  {nullptr, 0, nullptr, 0}
 };
 
 void
@@ -131,10 +131,10 @@ list_signals (bool table, char *const *argv)
 
   if (table)
     {
-      unsigned int name_width = 0;
+      int name_width = 0;
 
       /* Compute the maximum width of a signal number.  */
-      unsigned int num_width = 1;
+      int num_width = 1;
       for (signum = 1; signum <= SIGNUM_BOUND / 10; signum *= 10)
         num_width++;
 
@@ -142,7 +142,7 @@ list_signals (bool table, char *const *argv)
       for (signum = 1; signum <= SIGNUM_BOUND; signum++)
         if (sig2str (signum, signame) == 0)
           {
-            size_t len = strlen (signame);
+            idx_t len = strlen (signame);
             if (name_width < len)
               name_width = len;
           }
@@ -199,9 +199,10 @@ send_signals (int signum, char *const *argv)
     {
       char *endp;
       intmax_t n = (errno = 0, strtoimax (arg, &endp, 10));
-      pid_t pid = n;
+      pid_t pid;
 
-      if (errno == ERANGE || pid != n || arg == endp || *endp)
+      if (errno == ERANGE || ckd_add (&pid, n, 0)
+          || arg == endp || *endp)
         {
           error (0, 0, _("%s: invalid process id"), quote (arg));
           status = EXIT_FAILURE;
@@ -234,7 +235,7 @@ main (int argc, char **argv)
 
   atexit (close_stdout);
 
-  while ((optc = getopt_long (argc, argv, short_options, long_options, NULL))
+  while ((optc = getopt_long (argc, argv, short_options, long_options, nullptr))
          != -1)
     switch (optc)
       {
@@ -309,6 +310,6 @@ main (int argc, char **argv)
     }
 
   return (list
-          ? list_signals (table, optind < argc ? argv + optind : NULL)
+          ? list_signals (table, optind < argc ? argv + optind : nullptr)
           : send_signals (signum, argv + optind));
 }

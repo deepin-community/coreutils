@@ -1,7 +1,7 @@
 # -*- autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-# Copyright (C) 1991-2022 Free Software Foundation, Inc.
+# Copyright (C) 1991-2023 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -57,6 +57,7 @@ AM_PROG_CC_C_O
 AC_PROG_CPP
 AC_PROG_GCC_TRADITIONAL
 AC_PROG_RANLIB
+AC_PROG_EGREP
 AC_PROG_LN_S
 gl_EARLY
 gl_SET_CRYPTO_CHECK_DEFAULT([auto-gpl-compat])
@@ -159,8 +160,7 @@ if test $gl_gcc_warnings != no; then
   ew=
   AS_IF([test $gl_gcc_warnings != expensive],
     [# -fanalyzer and related options slow GCC considerably.
-     ew="$ew -fanalyzer -Wno-analyzer-double-free -Wno-analyzer-malloc-leak"
-     ew="$ew -Wno-analyzer-null-dereference -Wno-analyzer-use-after-free"])
+     ew="$ew -fanalyzer -Wno-analyzer-malloc-leak"])
 
   # This, $nw, is the list of warnings we disable.
   nw=$ew
@@ -183,7 +183,7 @@ if test $gl_gcc_warnings != no; then
   nw="$nw -Wswitch-enum"            # Too many warnings for now
   nw="$nw -Wswitch-default"         # Too many warnings for now
   nw="$nw -Wstack-protector"        # not worth working around
-  nw="$nw -Wformat-overflow=2"      # False alarms due to GCC bug 80776
+  nw="$nw -Wformat-overflow=2"      # False alarms due to GCC bug 110333
   nw="$nw -Wformat-truncation=2"    # False alarm in ls.c, probably related
   # things I might fix soon:
   nw="$nw -Wfloat-equal"            # sort.c, seq.c
@@ -260,6 +260,10 @@ if test $gl_gcc_warnings != no; then
   # FIXME: remove this line when gcc improves
   # FP in careadlinkat.c w/gcc 10.0.1 20200205
   gl_WARN_ADD([-Wno-return-local-addr])
+
+  # FIXME: remove this line when gcc improves
+  # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=88443
+  gl_WARN_ADD([-Wno-stringop-overflow])
 
   gl_MANYWARN_COMPLEMENT([GNULIB_WARN_CFLAGS], [$WARN_CFLAGS], [$nw])
   AC_SUBST([GNULIB_WARN_CFLAGS])
@@ -402,38 +406,6 @@ AC_DEFUN([coreutils_DUMMY_1],
 ])
 coreutils_DUMMY_1
 
-AC_MSG_CHECKING([ut_host in struct utmp])
-AC_CACHE_VAL([su_cv_func_ut_host_in_utmp],
-[AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
-                                   #include <utmp.h>
-                                   struct utmp ut;
-                                   int s = sizeof ut.ut_host;]])],
-  [su_cv_func_ut_host_in_utmp=yes],
-  [su_cv_func_ut_host_in_utmp=no])])
-AC_MSG_RESULT([$su_cv_func_ut_host_in_utmp])
-if test $su_cv_func_ut_host_in_utmp = yes; then
-  have_ut_host=1
-  AC_DEFINE([HAVE_UT_HOST], [1], [FIXME])
-fi
-
-if test -z "$have_ut_host"; then
-  AC_MSG_CHECKING([ut_host in struct utmpx])
-  AC_CACHE_VAL([su_cv_func_ut_host_in_utmpx],
-  [AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
-                                     #include <utmpx.h>
-                                     struct utmpx ut;
-                                     int s = sizeof ut.ut_host;]])],
-    [su_cv_func_ut_host_in_utmpx=yes],
-    [su_cv_func_ut_host_in_utmpx=no])])
-  AC_MSG_RESULT([$su_cv_func_ut_host_in_utmpx])
-  if test $su_cv_func_ut_host_in_utmpx = yes; then
-    AC_DEFINE([HAVE_UTMPX_H], [1], [FIXME])
-    AC_DEFINE([HAVE_UT_HOST], [1], [FIXME])
-  fi
-fi
-
-GNULIB_BOOT_TIME([gl_ADD_PROG([optional_bin_progs], [uptime])])
-
 AC_SYS_POSIX_TERMIOS()
 gl_HEADER_TIOCGWINSZ_NEEDS_SYS_IOCTL
 
@@ -544,31 +516,10 @@ CFLAGS=$ac_save_CFLAGS
 LDFLAGS=$ac_save_LDFLAGS
 ac_c_werror_flag=$cu_save_c_werror_flag
 
-AC_MSG_CHECKING([if __get_cpuid available])
-AC_LINK_IFELSE(
-  [AC_LANG_SOURCE([[
-    #include <cpuid.h>
-
-    int
-    main (void)
-    {
-      unsigned int eax, ebx, ecx, edx;
-      __get_cpuid (1, &eax, &ebx, &ecx, &edx);
-      return 1;
-    }
-  ]])
-  ],[
-    AC_MSG_RESULT([yes])
-    AC_DEFINE([HAVE_CPUID], [1], [__get_cpuid available])
-    cpuid_exists=yes
-  ],[
-    AC_MSG_RESULT([no])
-  ])
-
 ac_save_CFLAGS=$CFLAGS
 CFLAGS="-mavx -mpclmul $CFLAGS"
 AC_MSG_CHECKING([if pclmul intrinsic exists])
-AC_COMPILE_IFELSE(
+AC_LINK_IFELSE(
   [AC_LANG_SOURCE([[
     #include <x86intrin.h>
 
@@ -577,49 +528,27 @@ AC_COMPILE_IFELSE(
     {
       __m128i a, b;
       a = _mm_clmulepi64_si128 (a, b, 0x00);
-      return 1;
+      a = _mm_shuffle_epi8 (a, b);
+      return __builtin_cpu_supports ("pclmul");
     }
   ]])
   ],[
-    AC_MSG_RESULT([yes])
-    AC_DEFINE([HAVE_PCLMUL_INTRINSIC], [1], [pclmul intrinsic exists])
     pclmul_intrinsic_exists=yes
   ],[
-    AC_MSG_RESULT([no])
+    pclmul_intrinsic_exists=no
   ])
-if test "x$cpuid_exists" = "xyes" &&
-   test "x$pclmul_intrinsic_exists" = "xyes"; then
+AC_MSG_RESULT([$pclmul_intrinsic_exists])
+if test $pclmul_intrinsic_exists = yes; then
   AC_DEFINE([USE_PCLMUL_CRC32], [1],
             [CRC32 calculation by pclmul hardware instruction enabled])
 fi
 AM_CONDITIONAL([USE_PCLMUL_CRC32],
-               [test "x$cpuid_exists" = "xyes" &&
-                test "x$pclmul_intrinsic_exists" = "xyes"])
+               [test $pclmul_intrinsic_exists = yes])
 CFLAGS=$ac_save_CFLAGS
 
-AC_MSG_CHECKING([if __get_cpuid_count exists])
-AC_LINK_IFELSE(
-  [AC_LANG_SOURCE([[
-    #include <cpuid.h>
-
-    int
-    main (void)
-    {
-      unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
-      __get_cpuid_count (7, 0, &eax, &ebx, &ecx, &edx);
-      return 1;
-    }
-  ]])
-  ],[
-    AC_MSG_RESULT([yes])
-    get_cpuid_count_exists=yes
-  ],[
-    AC_MSG_RESULT([no])
-  ])
-
 CFLAGS="-mavx2 $CFLAGS"
-AC_MSG_CHECKING([if avx2 intrinstics exists])
-AC_COMPILE_IFELSE(
+AC_MSG_CHECKING([for avx2 intrinsics])
+AC_LINK_IFELSE(
   [AC_LANG_SOURCE([[
     #include <x86intrin.h>
 
@@ -628,23 +557,20 @@ AC_COMPILE_IFELSE(
     {
       __m256i a, b;
       a = _mm256_sad_epu8 (a, b);
-      return 1;
+      return __builtin_cpu_supports ("avx2");
     }
   ]])
   ],[
-    AC_MSG_RESULT([yes])
-    AC_DEFINE([HAVE_AVX2_INTRINSIC], [1], [avx2 intrinsics exists])
     avx2_intrinsic_exists=yes
   ],[
-    AC_MSG_RESULT([no])
+    avx2_intrinsic_exists=no
   ])
-if test "x$get_cpuid_count_exists" = "xyes" &&
-   test "x$avx2_intrinsic_exists" = "xyes"; then
+AC_MSG_RESULT([$avx2_intrinsic_exists])
+if test $avx2_intrinsic_exists = yes; then
   AC_DEFINE([USE_AVX2_WC_LINECOUNT], [1], [Counting lines with AVX2 enabled])
 fi
 AM_CONDITIONAL([USE_AVX2_WC_LINECOUNT],
-               [test "x$get_cpuid_count_exists" = "xyes" &&
-                test "x$avx2_intrinsic_exists" = "xyes"])
+               [test $avx2_intrinsic_exists = yes])
 
 CFLAGS=$ac_save_CFLAGS
 

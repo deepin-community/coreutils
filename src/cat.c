@@ -1,5 +1,5 @@
 /* cat -- concatenate files and print on the standard output.
-   Copyright (C) 1988-2022 Free Software Foundation, Inc.
+   Copyright (C) 1988-2023 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,10 +19,11 @@
    * Usually much faster than other versions of cat, the difference
    is especially apparent when using the -v option.
 
-   By tege@sics.se, Torbjorn Granlund, advised by rms, Richard Stallman.  */
+   By tege@sics.se, Torbjörn Granlund, advised by rms, Richard Stallman.  */
 
 #include <config.h>
 
+#include <stdckdint.h>
 #include <stdio.h>
 #include <getopt.h>
 #include <sys/types.h>
@@ -34,10 +35,7 @@
 
 #include "system.h"
 #include "alignalloc.h"
-#include "idx.h"
 #include "ioblksize.h"
-#include "die.h"
-#include "error.h"
 #include "fadvise.h"
 #include "full-write.h"
 #include "safe-read.h"
@@ -47,7 +45,7 @@
 #define PROGRAM_NAME "cat"
 
 #define AUTHORS \
-  proper_name ("Torbjorn Granlund"), \
+  proper_name_lite ("Torbjorn Granlund", "Torbj\303\266rn Granlund"), \
   proper_name ("Richard M. Stallman")
 
 /* Name of input file.  May be "-".  */
@@ -179,7 +177,7 @@ simple_cat (char *buf, idx_t bufsize)
       /* Write this block out.  */
 
       if (full_write (STDOUT_FILENO, buf, n_read) != n_read)
-        die (EXIT_FAILURE, errno, _("write error"));
+        write_error ();
     }
 }
 
@@ -194,7 +192,7 @@ write_pending (char *outbuf, char **bpout)
   if (0 < n_write)
     {
       if (full_write (STDOUT_FILENO, outbuf, n_write) != n_write)
-        die (EXIT_FAILURE, errno, _("write error"));
+        write_error ();
       *bpout = outbuf;
     }
 }
@@ -258,7 +256,7 @@ cat (char *inbuf, idx_t insize, char *outbuf, idx_t outsize,
               do
                 {
                   if (full_write (STDOUT_FILENO, wp, outsize) != outsize)
-                    die (EXIT_FAILURE, errno, _("write error"));
+                    write_error ();
                   wp += outsize;
                   remaining_bytes = bpout - wp;
                 }
@@ -518,7 +516,7 @@ copy_cat (void)
      unsupported or the input file seems empty.  */
 
   for (bool some_copied = false; ; some_copied = true)
-    switch (copy_file_range (input_desc, NULL, STDOUT_FILENO, NULL,
+    switch (copy_file_range (input_desc, nullptr, STDOUT_FILENO, nullptr,
                              copy_max, 0))
       {
       case 0:
@@ -554,16 +552,16 @@ main (int argc, char **argv)
 
   static struct option const long_options[] =
   {
-    {"number-nonblank", no_argument, NULL, 'b'},
-    {"number", no_argument, NULL, 'n'},
-    {"squeeze-blank", no_argument, NULL, 's'},
-    {"show-nonprinting", no_argument, NULL, 'v'},
-    {"show-ends", no_argument, NULL, 'E'},
-    {"show-tabs", no_argument, NULL, 'T'},
-    {"show-all", no_argument, NULL, 'A'},
+    {"number-nonblank", no_argument, nullptr, 'b'},
+    {"number", no_argument, nullptr, 'n'},
+    {"squeeze-blank", no_argument, nullptr, 's'},
+    {"show-nonprinting", no_argument, nullptr, 'v'},
+    {"show-ends", no_argument, nullptr, 'E'},
+    {"show-tabs", no_argument, nullptr, 'T'},
+    {"show-all", no_argument, nullptr, 'A'},
     {GETOPT_HELP_OPTION_DECL},
     {GETOPT_VERSION_OPTION_DECL},
-    {NULL, 0, NULL, 0}
+    {nullptr, 0, nullptr, 0}
   };
 
   initialize_main (&argc, &argv);
@@ -581,7 +579,7 @@ main (int argc, char **argv)
   /* Parse command line options.  */
 
   int c;
-  while ((c = getopt_long (argc, argv, "benstuvAET", long_options, NULL))
+  while ((c = getopt_long (argc, argv, "benstuvAET", long_options, nullptr))
          != -1)
     {
       switch (c)
@@ -643,7 +641,7 @@ main (int argc, char **argv)
   /* Get device, i-node number, and optimal blocksize of output.  */
 
   if (fstat (STDOUT_FILENO, &stat_buf) < 0)
-    die (EXIT_FAILURE, errno, _("standard output"));
+    error (EXIT_FAILURE, errno, _("standard output"));
 
   /* Optimal size of i/o operations of output.  */
   idx_t outsize = io_blksize (stat_buf);
@@ -731,7 +729,7 @@ main (int argc, char **argv)
             out_isreg && S_ISREG (stat_buf.st_mode) ? copy_cat () : 0;
           if (copy_cat_status != 0)
             {
-              inbuf = NULL;
+              inbuf = nullptr;
               ok &= 0 < copy_cat_status;
             }
           else
@@ -768,9 +766,9 @@ main (int argc, char **argv)
              on some paging implementations.  */
 
           idx_t bufsize;
-          if (INT_MULTIPLY_WRAPV (insize, 4, &bufsize)
-              || INT_ADD_WRAPV (bufsize, outsize, &bufsize)
-              || INT_ADD_WRAPV (bufsize, LINE_COUNTER_BUF_LEN - 1, &bufsize))
+          if (ckd_mul (&bufsize, insize, 4)
+              || ckd_add (&bufsize, bufsize, outsize)
+              || ckd_add (&bufsize, bufsize, LINE_COUNTER_BUF_LEN - 1))
             xalloc_die ();
           char *outbuf = xalignalloc (page_size, bufsize);
 
@@ -795,11 +793,11 @@ main (int argc, char **argv)
   if (pending_cr)
     {
       if (full_write (STDOUT_FILENO, "\r", 1) != 1)
-        die (EXIT_FAILURE, errno, _("write error"));
+        write_error ();
     }
 
   if (have_read_stdin && close (STDIN_FILENO) < 0)
-    die (EXIT_FAILURE, errno, _("closing standard input"));
+    error (EXIT_FAILURE, errno, _("closing standard input"));
 
   return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }

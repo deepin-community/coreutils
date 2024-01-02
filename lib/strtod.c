@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-1992, 1997, 1999, 2003, 2006, 2008-2022 Free Software
+/* Copyright (C) 1991-1992, 1997, 1999, 2003, 2006, 2008-2023 Free Software
    Foundation, Inc.
 
    This file is free software: you can redistribute it and/or modify
@@ -27,7 +27,6 @@
 #include <limits.h>     /* LONG_{MIN,MAX} */
 #include <locale.h>     /* localeconv() */
 #include <math.h>       /* NAN */
-#include <stdbool.h>
 #include <stdio.h>      /* sprintf() */
 #include <string.h>     /* strdup() */
 #if HAVE_NL_LANGINFO
