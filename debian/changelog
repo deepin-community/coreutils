@@ -1,3 +1,10 @@
+coreutils (9.4-2-1deepin2) UNRELEASED; urgency=medium
+
+  * chore: Update dependency version in debian/control(update libselinux1-dev
+    to 1.35-1) 
+
+ -- zhoushicheng <zhoushicheng@uniontech.com>  Thu, 24 Oct 2024 15:58:35 +0800
+
 coreutils (9.4-2-1deepin1) unstable; urgency=low
 
   * feat: usec: cp光盘内容产生审计日志. add cp copy audit
