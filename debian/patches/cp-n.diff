@@ -1,0 +1,30 @@
+Description: revert cp -n behavior to debian 12 and prior
+Author: Michael Stone <mstone@debian.org>
+Bug-Debian: https://bugs.debian.org/1058752
+Index: coreutils-9.4/src/cp.c
+===================================================================
+--- coreutils-9.4.orig/src/cp.c	2024-01-02 08:48:03.483257638 -0500
++++ coreutils-9.4/src/cp.c	2024-01-02 08:49:03.994219898 -0500
+@@ -192,8 +192,9 @@
+   -L, --dereference            always follow symbolic links in SOURCE\n\
+ "), stdout);
+       fputs (_("\
+-  -n, --no-clobber             do not overwrite an existing file (overrides a\n\
+-                                 -u or previous -i option). See also --update\n\
++  -n, --no-clobber             do not overwrite an existing file and do not fail\n\
++                                 (overrides a -u or previous -i option). See also\n\
++                                 --update; equivalent to --update=none.\n\
+ "), stdout);
+       fputs (_("\
+   -P, --no-dereference         never follow symbolic links in SOURCE\n\
+@@ -1067,7 +1068,9 @@
+           break;
+ 
+         case 'n':
+-          x.interactive = I_ALWAYS_NO;
++          x.interactive = I_ALWAYS_SKIP;
++          x.update = false;
++          error (0, 0, _("warning: behavior of -n is non-portable and may change in future; use --update=none instead"));
+           break;
+ 
+         case 'P':
