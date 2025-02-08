@@ -1,5 +1,5 @@
 /* echo.c, derived from code echo.c in Bash.
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 #include <sys/types.h>
 #include "system.h"
 #include "assure.h"
+#include "c-ctype.h"
 
 /* The official name of this program (e.g., no 'g' prefix).  */
 #define PROGRAM_NAME "echo"
@@ -81,8 +82,8 @@ If -e is in effect, the following sequences are recognized:\n\
 "), stdout);
   printf (USAGE_BUILTIN_WARNING, PROGRAM_NAME);
   fputs (_("\n\
-NOTE: printf(1) is a preferred alternative,\n\
-which does not have issues outputting option-like strings.\n\
+Consider using the 'printf' command instead,\n\
+as it avoids problems when outputting option-like strings.\n\
 "), stdout);
   emit_ancillary_info (PROGRAM_NAME);
   exit (status);
@@ -219,12 +220,12 @@ just_echo:
                     case 'x':
                       {
                         unsigned char ch = *s;
-                        if (! isxdigit (ch))
+                        if (! c_isxdigit (ch))
                           goto not_an_escape;
                         s++;
                         c = hextobin (ch);
                         ch = *s;
-                        if (isxdigit (ch))
+                        if (c_isxdigit (ch))
                           {
                             s++;
                             c = c * 16 + hextobin (ch);

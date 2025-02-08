@@ -1,5 +1,5 @@
 /* comm -- compare two sorted files line by line.
-   Copyright (C) 1986-2023 Free Software Foundation, Inc.
+   Copyright (C) 1986-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -35,10 +35,6 @@
 #define AUTHORS \
   proper_name ("Richard M. Stallman"), \
   proper_name ("David MacKenzie")
-
-/* Undefine, to avoid warning about redefinition on some systems.  */
-#undef min
-#define min(x, y) ((x) < (y) ? (x) : (y))
 
 /* True if the LC_COLLATE locale is hard.  */
 static bool hard_LC_COLLATE;
@@ -149,7 +145,7 @@ and column three contains lines common to both files.\n\
       fputs (VERSION_OPTION_DESCRIPTION, stdout);
       fputs (_("\
 \n\
-Note, comparisons honor the rules specified by 'LC_COLLATE'.\n\
+Comparisons honor the rules specified by 'LC_COLLATE'.\n\
 "), stdout);
       printf (_("\
 \n\
@@ -319,7 +315,7 @@ compare_files (char **infiles)
                               thisline[1]->buffer, thisline[1]->length - 1);
           else
             {
-              size_t len = min (thisline[0]->length, thisline[1]->length) - 1;
+              size_t len = MIN (thisline[0]->length, thisline[1]->length) - 1;
               order = memcmp (thisline[0]->buffer, thisline[1]->buffer, len);
               if (order == 0)
                 order = ((thisline[0]->length > thisline[1]->length)

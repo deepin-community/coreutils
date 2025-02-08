@@ -1,11 +1,11 @@
-# serial 45
+# serial 47
 
 dnl From Jim Meyering.
 dnl Check for the nanosleep function.
 dnl If not found, use the supplied replacement.
 dnl
 
-# Copyright (C) 1999-2001, 2003-2023 Free Software Foundation, Inc.
+# Copyright (C) 1999-2001, 2003-2024 Free Software Foundation, Inc.
 
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -21,7 +21,7 @@ AC_DEFUN([gl_FUNC_NANOSLEEP],
 
  AC_CHECK_DECLS_ONCE([alarm])
 
- nanosleep_save_libs=$LIBS
+ gl_saved_LIBS=$LIBS
 
  # Solaris 2.5.1 needs -lposix4 to get the nanosleep function.
  # Solaris 7 prefers the library name -lrt to the obsolescent name -lposix4.
@@ -119,6 +119,10 @@ AC_DEFUN([gl_FUNC_NANOSLEEP],
             # Guess it halfway works when the kernel is Linux.
           linux*)
             gl_cv_func_nanosleep='guessing no (mishandles large arguments)' ;;
+            # Midipix generally emulates the Linux system calls,
+            # but here it handles large arguments correctly.
+          midipix*)
+            gl_cv_func_nanosleep='guessing yes' ;;
             # Guess no on native Windows.
           mingw* | windows*)
             gl_cv_func_nanosleep='guessing no' ;;
@@ -143,7 +147,7 @@ AC_DEFUN([gl_FUNC_NANOSLEEP],
  else
    HAVE_NANOSLEEP=0
  fi
- LIBS=$nanosleep_save_libs
+ LIBS=$gl_saved_LIBS
 
  # For backward compatibility.
  LIB_NANOSLEEP="$NANOSLEEP_LIB"

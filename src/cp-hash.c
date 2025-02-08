@@ -1,5 +1,5 @@
 /* cp-hash.c  -- file copying (hash search routines)
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -65,7 +65,7 @@ src_to_dest_compare (void const *x, void const *y)
 {
   struct Src_to_dest const *a = x;
   struct Src_to_dest const *b = y;
-  return SAME_INODE (*a, *b) ? true : false;
+  return PSAME_INODE (a, b);
 }
 
 static void

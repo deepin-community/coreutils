@@ -1,5 +1,5 @@
 /* stdbuf -- setup the standard streams for a command
-   Copyright (C) 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 2009-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -285,11 +285,11 @@ set_libstdbuf_options (void)
 
           if (*stdbuf[i].optarg == 'L')
             ret = asprintf (&var, "%s%c=L", "_STDBUF_",
-                            toupper (stdbuf[i].optc));
+                            c_toupper (stdbuf[i].optc));
           else
-            ret = asprintf (&var, "%s%c=%" PRIuMAX, "_STDBUF_",
-                            toupper (stdbuf[i].optc),
-                            (uintmax_t) stdbuf[i].size);
+            ret = asprintf (&var, "%s%c=%zu", "_STDBUF_",
+                            c_toupper (stdbuf[i].optc),
+                            stdbuf[i].size);
           if (ret < 0)
             xalloc_die ();
 

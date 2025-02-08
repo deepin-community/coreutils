@@ -1,5 +1,5 @@
 /* seq - print sequence of numbers to standard output.
-   Copyright (C) 1994-2023 Free Software Foundation, Inc.
+   Copyright (C) 1994-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
 /* Written by Ulrich Drepper.  */
 
 #include <config.h>
+#include <ctype.h>
 #include <getopt.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -306,7 +307,11 @@ print_numbers (char const *fmt, struct layout layout,
             write_error ();
           if (out_of_range)
             break;
+
+          /* Mathematically equivalent to 'x += step;', and typically
+             less subject to rounding error.  */
           x = first + i * step;
+
           out_of_range = (step < 0 ? x < last : last < x);
 
           if (out_of_range)

@@ -2,7 +2,7 @@
 
 /* Modified to run with the GNU shell by bfox. */
 
-/* Copyright (C) 1987-2023 Free Software Foundation, Inc.
+/* Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,13 +20,8 @@
 /* Define TEST_STANDALONE to get the /bin/test version.  Otherwise, you get
    the shell builtin version. */
 
-/* Without this pragma, gcc 4.6.2 20111027 mistakenly suggests that
-   the advance function might be candidate for attribute 'pure'.  */
-#if (__GNUC__ == 4 && 6 <= __GNUC_MINOR__) || 4 < __GNUC__
-# pragma GCC diagnostic ignored "-Wsuggest-attribute=pure"
-#endif
-
 #include <config.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <sys/types.h>
 
@@ -135,7 +130,7 @@ find_int (char const *string)
   char const *p;
   char const *number_start;
 
-  for (p = string; isblank (to_uchar (*p)); p++)
+  for (p = string; isspace (to_uchar (*p)); p++)
     continue;
 
   if (*p == '+')
@@ -153,7 +148,7 @@ find_int (char const *string)
     {
       while (ISDIGIT (*p))
         p++;
-      while (isblank (to_uchar (*p)))
+      while (isspace (to_uchar (*p)))
         p++;
       if (!*p)
         return number_start;
@@ -767,13 +762,12 @@ INTEGER may also be -l STRING, which evaluates to the length of STRING.\n\
 "), stdout);
       fputs (_("\
 \n\
-NOTE: Binary -a and -o are inherently ambiguous.  Use 'test EXPR1 && test\n\
-EXPR2' or 'test EXPR1 || test EXPR2' instead.\n\
+Binary -a and -o are ambiguous.  Use 'test EXPR1 && test EXPR2'\n\
+or 'test EXPR1 || test EXPR2' instead.\n\
 "), stdout);
       fputs (_("\
 \n\
-NOTE: [ honors the --help and --version options, but test does not.\n\
-test treats each of those as it treats any other nonempty STRING.\n\
+'[' honors --help and --version, but 'test' treats them as STRINGs.\n\
 "), stdout);
       printf (USAGE_BUILTIN_WARNING, _("test and/or ["));
       emit_ancillary_info (PROGRAM_NAME);

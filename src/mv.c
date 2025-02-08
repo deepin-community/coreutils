@@ -1,5 +1,5 @@
 /* mv -- move or rename files
-   Copyright (C) 1986-2023 Free Software Foundation, Inc.
+   Copyright (C) 1986-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -48,17 +48,18 @@
 enum
 {
   DEBUG_OPTION = CHAR_MAX + 1,
+  EXCHANGE_OPTION,
   NO_COPY_OPTION,
   STRIP_TRAILING_SLASHES_OPTION
 };
 
 static char const *const update_type_string[] =
 {
-  "all", "none", "older", nullptr
+  "all", "none", "none-fail", "older", nullptr
 };
 static enum Update_type const update_type[] =
 {
-  UPDATE_ALL, UPDATE_NONE, UPDATE_OLDER,
+  UPDATE_ALL, UPDATE_NONE, UPDATE_NONE_FAIL, UPDATE_OLDER,
 };
 ARGMATCH_VERIFY (update_type_string, update_type);
 
@@ -67,9 +68,10 @@ static struct option const long_options[] =
   {"backup", optional_argument, nullptr, 'b'},
   {"context", no_argument, nullptr, 'Z'},
   {"debug", no_argument, nullptr, DEBUG_OPTION},
+  {"exchange", no_argument, nullptr, EXCHANGE_OPTION},
   {"force", no_argument, nullptr, 'f'},
   {"interactive", no_argument, nullptr, 'i'},
-  {"no-clobber", no_argument, nullptr, 'n'},
+  {"no-clobber", no_argument, nullptr, 'n'},   /* Deprecated.  */
   {"no-copy", no_argument, nullptr, NO_COPY_OPTION},
   {"no-target-directory", no_argument, nullptr, 'T'},
   {"strip-trailing-slashes", no_argument, nullptr,
@@ -273,6 +275,9 @@ Rename SOURCE to DEST, or move SOURCE(s) to DIRECTORY.\n\
       --debug                  explain how a file is copied.  Implies -v\n\
 "), stdout);
       fputs (_("\
+      --exchange               exchange source and destination\n\
+"), stdout);
+      fputs (_("\
   -f, --force                  do not prompt before overwriting\n\
   -i, --interactive            prompt before overwrite\n\
   -n, --no-clobber             do not overwrite an existing file\n\
@@ -290,8 +295,8 @@ If you specify more than one of -i, -f, -n, only the final one takes effect.\n\
 "), stdout);
       fputs (_("\
   --update[=UPDATE]            control which existing files are updated;\n\
-                                 UPDATE={all,none,older(default)}.  See below\n\
-  -u                           equivalent to --update[=older]\n\
+                                 UPDATE={all,none,none-fail,older(default)}.\n\
+  -u                           equivalent to --update[=older].  See below\n\
 "), stdout);
       fputs (_("\
   -v, --verbose                explain what is being done\n\
@@ -322,6 +327,7 @@ main (int argc, char **argv)
   int n_files;
   char **file;
   bool selinux_enabled = (0 < is_selinux_enabled ());
+  bool no_clobber = false;
 
   initialize_main (&argc, &argv);
   set_program_name (argv[0]);
@@ -353,10 +359,15 @@ main (int argc, char **argv)
           x.interactive = I_ASK_USER;
           break;
         case 'n':
-          x.interactive = I_ALWAYS_NO;
+          x.interactive = I_ALWAYS_SKIP;
+          no_clobber = true;
+          x.update = false;
           break;
         case DEBUG_OPTION:
           x.debug = x.verbose = true;
+          break;
+        case EXCHANGE_OPTION:
+          x.exchange = true;
           break;
         case NO_COPY_OPTION:
           x.no_copy = true;
@@ -373,13 +384,12 @@ main (int argc, char **argv)
           no_target_directory = true;
           break;
         case 'u':
-          if (optarg == nullptr)
-            x.update = true;
-          else if (x.interactive != I_ALWAYS_NO)  /* -n takes precedence.  */
+          if (! no_clobber)
             {
-              enum Update_type update_opt;
-              update_opt = XARGMATCH ("--update", optarg,
-                                      update_type_string, update_type);
+              enum Update_type update_opt = UPDATE_OLDER;
+              if (optarg)
+                update_opt = XARGMATCH ("--update", optarg,
+                                        update_type_string, update_type);
               if (update_opt == UPDATE_ALL)
                 {
                   /* Default mv operation.  */
@@ -390,6 +400,11 @@ main (int argc, char **argv)
                 {
                   x.update = false;
                   x.interactive = I_ALWAYS_SKIP;
+                }
+              else if (update_opt == UPDATE_NONE_FAIL)
+                {
+                  x.update = false;
+                  x.interactive = I_ALWAYS_NO;
                 }
               else if (update_opt == UPDATE_OLDER)
                 {
@@ -462,7 +477,7 @@ main (int argc, char **argv)
   else
     {
       char const *lastfile = file[n_files - 1];
-      if (n_files == 2)
+      if (n_files == 2 && !x.exchange)
         x.rename_errno = (renameatu (AT_FDCWD, file[0], AT_FDCWD, lastfile,
                                      RENAME_NOREPLACE)
                           ? errno : 0);
@@ -506,13 +521,14 @@ main (int argc, char **argv)
     for (int i = 0; i < n_files; i++)
       strip_trailing_slashes (file[i]);
 
-  if (x.interactive == I_ALWAYS_NO)
-    x.update = false;
-
-  if (make_backups && x.interactive == I_ALWAYS_NO)
+  if (make_backups
+      && (x.exchange
+          || x.interactive == I_ALWAYS_SKIP
+          || x.interactive == I_ALWAYS_NO))
     {
       error (0, 0,
-             _("options --backup and --no-clobber are mutually exclusive"));
+             _("cannot combine --backup with "
+               "--exchange, -n, or --update=none-fail"));
       usage (EXIT_FAILURE);
     }
 

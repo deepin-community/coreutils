@@ -1,5 +1,5 @@
 /* cat -- concatenate files and print on the standard output.
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@
 
 #include <config.h>
 
-#include <stdckdint.h>
 #include <stdio.h>
 #include <getopt.h>
 #include <sys/types.h>
@@ -644,7 +643,7 @@ main (int argc, char **argv)
     error (EXIT_FAILURE, errno, _("standard output"));
 
   /* Optimal size of i/o operations of output.  */
-  idx_t outsize = io_blksize (stat_buf);
+  idx_t outsize = io_blksize (&stat_buf);
 
   /* Device and I-node number of the output.  */
   dev_t out_dev = stat_buf.st_dev;
@@ -698,7 +697,7 @@ main (int argc, char **argv)
         }
 
       /* Optimal size of i/o operations of input.  */
-      idx_t insize = io_blksize (stat_buf);
+      idx_t insize = io_blksize (&stat_buf);
 
       fdadvise (input_desc, 0, 0, FADVISE_SEQUENTIAL);
 

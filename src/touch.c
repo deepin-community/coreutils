@@ -1,5 +1,5 @@
 /* touch -- change modification and access times of files
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -239,17 +239,16 @@ change the times of the file associated with standard output.\n\
 "), stdout);
       fputs (_("\
   -r, --reference=FILE   use this file's times instead of current time\n\
-  -t STAMP               use [[CC]YY]MMDDhhmm[.ss] instead of current time\n\
-      --time=WORD        change the specified time:\n\
-                           WORD is access, atime, or use: equivalent to -a\n\
-                           WORD is modify or mtime: equivalent to -m\n\
+  -t [[CC]YY]MMDDhhmm[.ss]  use specified time instead of current time,\n\
+                         with a date-time format that differs from -d's\n\
+"), stdout);
+      fputs (_("\
+      --time=WORD        specify which time to change:\n\
+                           access time (-a): 'access', 'atime', 'use';\n\
+                           modification time (-m): 'modify', 'mtime'\n\
 "), stdout);
       fputs (HELP_OPTION_DESCRIPTION, stdout);
       fputs (VERSION_OPTION_DESCRIPTION, stdout);
-      fputs (_("\
-\n\
-Note that the -d and -t options accept different time-date formats.\n\
-"), stdout);
       emit_ancillary_info (PROGRAM_NAME);
     }
   exit (status);

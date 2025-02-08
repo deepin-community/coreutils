@@ -18,6 +18,7 @@ Adam Jimerson                       vendion@charter.net
 Adam Klein                          aklein@debian.org
 Adam Sampson                        ats@offog.org
 Adrian Bunk                         bunk@stusta.de
+Aearil                              aearil@paranoici.org
 AIDA Shinra                         shinra@j10n.org
 Akim Demaille                       akim.demaille@gmail.com
 Alain Magloire                      alain@qnx.com
@@ -162,6 +163,7 @@ Chris Meyering                      christophe.meyering@gmail.com
 Chris Sylvain                       csylvain@umm.edu
 Chris Yeo                           cyeo@biking.org
 Christi Alice Scarborough           christi@chiark.greenend.org.uk
+Christian Göttsche                  cgzones@googlemail.com
 Christian Harkort                   christian.harkort@web.de
 Christian Hesse                     mail@eworm.de
 Christian Jullien                   eligis@orange.fr
@@ -180,11 +182,13 @@ Cojocaru Alexandru                  xojoc@gmx.com
 Colin Leitner                       colin.leitner@googlemail.com
 Colin Plumb                         colin@nyx.net
 Colin Watson                        cjwatson@debian.org
+Collin Funk                         collin.funk1@gmail.com
 Collin Rogowski                     collin@rogowski.de
 Cray-Cyber Project                  https://www.cray-cyber.org
 Cristian Cadar                      cristic@stanford.edu
 Cyril Bouthors                      cyril@bouthors.org
 D. Hugh Redelmeier                  hugh@mimosa.com
+Daan De Meyer                       daan.j.demeyer@gmail.com
 Daiki Ueno                          ueno@gnu.org
 Dale Scheetz                        dwarf@polaris.net
 Dameon G. Rogers                    dgr03@uark.edu
@@ -204,6 +208,7 @@ Daniel Schepler                     dschepler@gmail.com
 Daniel Stavrovski                   d@stavrovski.net
 Daniel Tschinder                    daniel.tschinder@project-a.com
 Dániel Varga                        danielv@axelero.hu
+dann frazier                        dann.frazier@canonical.com
 Danny Levinson                      danny.levinson@overture.com
 Dario Giovannetti                   dariogiova@gmail.com
 Darrel Francis                      d.francis@cheerful.com
@@ -331,9 +336,10 @@ Greg McGary                         gkm@gnu.org
 Greg Metcalfe                       metcalfegreg@qwest.net
 Greg Schafer                        gschafer@zip.com.au
 Greg Troxel                         gdt@bbn.com
-Greg Wooledge                       gawooledge@sherwin.com
+Greg Wooledge                       greg@wooledge.org
 Gregory Leblanc                     gleblanc@cu-portland.edu
 Grigorii Sokolik                    g.sokol99@g-sokol.info
+Grisha Levit                        grishalevit@gmail.com
 Guenter Knauf                       lists@gknw.net
 Guido Leenders                      guido.leenders@invantive.com
 Guilherme de Almeida Suckevicz      guito.linux@gmail.com
@@ -519,6 +525,7 @@ Ludovic Courtès                     ludo@gnu.org
 Luke Hassell                        lukehassell@yahoo.com
 Luke Kendall                        lukekendall@optushome.com.au
 Luther Thompson                     lutheroto@gmail.com
+lvgenggeng                          lvgenggeng@uniontech.com
 M. P. Suzuki                        mpsuzuki@hiroshima-u.ac.jp
 Maciej Kwapulinski                  pikpok@univ.gda.pl
 Manas Garg                          manas@cygsoft.com
@@ -566,6 +573,7 @@ Masami Takikawa                     takikawm@CS.ORST.EDU
 Mate Wierdl                         mw@moni.msci.memphis.edu
 Matej Vela                          mvela@public.srce.hr
 Matěj Cepl                          mcepl@redhat.com
+Matheus Afonso Martins Moreira      matheus.a.m.moreira@gmail.com
 Mathias Brodala                     info@noctus.net
 Mathieu Bridon                      bochecha@fedoraproject.org
 Matias A. Fonzo                     selk@dragora.org
@@ -624,6 +632,7 @@ Michal Nazarewicz                   mina86@mina86.com
 Michal Politowski                   mpol@charybda.icm.edu.pl
 Michal Svec                         msvec@suse.cz
 Michal Trunecka                     mtruneck@redhat.com
+Michel Lind                         michel@michel-slm.name
 Michel Robitaille                   robitail@IRO.UMontreal.CA
 Michiel Bacchiani                   bacchian@raven.bu.edu
 Mikael Magnusson                    mikachu@gmail.com
@@ -711,6 +720,7 @@ Peter Moulder                       reiter@netspace.net.au
 Peter O'Gorman                      bug-coreutils@mlists.thewrittenword.com
 Peter Samuelson                     psamuels@sampo.creighton.edu
 Peter Seebach                       seebs@taniemarie.solon.com
+Petr Malat                          oss@malat.biz
 Petr Pisar                          petr.pisar@atlas.cz
 Petr Salinger                       Petr.Salinger@seznam.cz
 Petr Stodůlka                       pstodulk@redhat.com
@@ -811,6 +821,7 @@ Stefan Vargyas                      stvar@yahoo.com
 Stefano Lattarini                   stefano.lattarini@gmail.com
 Stephan Krempel                     krempel@par-tec.com
 Stephane Chazelas                   stephane.chazelas@gmail.com
+Stephane Chazelas                   stephane@chazelas.org
 Stéphane Aulery                     saulery@free.fr
 Stéphane Campinas                   stephane.campinas@gmail.com
 Stéphane Chazelas                   Stephane_CHAZELAS@yahoo.fr
@@ -818,6 +829,7 @@ Stéphane Raimbault                  stephane.raimbault@gmail.com
 Stephen Depooter                    sbdep@myrealbox.com
 Stephen Eglen                       eglen@pcg.wustl.edu
 Stephen Gildea                      gildea@stop.mail-abuse.org
+Stephen Kitt                        skitt@redhat.com
 Stephen Shirley                     kormat@gmail.com
 Stephen Smoogen                     smooge@mindspring.com
 Steve McConnel                      steve@acadcomp.sil.org

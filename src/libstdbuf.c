@@ -1,5 +1,5 @@
 /* libstdbuf -- a shared lib to preload to setup stdio buffering for a command
-   Copyright (C) 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 2009-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -118,8 +118,7 @@ apply_mode (FILE *stream, char const *mode)
              glibc currently ignores the combination of null buffer
              with non zero size, we'll fail here.  */
           fprintf (stderr,
-                   _("failed to allocate a %" PRIuMAX
-                     " byte stdio buffer\n"),
+                   _("failed to allocate a %ju byte stdio buffer\n"),
                    size);
           return;
         }

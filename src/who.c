@@ -1,5 +1,5 @@
 /* GNU's who.
-   Copyright (C) 1992-2023 Free Software Foundation, Inc.
+   Copyright (C) 1992-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -25,7 +25,6 @@
 
 #include <config.h>
 #include <getopt.h>
-#include <stdckdint.h>
 #include <stdio.h>
 
 #include <sys/types.h>

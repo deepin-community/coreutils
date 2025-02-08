@@ -1,6 +1,6 @@
 /* Generate random integers.
 
-   Copyright (C) 2006-2023 Free Software Foundation, Inc.
+   Copyright (C) 2006-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ main (int argc, char **argv)
   struct randint_source *ints = randint_all_new (name, SIZE_MAX);
 
   for (i = 0; i < n; i++)
-    printf ("%"PRIuMAX"\n", randint_choose (ints, choices));
+    printf ("%ju\n", randint_choose (ints, choices));
 
   return (randint_all_free (ints) == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

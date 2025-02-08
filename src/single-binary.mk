@@ -2,6 +2,7 @@
 src_libsinglebin_dir_a_DEPENDENCIES = src/libsinglebin_ls.a
 src_libsinglebin_vdir_a_DEPENDENCIES = src/libsinglebin_ls.a
 src_libsinglebin_arch_a_DEPENDENCIES = src/libsinglebin_uname.a
+src_libsinglebin_chgrp_a_DEPENDENCIES = src/libsinglebin_chown.a
 # Command arch
 noinst_LIBRARIES += src/libsinglebin_arch.a
 src_libsinglebin_arch_a_SOURCES = src/coreutils-arch.c
@@ -52,7 +53,7 @@ src_libsinglebin_stty_a_CFLAGS = "-Dmain=single_binary_main_stty (int, char **);
 # Command timeout
 noinst_LIBRARIES += src/libsinglebin_timeout.a
 src_libsinglebin_timeout_a_SOURCES =   src/timeout.c src/operand2sig.c
-src_libsinglebin_timeout_a_ldadd =   $(LIB_TIMER_TIME)
+src_libsinglebin_timeout_a_ldadd =   $(TIMER_TIME_LIB)
 src_libsinglebin_timeout_a_DEPENDENCIES = $(src_timeout_DEPENDENCIES)
 src_libsinglebin_timeout_a_CFLAGS = "-Dmain=single_binary_main_timeout (int, char **);  int single_binary_main_timeout"  -Dusage=_usage_timeout $(src_coreutils_CFLAGS)
 # Command users
@@ -115,8 +116,8 @@ src_libsinglebin_chcon_a_DEPENDENCIES = $(src_chcon_DEPENDENCIES)
 src_libsinglebin_chcon_a_CFLAGS = "-Dmain=single_binary_main_chcon (int, char **);  int single_binary_main_chcon"  -Dusage=_usage_chcon $(src_coreutils_CFLAGS)
 # Command chgrp
 noinst_LIBRARIES += src/libsinglebin_chgrp.a
-src_libsinglebin_chgrp_a_SOURCES =   src/chgrp.c src/chown-core.c
-src_libsinglebin_chgrp_a_DEPENDENCIES = $(src_chgrp_DEPENDENCIES)
+src_libsinglebin_chgrp_a_SOURCES = src/coreutils-chgrp.c
+src_libsinglebin_chgrp_a_ldadd =   $(src_chown_LDADD) src/libsinglebin_chown.a
 src_libsinglebin_chgrp_a_CFLAGS = "-Dmain=single_binary_main_chgrp (int, char **);  int single_binary_main_chgrp"  -Dusage=_usage_chgrp $(src_coreutils_CFLAGS)
 # Command chmod
 noinst_LIBRARIES += src/libsinglebin_chmod.a
@@ -125,7 +126,7 @@ src_libsinglebin_chmod_a_DEPENDENCIES = $(src_chmod_DEPENDENCIES)
 src_libsinglebin_chmod_a_CFLAGS = "-Dmain=single_binary_main_chmod (int, char **);  int single_binary_main_chmod"  -Dusage=_usage_chmod $(src_coreutils_CFLAGS)
 # Command chown
 noinst_LIBRARIES += src/libsinglebin_chown.a
-src_libsinglebin_chown_a_SOURCES =   src/chown.c src/chown-core.c
+src_libsinglebin_chown_a_SOURCES =   src/chown.c src/chown-core.c src/chown-chown.c
 src_libsinglebin_chown_a_DEPENDENCIES = $(src_chown_DEPENDENCIES)
 src_libsinglebin_chown_a_CFLAGS = "-Dmain=single_binary_main_chown (int, char **);  int single_binary_main_chown"  -Dusage=_usage_chown $(src_coreutils_CFLAGS)
 # Command cksum
@@ -165,7 +166,7 @@ src_libsinglebin_date_a_CFLAGS = "-Dmain=single_binary_main_date (int, char **);
 # Command dd
 noinst_LIBRARIES += src/libsinglebin_dd.a
 src_libsinglebin_dd_a_SOURCES = src/dd.c
-src_libsinglebin_dd_a_ldadd =   $(GETHRXTIME_LIB)  $(LIB_FDATASYNC)
+src_libsinglebin_dd_a_ldadd =   $(GETHRXTIME_LIB)  $(FDATASYNC_LIB)
 src_libsinglebin_dd_a_DEPENDENCIES = $(src_dd_DEPENDENCIES)
 src_libsinglebin_dd_a_CFLAGS = "-Dmain=single_binary_main_dd (int, char **);  int single_binary_main_dd"  -Dusage=_usage_dd $(src_coreutils_CFLAGS)
 # Command dir
@@ -454,7 +455,7 @@ src_libsinglebin_sha512sum_a_CPPFLAGS =   -DHASH_ALGO_SHA512=1 $(AM_CPPFLAGS)
 # Command shred
 noinst_LIBRARIES += src/libsinglebin_shred.a
 src_libsinglebin_shred_a_SOURCES = src/shred.c
-src_libsinglebin_shred_a_ldadd =   $(LIB_FDATASYNC)
+src_libsinglebin_shred_a_ldadd =   $(FDATASYNC_LIB)
 src_libsinglebin_shred_a_DEPENDENCIES = $(src_shred_DEPENDENCIES)
 src_libsinglebin_shred_a_CFLAGS = "-Dmain=single_binary_main_shred (int, char **);  int single_binary_main_shred"  -Dusage=_usage_shred $(src_coreutils_CFLAGS)
 # Command shuf
@@ -471,7 +472,7 @@ src_libsinglebin_sleep_a_CFLAGS = "-Dmain=single_binary_main_sleep (int, char **
 # Command sort
 noinst_LIBRARIES += src/libsinglebin_sort.a
 src_libsinglebin_sort_a_SOURCES = src/sort.c
-src_libsinglebin_sort_a_ldadd =   $(EUIDACCESS_LIBGEN)  $(CLOCK_TIME_LIB)  $(NANOSLEEP_LIB)  $(LIB_CRYPTO)  $(LIBPMULTITHREAD)  $(PTHREAD_SIGMASK_LIB)
+src_libsinglebin_sort_a_ldadd =   $(EUIDACCESS_LIBGEN)  $(CLOCK_TIME_LIB)  $(NANOSLEEP_LIB)  $(LIB_DL) $(LIB_CRYPTO)  $(LIBPMULTITHREAD)  $(PTHREAD_SIGMASK_LIB)
 src_libsinglebin_sort_a_DEPENDENCIES = $(src_sort_DEPENDENCIES)
 src_libsinglebin_sort_a_CFLAGS = "-Dmain=single_binary_main_sort (int, char **);  int single_binary_main_sort"  -Dusage=_usage_sort $(src_coreutils_CFLAGS)
 # Command split
@@ -495,7 +496,7 @@ src_libsinglebin_sum_a_CPPFLAGS =   -DHASH_ALGO_SUM=1 $(AM_CPPFLAGS)
 # Command sync
 noinst_LIBRARIES += src/libsinglebin_sync.a
 src_libsinglebin_sync_a_SOURCES = src/sync.c
-src_libsinglebin_sync_a_ldadd =   $(LIB_FDATASYNC)
+src_libsinglebin_sync_a_ldadd =   $(FDATASYNC_LIB)
 src_libsinglebin_sync_a_DEPENDENCIES = $(src_sync_DEPENDENCIES)
 src_libsinglebin_sync_a_CFLAGS = "-Dmain=single_binary_main_sync (int, char **);  int single_binary_main_sync"  -Dusage=_usage_sync $(src_coreutils_CFLAGS)
 # Command tac

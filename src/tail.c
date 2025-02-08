@@ -1,5 +1,5 @@
 /* tail -- output the last part of file(s)
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -202,9 +202,14 @@ enum header_mode
 static uintmax_t max_n_unchanged_stats_between_opens =
   DEFAULT_MAX_N_UNCHANGED_STATS_BETWEEN_OPENS;
 
-/* The process ID of the process (presumably on the current host)
-   that is writing to all followed files.  */
-static pid_t pid;
+/* The process IDs of the processes to watch (those writing the followed
+   files, or perhaps other processes the user cares about).  */
+static int nbpids = 0;
+static pid_t * pids = nullptr;
+static idx_t pids_alloc;
+
+/* Used to determine the buffer size when scanning backwards in a file.  */
+static idx_t page_size;
 
 /* True if we have ever read standard input.  */
 static bool have_read_stdin;
@@ -298,7 +303,8 @@ With more than one FILE, precede each with a header giving the file name.\n\
              DEFAULT_MAX_N_UNCHANGED_STATS_BETWEEN_OPENS
              );
      fputs (_("\
-      --pid=PID            with -f, terminate after process ID, PID dies\n\
+      --pid=PID            with -f, terminate after process ID, PID dies;\n\
+                             can be repeated to watch multiple processes\n\
   -q, --quiet, --silent    never output headers giving file names\n\
       --retry              keep trying to open a file if it is inaccessible\n\
 "), stdout);
@@ -512,22 +518,40 @@ xlseek (int fd, off_t offset, int whence, char const *filename)
    Return true if successful.  */
 
 static bool
-file_lines (char const *pretty_filename, int fd, uintmax_t n_lines,
-            off_t start_pos, off_t end_pos, uintmax_t *read_pos)
+file_lines (char const *pretty_filename, int fd, struct stat const *sb,
+            uintmax_t n_lines, off_t start_pos, off_t end_pos,
+            uintmax_t *read_pos)
 {
-  char buffer[BUFSIZ];
+  char *buffer;
   size_t bytes_read;
+  blksize_t bufsize = BUFSIZ;
   off_t pos = end_pos;
+  bool ok = true;
 
   if (n_lines == 0)
     return true;
 
+  /* Be careful with files with sizes that are a multiple of the page size,
+     as on /proc or /sys file systems these files accept seeking to within
+     the file, but then return no data when read.  So use a buffer that's
+     at least PAGE_SIZE to avoid seeking within such files.
+
+     We could also indirectly use a large enough buffer through io_blksize()
+     however this would be less efficient in the common case, as it would
+     generally pick a larger buffer size, resulting in reading more data
+     from the end of the file.  */
+  affirm (S_ISREG (sb->st_mode));
+  if (sb->st_size % page_size == 0)
+    bufsize = MAX (BUFSIZ, page_size);
+
+  buffer = xmalloc (bufsize);
+
   /* Set 'bytes_read' to the size of the last, probably partial, buffer;
-     0 < 'bytes_read' <= 'BUFSIZ'.  */
-  bytes_read = (pos - start_pos) % BUFSIZ;
+     0 < 'bytes_read' <= 'bufsize'.  */
+  bytes_read = (pos - start_pos) % bufsize;
   if (bytes_read == 0)
-    bytes_read = BUFSIZ;
-  /* Make 'pos' a multiple of 'BUFSIZ' (0 if the file is short), so that all
+    bytes_read = bufsize;
+  /* Make 'pos' a multiple of 'bufsize' (0 if the file is short), so that all
      reads will be on block boundaries, which might increase efficiency.  */
   pos -= bytes_read;
   xlseek (fd, pos, SEEK_SET, pretty_filename);
@@ -535,7 +559,8 @@ file_lines (char const *pretty_filename, int fd, uintmax_t n_lines,
   if (bytes_read == SAFE_READ_ERROR)
     {
       error (0, errno, _("error reading %s"), quoteaf (pretty_filename));
-      return false;
+      ok = false;
+      goto free_buffer;
     }
   *read_pos = pos + bytes_read;
 
@@ -562,7 +587,7 @@ file_lines (char const *pretty_filename, int fd, uintmax_t n_lines,
               xwrite_stdout (nl + 1, bytes_read - (n + 1));
               *read_pos += dump_remainder (false, pretty_filename, fd,
                                            end_pos - (pos + bytes_read));
-              return true;
+              goto free_buffer;
             }
         }
 
@@ -574,23 +599,26 @@ file_lines (char const *pretty_filename, int fd, uintmax_t n_lines,
           xlseek (fd, start_pos, SEEK_SET, pretty_filename);
           *read_pos = start_pos + dump_remainder (false, pretty_filename, fd,
                                                   end_pos);
-          return true;
+          goto free_buffer;
         }
-      pos -= BUFSIZ;
+      pos -= bufsize;
       xlseek (fd, pos, SEEK_SET, pretty_filename);
 
-      bytes_read = safe_read (fd, buffer, BUFSIZ);
+      bytes_read = safe_read (fd, buffer, bufsize);
       if (bytes_read == SAFE_READ_ERROR)
         {
           error (0, errno, _("error reading %s"), quoteaf (pretty_filename));
-          return false;
+          ok = false;
+          goto free_buffer;
         }
 
       *read_pos = pos + bytes_read;
     }
   while (bytes_read > 0);
 
-  return true;
+free_buffer:
+  free (buffer);
+  return ok;
 }
 
 /* Print the last N_LINES lines from the end of the standard input,
@@ -1111,6 +1139,25 @@ any_live_files (const struct File_spec *f, size_t n_files)
   return false;
 }
 
+/* Determine whether all watched writers are dead.
+   Returns true only if all processes' states can be determined,
+   and all processes no longer exist.  */
+
+static bool
+writers_are_dead (void)
+{
+  if (!nbpids)
+    return false;
+
+  for (int i = 0; i < nbpids; i++)
+    {
+      if (kill (pids[i], 0) == 0 || errno == EPERM)
+        return false;
+    }
+
+  return true;
+}
+
 /* Tail N_FILES files forever, or until killed.
    The pertinent information for each file is stored in an entry of F.
    Loop over each of them, doing an fstat to see if they have changed size,
@@ -1122,10 +1169,10 @@ static void
 tail_forever (struct File_spec *f, size_t n_files, double sleep_interval)
 {
   /* Use blocking I/O as an optimization, when it's easy.  */
-  bool blocking = (pid == 0 && follow_mode == Follow_descriptor
+  bool blocking = (!nbpids && follow_mode == Follow_descriptor
                    && n_files == 1 && f[0].fd != -1 && ! S_ISREG (f[0].mode));
   size_t last;
-  bool writer_is_dead = false;
+  bool writers_dead = false;
 
   last = n_files - 1;
 
@@ -1273,19 +1320,14 @@ tail_forever (struct File_spec *f, size_t n_files, double sleep_interval)
       /* If nothing was read, sleep and/or check for dead writers.  */
       if (!any_input)
         {
-          if (writer_is_dead)
+          if (writers_dead)
             break;
 
           /* Once the writer is dead, read the files once more to
              avoid a race condition.  */
-          writer_is_dead = (pid != 0
-                            && kill (pid, 0) != 0
-                            /* Handle the case in which you cannot send a
-                               signal to the writer, so kill fails and sets
-                               errno to EPERM.  */
-                            && errno != EPERM);
+          writers_dead = writers_are_dead ();
 
-          if (!writer_is_dead && xnanosleep (sleep_interval))
+          if (!writers_dead && xnanosleep (sleep_interval))
             error (EXIT_FAILURE, errno, _("cannot read realtime clock"));
 
         }
@@ -1445,7 +1487,7 @@ tail_forever_inotify (int wd, struct File_spec *f, size_t n_files,
   bool tailed_but_unwatchable = false;
   bool found_unwatchable_dir = false;
   bool no_inotify_resources = false;
-  bool writer_is_dead = false;
+  bool writers_dead = false;
   struct File_spec *prev_fspec;
   size_t evlen = 0;
   char *evbuf;
@@ -1611,14 +1653,14 @@ tail_forever_inotify (int wd, struct File_spec *f, size_t n_files,
               /* How many ms to wait for changes.  -1 means wait forever.  */
               int delay = -1;
 
-              if (pid)
+              if (nbpids)
                 {
-                  if (writer_is_dead)
+                  if (writers_dead)
                     exit (EXIT_SUCCESS);
 
-                  writer_is_dead = (kill (pid, 0) != 0 && errno != EPERM);
+                  writers_dead = writers_are_dead ();
 
-                  if (writer_is_dead || sleep_interval <= 0)
+                  if (writers_dead || sleep_interval <= 0)
                     delay = 0;
                   else if (sleep_interval < INT_MAX / 1000 - 1)
                     {
@@ -1841,7 +1883,7 @@ tail_bytes (char const *pretty_filename, int fd, uintmax_t n_bytes,
           else if ((current_pos = lseek (fd, -n_bytes, SEEK_END)) != -1)
             end_pos = current_pos + n_bytes;
         }
-      if (end_pos <= (off_t) ST_BLKSIZE (stats))
+      if (end_pos <= (off_t) STP_BLKSIZE (&stats))
         return pipe_bytes (pretty_filename, fd, n_bytes, read_pos);
       if (current_pos == -1)
         current_pos = xlseek (fd, 0, SEEK_CUR, pretty_filename);
@@ -1898,7 +1940,7 @@ tail_lines (char const *pretty_filename, int fd, uintmax_t n_lines,
         {
           *read_pos = end_pos;
           if (end_pos != 0
-              && ! file_lines (pretty_filename, fd, n_lines,
+              && ! file_lines (pretty_filename, fd, &stats, n_lines,
                                start_pos, end_pos, read_pos))
             return false;
         }
@@ -2192,7 +2234,11 @@ parse_options (int argc, char **argv,
           break;
 
         case PID_OPTION:
-          pid = xdectoumax (optarg, 0, PID_T_MAX, "", _("invalid PID"), 0);
+          if (nbpids == pids_alloc)
+            pids = xpalloc (pids, &pids_alloc, 1,
+                            MIN (INT_MAX, PTRDIFF_MAX), sizeof *pids);
+          pids[nbpids++] = xdectoumax (optarg, 0, PID_T_MAX, "",
+                                       _("invalid PID"), 0);
           break;
 
         case PRESUME_INPUT_PIPE_OPTION:
@@ -2246,13 +2292,14 @@ parse_options (int argc, char **argv,
         error (0, 0, _("warning: --retry only effective for the initial open"));
     }
 
-  if (pid && !forever)
+  if (nbpids && !forever)
     error (0, 0,
            _("warning: PID ignored; --pid=PID is useful only when following"));
-  else if (pid && kill (pid, 0) != 0 && errno == ENOSYS)
+  else if (nbpids && kill (pids[0], 0) != 0 && errno == ENOSYS)
     {
       error (0, 0, _("warning: --pid=PID is not supported on this system"));
-      pid = 0;
+      nbpids = 0;
+      free (pids);
     }
 }
 
@@ -2315,6 +2362,8 @@ main (int argc, char **argv)
 
   atexit (close_stdout);
 
+  page_size = getpagesize ();
+
   have_read_stdin = false;
 
   count_lines = true;
@@ -2365,7 +2414,7 @@ main (int argc, char **argv)
       {
         struct stat in_stat;
         bool blocking_stdin;
-        blocking_stdin = (pid == 0 && follow_mode == Follow_descriptor
+        blocking_stdin = (!nbpids && follow_mode == Follow_descriptor
                           && n_files == 1 && ! fstat (STDIN_FILENO, &in_stat)
                           && ! S_ISREG (in_stat.st_mode));
 

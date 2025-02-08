@@ -1,5 +1,5 @@
 /* chown-core.c -- core functions for changing ownership.
-   Copyright (C) 2000-2023 Free Software Foundation, Inc.
+   Copyright (C) 2000-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@ enum RCH_status
     /* required_uid and/or required_gid are specified, but don't match */
     RC_excluded,
 
-    /* SAME_INODE check failed */
+    /* The file was replaced by another file during the requested change.  */
     RC_inode_changed,
 
     /* open/fchown isn't needed, isn't safe, or doesn't work due to
@@ -255,21 +255,16 @@ restricted_chown (int cwd_fd, char const *file,
 
   if (fstat (fd, &st) != 0)
     status = RC_error;
-  else if (! SAME_INODE (*orig_st, st))
+  else if (! psame_inode (orig_st, &st))
     status = RC_inode_changed;
   else if ((required_uid == (uid_t) -1 || required_uid == st.st_uid)
            && (required_gid == (gid_t) -1 || required_gid == st.st_gid))
     {
+#if HAVE_FCHOWN
       if (fchown (fd, uid, gid) == 0)
-        {
-          status = (close (fd) == 0
-                    ? RC_ok : RC_error);
-          return status;
-        }
-      else
-        {
-          status = RC_error;
-        }
+        return close (fd) < 0 ? RC_error : RC_ok;
+#endif
+      status = RC_error;
     }
 
   int saved_errno = errno;
@@ -425,7 +420,7 @@ change_file_owner (FTS *fts, FTSENT *ent,
           /* Ignore any error due to lack of support; POSIX requires
              this behavior for top-level symbolic links with -h, and
              implies that it's required for all symbolic links.  */
-          if (!ok && errno == EOPNOTSUPP)
+          if (!ok && is_ENOTSUP (errno))
             {
               ok = true;
               symlink_changed = false;

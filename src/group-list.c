@@ -1,5 +1,5 @@
 /* group-list.c --Print a list of group IDs or names.
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -112,12 +112,12 @@ print_group (gid_t gid, bool use_name)
           if (TYPE_SIGNED (gid_t))
             {
               intmax_t g = gid;
-              error (0, 0, _("cannot find name for group ID %"PRIdMAX), g);
+              error (0, 0, _("cannot find name for group ID %jd"), g);
             }
           else
             {
               uintmax_t g = gid;
-              error (0, 0, _("cannot find name for group ID %"PRIuMAX), g);
+              error (0, 0, _("cannot find name for group ID %ju"), g);
             }
           ok = false;
         }

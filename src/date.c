@@ -1,5 +1,5 @@
 /* date - print or set the system date and time
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -294,6 +294,7 @@ Show the local time for 9AM next Friday on the west coast of the US\n\
 /* Yield the number of decimal digits needed to output a time with the
    nanosecond resolution RES, without losing information.  */
 
+ATTRIBUTE_CONST
 static int
 res_width (long int res)
 {

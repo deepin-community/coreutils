@@ -1,5 +1,5 @@
 /* expand-common - common functionality for expand/unexpand
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -16,6 +16,7 @@
 
 #include <config.h>
 
+#include <ctype.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include "system.h"
@@ -193,7 +194,7 @@ parse_tab_stops (char const *stops)
             }
 
           /* Detect overflow.  */
-          if (!DECIMAL_DIGIT_ACCUMULATE (tabval, *stops - '0', uintmax_t))
+          if (!DECIMAL_DIGIT_ACCUMULATE (tabval, *stops - '0'))
             {
               size_t len = strspn (num_start, "0123456789");
               char *bad_num = ximemdup0 (num_start, len);

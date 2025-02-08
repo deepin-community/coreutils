@@ -1,5 +1,5 @@
 /* du -- summarize device usage
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -587,7 +587,7 @@ process_file (FTS *fts, FTSENT *ent)
   duinfo_set (&dui,
               (apparent_size
                ? (usable_st_size (sb) ? MAX (0, sb->st_size) : 0)
-               : (uintmax_t) ST_NBLOCKS (*sb) * ST_NBLOCKSIZE),
+               : (uintmax_t) STP_NBLOCKS (sb) * ST_NBLOCKSIZE),
               (time_type == time_mtime ? get_stat_mtime (sb)
                : time_type == time_atime ? get_stat_atime (sb)
                : get_stat_ctime (sb)));

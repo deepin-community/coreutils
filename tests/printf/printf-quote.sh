@@ -1,7 +1,7 @@
 #!/bin/sh
 # tests for printf %q
 
-# Copyright (C) 2015-2023 Free Software Foundation, Inc.
+# Copyright (C) 2015-2024 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,9 +35,8 @@ EOF
 compare exp out || fail=1
 
 unset LC_ALL
-f=$LOCALE_FR_UTF8
-: ${LOCALE_FR_UTF8=none}
 if test "$LOCALE_FR_UTF8" != "none"; then
+  f=$LOCALE_FR_UTF8
   (
    #printable multi-byte
    LC_ALL=$f $prog '%q\n' 'áḃç' > out

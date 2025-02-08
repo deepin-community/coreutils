@@ -1,5 +1,5 @@
 /* 'ln' program to create links between files.
-   Copyright (C) 1986-2023 Free Software Foundation, Inc.
+   Copyright (C) 1986-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -259,7 +259,7 @@ do_link (char const *source, int destdir_fd, char const *dest_base,
                   if (source_status != 0)
                     source_status = stat (source, &source_stats);
                   if (source_status == 0
-                      && SAME_INODE (source_stats, dest_stats)
+                      && psame_inode (&source_stats, &dest_stats)
                       && (source_stats.st_nlink == 1
                           || same_nameat (AT_FDCWD, source,
                                           destdir_fd, dest_base)))
@@ -429,7 +429,7 @@ interpreted in relation to its parent directory.\n\
       --backup[=CONTROL]      make a backup of each existing destination file\n\
   -b                          like --backup but does not accept an argument\n\
   -d, -F, --directory         allow the superuser to attempt to hard link\n\
-                                directories (note: will probably fail due to\n\
+                                directories (this will probably fail due to\n\
                                 system restrictions, even for the superuser)\n\
   -f, --force                 remove existing destination files\n\
 "), stdout);

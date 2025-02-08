@@ -1,6 +1,6 @@
 /* Traverse a file hierarchy.
 
-   Copyright (C) 2004-2023 Free Software Foundation, Inc.
+   Copyright (C) 2004-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1714,7 +1714,7 @@ same_fd (int fd1, int fd2)
   struct stat sb1, sb2;
   return (fstat (fd1, &sb1) == 0
           && fstat (fd2, &sb2) == 0
-          && SAME_INODE (sb1, sb2));
+          && psame_inode (&sb1, &sb2));
 }
 
 static void

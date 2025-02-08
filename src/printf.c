@@ -1,5 +1,5 @@
 /* printf - format and print data
-   Copyright (C) 1990-2023 Free Software Foundation, Inc.
+   Copyright (C) 1990-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -56,6 +56,7 @@
 #include <wchar.h>
 
 #include "system.h"
+#include "c-ctype.h"
 #include "cl-strtod.h"
 #include "quote.h"
 #include "unicodeio.h"
@@ -172,10 +173,11 @@ FUNC_NAME (char const *s)						 \
                                                                          \
       if (MB_CUR_MAX > 1 && *(s + 1))					 \
         {								 \
-          mbstate_t mbstate = { 0, };					 \
+          mbstate_t mbstate; mbszero (&mbstate);			 \
           wchar_t wc;							 \
           size_t slen = strlen (s);					 \
           ssize_t bytes;						 \
+          /* Use mbrtowc not mbrtoc32, as per POSIX.  */		 \
           bytes = mbrtowc (&wc, s, slen, &mbstate);			 \
           if (0 < bytes)						 \
             {								 \
@@ -261,7 +263,7 @@ print_esc (char const *escstart, bool octal_0)
     {
       /* A hexadecimal \xhh escape sequence must have 1 or 2 hex. digits.  */
       for (esc_length = 0, ++p;
-           esc_length < 2 && isxdigit (to_uchar (*p));
+           esc_length < 2 && c_isxdigit (to_uchar (*p));
            ++esc_length, ++p)
         esc_value = esc_value * 16 + hextobin (*p);
       if (esc_length == 0)
@@ -291,7 +293,7 @@ print_esc (char const *escstart, bool octal_0)
            esc_length > 0;
            --esc_length, ++p)
         {
-          if (! isxdigit (to_uchar (*p)))
+          if (! c_isxdigit (to_uchar (*p)))
             error (EXIT_FAILURE, 0, _("missing hexadecimal number in escape"));
           uni_value = uni_value * 16 + hextobin (*p);
         }
@@ -355,8 +357,8 @@ print_direc (char const *start, size_t length, char conversion,
     switch (conversion)
       {
       case 'd': case 'i': case 'o': case 'u': case 'x': case 'X':
-        length_modifier = PRIdMAX;
-        length_modifier_len = sizeof PRIdMAX - 2;
+        length_modifier = "j";
+        length_modifier_len = 1;
         break;
 
       case 'a': case 'e': case 'f': case 'g':

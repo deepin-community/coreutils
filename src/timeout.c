@@ -1,5 +1,5 @@
 /* timeout -- run a command with bounded time
-   Copyright (C) 2008-2023 Free Software Foundation, Inc.
+   Copyright (C) 2008-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -117,7 +117,7 @@ settimeout (double duration, bool warn)
   /* timer_settime() provides potentially nanosecond resolution.  */
 
   struct timespec ts = dtotimespec (duration);
-  struct itimerspec its = { {0, 0}, ts };
+  struct itimerspec its = {.it_interval = {0}, .it_value = ts};
   timer_t timerid;
   if (timer_create (CLOCK_REALTIME, nullptr, &timerid) == 0)
     {
@@ -151,7 +151,7 @@ settimeout (double duration, bool warn)
       else
         tv.tv_usec--;
     }
-  struct itimerval it = { {0, 0}, tv };
+  struct itimerval it = {.it_interval = {0}, .it_value = tv };
   if (setitimer (ITIMER_REAL, &it, nullptr) == 0)
     return;
   else
@@ -207,7 +207,7 @@ cleanup (int sig)
       timed_out = 1;
       sig = term_signal;
     }
-  if (monitored_pid)
+  if (0 < monitored_pid)
     {
       if (kill_after)
         {
@@ -244,8 +244,13 @@ cleanup (int sig)
             }
         }
     }
-  else /* we're the child or the child is not exec'd yet.  */
-    _exit (128 + sig);
+  else if (monitored_pid == -1)
+    { /* were in the parent, so let it continue to exit below.  */
+    }
+  else /* monitored_pid == 0  */
+    { /* parent hasn't forked yet, or child has not exec'd yet.  */
+      _exit (128 + sig);
+    }
 }
 
 void
@@ -447,7 +452,7 @@ disable_core_dumps (void)
 #elif HAVE_SETRLIMIT && defined RLIMIT_CORE
   /* Note this doesn't disable processing by a filter in
      /proc/sys/kernel/core_pattern on Linux.  */
-  if (setrlimit (RLIMIT_CORE, &(struct rlimit) {0,0}) == 0)
+  if (setrlimit (RLIMIT_CORE, &(struct rlimit) {0}) == 0)
     return true;
 
 #else
@@ -462,7 +467,6 @@ int
 main (int argc, char **argv)
 {
   double timeout;
-  char signame[SIG2STR_MAX];
   int c;
 
   initialize_main (&argc, &argv);
@@ -483,7 +487,7 @@ main (int argc, char **argv)
           break;
 
         case 's':
-          term_signal = operand2sig (optarg, signame);
+          term_signal = operand2sig (optarg);
           if (term_signal == -1)
             usage (EXIT_CANCELED);
           break;
@@ -532,14 +536,29 @@ main (int argc, char **argv)
   signal (SIGTTOU, SIG_IGN);   /* Don't stop if background child needs tty.  */
   install_sigchld ();          /* Interrupt sigsuspend() when child exits.   */
 
+  /* We configure timers so that SIGALRM is sent on expiry.
+     Therefore ensure we don't inherit a mask blocking SIGALRM.  */
+  unblock_signal (SIGALRM);
+
+  /* Block signals now, so monitored_pid is deterministic in cleanup().  */
+  sigset_t orig_set;
+  block_cleanup_and_chld (term_signal, &orig_set);
+
   monitored_pid = fork ();
   if (monitored_pid == -1)
     {
       error (0, errno, _("fork system call failed"));
       return EXIT_CANCELED;
     }
-  else if (monitored_pid == 0)
-    {                           /* child */
+  else if (monitored_pid == 0)  /* child */
+    {
+      /* Restore signal mask for child.  */
+      if (sigprocmask (SIG_SETMASK, &orig_set, nullptr) != 0)
+        {
+          error (0, errno, _("child failed to reset signal mask"));
+          return EXIT_CANCELED;
+        }
+
       /* exec doesn't reset SIG_IGN -> SIG_DFL.  */
       signal (SIGTTIN, SIG_DFL);
       signal (SIGTTOU, SIG_DFL);
@@ -556,19 +575,14 @@ main (int argc, char **argv)
       pid_t wait_result;
       int status;
 
-      /* We configure timers so that SIGALRM is sent on expiry.
-         Therefore ensure we don't inherit a mask blocking SIGALRM.  */
-      unblock_signal (SIGALRM);
-
       settimeout (timeout, true);
 
-      /* Ensure we don't cleanup() after waitpid() reaps the child,
+      /* Note signals remain blocked in parent here, to ensure
+         we don't cleanup() after waitpid() reaps the child,
          to avoid sending signals to a possibly different process.  */
-      sigset_t cleanup_set;
-      block_cleanup_and_chld (term_signal, &cleanup_set);
 
       while ((wait_result = waitpid (monitored_pid, &status, WNOHANG)) == 0)
-        sigsuspend (&cleanup_set);  /* Wait with cleanup signals unblocked.  */
+        sigsuspend (&orig_set);  /* Wait with cleanup signals unblocked.  */
 
       if (wait_result < 0)
         {

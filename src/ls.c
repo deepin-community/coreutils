@@ -1,5 +1,5 @@
 /* 'dir', 'vdir' and 'ls' directory listing programs for GNU.
-   Copyright (C) 1985-2023 Free Software Foundation, Inc.
+   Copyright (C) 1985-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -36,6 +36,7 @@
    Greg Lee <lee@uhunix.uhcc.hawaii.edu>.  */
 
 #include <config.h>
+#include <ctype.h>
 #include <sys/types.h>
 
 #include <termios.h>
@@ -55,7 +56,7 @@
 #include <getopt.h>
 #include <signal.h>
 #include <selinux/selinux.h>
-#include <wchar.h>
+#include <uchar.h>
 
 #if HAVE_LANGINFO_CODESET
 # include <langinfo.h>
@@ -108,7 +109,6 @@
 #include "xstrtol.h"
 #include "xstrtol-error.h"
 #include "areadlink.h"
-#include "mbsalign.h"
 #include "dircolors.h"
 #include "xgethostname.h"
 #include "c-ctype.h"
@@ -1084,7 +1084,7 @@ dired_dump_obstack (char const *prefix, struct obstack *os)
       for (size_t i = 0; i < n_pos; i++)
         {
           intmax_t p = pos[i];
-          printf (" %"PRIdMAX, p);
+          printf (" %jd", p);
         }
       putchar ('\n');
     }
@@ -1282,6 +1282,8 @@ file_escape_init (void)
     RFC3986[i] |= c_isalnum (i) || i == '~' || i == '-' || i == '.' || i == '_';
 }
 
+enum { MBSWIDTH_FLAGS = MBSW_REJECT_INVALID | MBSW_REJECT_UNPRINTABLE };
+
 /* Read the abbreviated month names from the locale, to align them
    and to determine the max width of the field and to truncate names
    greater than our max allowed.
@@ -1290,11 +1292,6 @@ file_escape_init (void)
    variable width abbreviated months and also precomputing/caching
    the names was seen to increase the performance of ls significantly.  */
 
-/* max number of display cells to use.
-   As of 2018 the abmon for Arabic has entries with width 12.
-   It doesn't make much sense to support wider than this
-   and locales should aim for abmon entries of width <= 5.  */
-enum { MAX_MON_WIDTH = 12 };
 /* abformat[RECENT][MON] is the format to use for timestamps with
    recentness RECENT and month MON.  */
 enum { ABFORMAT_SIZE = 128 };
@@ -1313,28 +1310,41 @@ abmon_init (char abmon[12][ABFORMAT_SIZE])
 #ifndef HAVE_NL_LANGINFO
   return false;
 #else
-  size_t required_mon_width = MAX_MON_WIDTH;
-  size_t curr_max_width;
-  do
+  int max_mon_width = 0;
+  int mon_width[12];
+  int mon_len[12];
+
+  for (int i = 0; i < 12; i++)
     {
-      curr_max_width = required_mon_width;
-      required_mon_width = 0;
-      for (int i = 0; i < 12; i++)
-        {
-          size_t width = curr_max_width;
-          char const *abbr = nl_langinfo (ABMON_1 + i);
-          if (strchr (abbr, '%'))
-            return false;
-          mbs_align_t alignment = isdigit (to_uchar (*abbr))
-                                  ? MBS_ALIGN_RIGHT : MBS_ALIGN_LEFT;
-          size_t req = mbsalign (abbr, abmon[i], ABFORMAT_SIZE,
-                                 &width, alignment, 0);
-          if (! (req < ABFORMAT_SIZE))
-            return false;
-          required_mon_width = MAX (required_mon_width, width);
-        }
+      char const *abbr = nl_langinfo (ABMON_1 + i);
+      mon_len[i] = strnlen (abbr, ABFORMAT_SIZE);
+      if (mon_len[i] == ABFORMAT_SIZE)
+        return false;
+      if (strchr (abbr, '%'))
+        return false;
+      mon_width[i] = mbswidth (strcpy (abmon[i], abbr), MBSWIDTH_FLAGS);
+      if (mon_width[i] < 0)
+        return false;
+      max_mon_width = MAX (max_mon_width, mon_width[i]);
     }
-  while (curr_max_width > required_mon_width);
+
+  for (int i = 0; i < 12; i++)
+    {
+      int fill = max_mon_width - mon_width[i];
+      if (ABFORMAT_SIZE - mon_len[i] <= fill)
+        return false;
+      bool align_left = !isdigit (to_uchar (abmon[i][0]));
+      int fill_offset;
+      if (align_left)
+        fill_offset = mon_len[i];
+      else
+        {
+          memmove (abmon[i] + fill, abmon[i], mon_len[i]);
+          fill_offset = 0;
+        }
+      memset (abmon[i] + fill_offset, ' ', fill);
+      abmon[i][mon_len[i] + fill] = '\0';
+    }
 
   return true;
 #endif
@@ -1394,7 +1404,7 @@ dev_ino_compare (void const *x, void const *y)
 {
   struct dev_ino const *a = x;
   struct dev_ino const *b = y;
-  return SAME_INODE (*a, *b) ? true : false;
+  return PSAME_INODE (a, b);
 }
 
 static void
@@ -1901,7 +1911,7 @@ stdout_isatty (void)
 static int
 decode_switches (int argc, char **argv)
 {
-  char *time_style_option = nullptr;
+  char const *time_style_option = nullptr;
 
   /* These variables are false or -1 unless a switch says otherwise.  */
   bool kibibytes_specified = false;
@@ -1940,15 +1950,13 @@ decode_switches (int argc, char **argv)
           break;
 
         case 'f':
-          /* Same as -a -U -1 --color=none --hyperlink=none,
-             while disabling -s.  */
-          ignore_mode = IGNORE_MINIMAL;
-          sort_opt = sort_none;
+          ignore_mode = IGNORE_MINIMAL; /* enable -a */
+          sort_opt = sort_none;         /* enable -U */
           if (format_opt == long_format)
-            format_opt = -1;
-          print_with_color = false;
-          print_hyperlink = false;
-          print_block_size = false;
+            format_opt = -1;            /* disable -l */
+          print_with_color = false;     /* disable --color */
+          print_hyperlink = false;      /* disable --hyperlink */
+          print_block_size = false;     /* disable -s */
           break;
 
         case FILE_TYPE_INDICATOR_OPTION: /* --file-type */
@@ -2045,6 +2053,8 @@ decode_switches (int argc, char **argv)
           break;
 
         case 'D':
+          format_opt = long_format;
+          print_hyperlink = false;
           dired = true;
           break;
 
@@ -2150,7 +2160,7 @@ decode_switches (int argc, char **argv)
 
         case FULL_TIME_OPTION:
           format_opt = long_format;
-          time_style_option = bad_cast ("full-iso");
+          time_style_option = "full-iso";
           break;
 
         case COLOR_OPTION:
@@ -2274,19 +2284,11 @@ decode_switches (int argc, char **argv)
 #ifdef TIOCGWINSZ
       if (linelen < 0)
         {
-          /* Suppress bogus warning re comparing ws.ws_col to big integer.  */
-# if 4 < __GNUC__ + (6 <= __GNUC_MINOR__)
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wtype-limits"
-# endif
           struct winsize ws;
           if (stdout_isatty ()
               && 0 <= ioctl (STDOUT_FILENO, TIOCGWINSZ, &ws)
               && 0 < ws.ws_col)
             linelen = ws.ws_col <= MIN (PTRDIFF_MAX, SIZE_MAX) ? ws.ws_col : 0;
-# if 4 < __GNUC__ + (6 <= __GNUC_MINOR__)
-#  pragma GCC diagnostic pop
-# endif
         }
 #endif
       if (linelen < 0)
@@ -2368,9 +2370,8 @@ decode_switches (int argc, char **argv)
   dirname_quoting_options = clone_quoting_options (nullptr);
   set_char_quoting (dirname_quoting_options, ':', 1);
 
-  /* --dired is meaningful only with --format=long (-l) and sans --hyperlink.
-     Otherwise, ignore it.  FIXME: warn about this?
-     Alternatively, make --dired imply --format=long?  */
+  /* --dired implies --format=long (-l) and sans --hyperlink.
+     So ignore it if those overridden.  */
   dired &= (format == long_format) & !print_hyperlink;
 
   if (eolbyte < dired)
@@ -2392,12 +2393,15 @@ decode_switches (int argc, char **argv)
 
   if (format == long_format)
     {
-      char *style = time_style_option;
+      char const *style = time_style_option;
       static char const posix_prefix[] = "posix-";
 
       if (! style)
-        if (! (style = getenv ("TIME_STYLE")))
-          style = bad_cast ("locale");
+        {
+          style = getenv ("TIME_STYLE");
+          if (! style)
+            style = "locale";
+        }
 
       while (STREQ_LEN (style, posix_prefix, sizeof posix_prefix - 1))
         {
@@ -2408,16 +2412,16 @@ decode_switches (int argc, char **argv)
 
       if (*style == '+')
         {
-          char *p0 = style + 1;
-          char *p1 = strchr (p0, '\n');
-          if (! p1)
-            p1 = p0;
-          else
+          char const *p0 = style + 1;
+          char *p0nl = strchr (p0, '\n');
+          char const *p1 = p0;
+          if (p0nl)
             {
-              if (strchr (p1 + 1, '\n'))
+              if (strchr (p0nl + 1, '\n'))
                 error (LS_FAILURE, 0, _("invalid time style format %s"),
                        quote (p0));
-              *p1++ = '\0';
+              *p0nl++ = '\0';
+              p1 = p0nl;
             }
           long_time_format[0] = p0;
           long_time_format[1] = p1;
@@ -3057,6 +3061,9 @@ print_dir (char const *name, char const *realname, bool command_line_arg)
          and when readdir simply finds that there are no more entries.  */
       errno = 0;
       next = readdir (dirp);
+      /* Some readdir()s do not absorb ENOENT (dir deleted but open).  */
+      if (errno == ENOENT)
+        errno = 0;
       if (next)
         {
           if (! file_ignored (next->d_name))
@@ -3601,13 +3608,13 @@ gobble_file (char const *name, enum filetype type, ino_t inode,
       else
         f->filetype = normal;
 
-      blocks = ST_NBLOCKS (f->stat);
+      blocks = STP_NBLOCKS (&f->stat);
       if (format == long_format || print_block_size)
         {
           char buf[LONGEST_HUMAN_READABLE + 1];
           int len = mbswidth (human_readable (blocks, buf, human_output_opts,
                                               ST_NBLOCKSIZE, output_block_size),
-                              0);
+                              MBSWIDTH_FLAGS);
           if (block_size_width < len)
             block_size_width = len;
         }
@@ -3670,7 +3677,7 @@ gobble_file (char const *name, enum filetype type, ino_t inode,
               int len = mbswidth (human_readable (size, buf,
                                                   file_human_output_opts,
                                                   1, file_output_block_size),
-                                  0);
+                                  MBSWIDTH_FLAGS);
               if (file_size_width < len)
                 file_size_width = len;
             }
@@ -4208,7 +4215,7 @@ long_time_expected_width (void)
           size_t len = align_nstrftime (buf, sizeof buf, false,
                                         &tm, localtz, 0);
           if (len != 0)
-            width = mbsnwidth (buf, len, 0);
+            width = mbsnwidth (buf, len, MBSWIDTH_FLAGS);
         }
 
       if (width < 0)
@@ -4226,7 +4233,8 @@ format_user_or_group (char const *name, uintmax_t id, int width)
 {
   if (name)
     {
-      int width_gap = width - mbswidth (name, 0);
+      int name_width = mbswidth (name, MBSWIDTH_FLAGS);
+      int width_gap = name_width < 0 ? 0 : width - name_width;
       int pad = MAX (0, width_gap);
       dired_outstring (name);
 
@@ -4235,7 +4243,7 @@ format_user_or_group (char const *name, uintmax_t id, int width)
       while (pad--);
     }
   else
-    dired_pos += printf ("%*"PRIuMAX" ", width, id);
+    dired_pos += printf ("%*ju ", width, id);
 }
 
 /* Print the name or id of the user with id U, using a print width of
@@ -4257,21 +4265,19 @@ format_group (gid_t g, int width, bool stat_ok)
                         (numeric_ids ? nullptr : getgroup (g)), g, width);
 }
 
-/* Return the number of columns that format_user_or_group will print.  */
+/* Return the number of columns that format_user_or_group will print,
+   or -1 if unknown.  */
 
 static int
 format_user_or_group_width (char const *name, uintmax_t id)
 {
-  if (name)
-    {
-      int len = mbswidth (name, 0);
-      return MAX (0, len);
-    }
-  else
-    return snprintf (nullptr, 0, "%"PRIuMAX, id);
+  return (name
+          ? mbswidth (name, MBSWIDTH_FLAGS)
+          : snprintf (nullptr, 0, "%ju", id));
 }
 
-/* Return the number of columns that format_user will print.  */
+/* Return the number of columns that format_user will print,
+   or -1 if unknown.  */
 
 static int
 format_user_width (uid_t u)
@@ -4370,10 +4376,11 @@ print_long_format (const struct fileinfo *f)
       char const *blocks =
         (! f->stat_ok
          ? "?"
-         : human_readable (ST_NBLOCKS (f->stat), hbuf, human_output_opts,
+         : human_readable (STP_NBLOCKS (&f->stat), hbuf, human_output_opts,
                            ST_NBLOCKSIZE, output_block_size));
-      int pad;
-      for (pad = block_size_width - mbswidth (blocks, 0); 0 < pad; pad--)
+      int blocks_width = mbswidth (blocks, MBSWIDTH_FLAGS);
+      for (int pad = blocks_width < 0 ? 0 : block_size_width - blocks_width;
+           0 < pad; pad--)
         *p++ = ' ';
       while ((*p++ = *blocks++))
         continue;
@@ -4432,8 +4439,9 @@ print_long_format (const struct fileinfo *f)
          : human_readable (unsigned_file_size (f->stat.st_size),
                            hbuf, file_human_output_opts, 1,
                            file_output_block_size));
-      int pad;
-      for (pad = file_size_width - mbswidth (size, 0); 0 < pad; pad--)
+      int size_width = mbswidth (size, MBSWIDTH_FLAGS);
+      for (int pad = size_width < 0 ? 0 : file_size_width - size_width;
+           0 < pad; pad--)
         *p++ = ' ';
       while ((*p++ = *size++))
         continue;
@@ -4598,14 +4606,14 @@ quote_name_buf (char **inbuf, size_t bufsize, char *name,
                      reach its end, replacing each non-printable multibyte
                      character with a single question mark.  */
                   {
-                    mbstate_t mbstate = { 0, };
+                    mbstate_t mbstate; mbszero (&mbstate);
                     do
                       {
-                        wchar_t wc;
+                        char32_t wc;
                         size_t bytes;
                         int w;
 
-                        bytes = mbrtowc (&wc, p, plimit - p, &mbstate);
+                        bytes = mbrtoc32 (&wc, p, plimit - p, &mbstate);
 
                         if (bytes == (size_t) -1)
                           {
@@ -4633,7 +4641,7 @@ quote_name_buf (char **inbuf, size_t bufsize, char *name,
                           /* A null wide character was encountered.  */
                           bytes = 1;
 
-                        w = wcwidth (wc);
+                        w = c32width (wc);
                         if (w >= 0)
                           {
                             /* A printable multibyte character.
@@ -4677,7 +4685,10 @@ quote_name_buf (char **inbuf, size_t bufsize, char *name,
   else if (width != nullptr)
     {
       if (MB_CUR_MAX > 1)
-        displayed_width = mbsnwidth (buf, len, 0);
+        {
+          displayed_width = mbsnwidth (buf, len, MBSWIDTH_FLAGS);
+          displayed_width = MAX (0, displayed_width);
+        }
       else
         {
           char const *p = buf;
@@ -4881,7 +4892,7 @@ print_file_name_and_frills (const struct fileinfo *f, size_t start_col)
   if (print_block_size)
     printf ("%*s ", format == with_commas ? 0 : block_size_width,
             ! f->stat_ok ? "?"
-            : human_readable (ST_NBLOCKS (f->stat), buf, human_output_opts,
+            : human_readable (STP_NBLOCKS (&f->stat), buf, human_output_opts,
                               ST_NBLOCKSIZE, output_block_size));
 
   if (print_scontext)
@@ -5113,7 +5124,7 @@ length_of_file_name_and_frills (const struct fileinfo *f)
   if (print_block_size)
     len += 1 + (format == with_commas
                 ? strlen (! f->stat_ok ? "?"
-                          : human_readable (ST_NBLOCKS (f->stat), buf,
+                          : human_readable (STP_NBLOCKS (&f->stat), buf,
                                             human_output_opts, ST_NBLOCKSIZE,
                                             output_block_size))
                 : block_size_width);
@@ -5455,7 +5466,7 @@ Sort entries alphabetically if none of -cftuvSUX nor --sort is specified.\n\
   -D, --dired                generate output designed for Emacs' dired mode\n\
 "), stdout);
       fputs (_("\
-  -f                         list all entries in directory order\n\
+  -f                         do not sort, enable -aU, disable -ls --color\n\
   -F, --classify[=WHEN]      append indicator (one of */=>@|) to entries WHEN\n\
       --file-type            likewise, except do not append '*'\n\
 "), stdout);

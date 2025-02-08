@@ -1,7 +1,7 @@
 #!/bin/sh
 # Test od on floating-point values.
 
-# Copyright (C) 2010-2023 Free Software Foundation, Inc.
+# Copyright (C) 2010-2024 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 . "${srcdir=.}/tests/init.sh"; path_prepend_ ./src
-print_ver_ od
+print_ver_ od printf
 
 export LC_ALL=C
 
@@ -68,5 +68,26 @@ set x $(printf 00000000ff000000 | tr 0f '\000\377' | od -t fL) || fail=1
 #*nan*) ;;
 #*) fail=1;;
 #esac
+
+# Check Half precision IEEE 16 bit float
+if grep '^#define FLOAT16_SUPPORTED 1' "$CONFIG_HEADER" >/dev/null; then
+  for fmt in '-tfH' '-tf2'; do
+    od_out=$(env printf '\x3C\x00\x3C\x00' | od --end=big -An $fmt | tr -d ' ')
+    test "$od_out" = '11' || fail=1
+  done
+else
+  echo "od: this system doesn't provide a 'fH' floating point type" > exp_err
+  returns_ 1 od -tfH /dev/null 2>err || fail=1
+  compare exp_err err || fail=1
+fi
+# Check Half precision Brain 16 bit float
+if grep '^#define BF16_SUPPORTED 1' "$CONFIG_HEADER" >/dev/null; then
+  od_out=$(env printf '\x3F\x80\x3F\x80' | od --end=big -An -tfB | tr -d ' ')
+  test "$od_out" = '11' || fail=1
+else
+  echo "od: this system doesn't provide a 'fB' floating point type" > exp_err
+  returns_ 1 od -tfB /dev/null 2>err || fail=1
+  compare exp_err err || fail=1
+fi
 
 Exit $fail

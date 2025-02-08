@@ -1,7 +1,7 @@
 #!/bin/sh
 # Validate cksum --algorithm operation
 
-# Copyright (C) 2021-2023 Free Software Foundation, Inc.
+# Copyright (C) 2021-2024 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -57,5 +57,14 @@ returns_ 1 cksum -a bsd --check </dev/null || fail=1
 
 # Ensure abbreviations not supported for algorithm selection
 returns_ 1 cksum -a sha22 </dev/null || fail=1
+
+# Ensure --tag -> --untagged transition resets binary indicator
+cksum --tag --untagged -a md5 /dev/null >out-1 || fail=1
+# --binary ignored in this edge case
+cksum --binary --tag --untagged -a md5 /dev/null >out-2 || fail=1
+# base case for comparison
+cksum --untagged -a md5 /dev/null >out || fail=1
+compare out out-1 || fail=1
+compare out out-2 || fail=1
 
 Exit $fail

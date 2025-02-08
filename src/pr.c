@@ -1,5 +1,5 @@
 /* pr -- convert text files for printing.
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -309,8 +309,8 @@
 
 #include <config.h>
 
+#include <ctype.h>
 #include <getopt.h>
-#include <stdckdint.h>
 #include <sys/types.h>
 #include "system.h"
 #include "fadvise.h"
@@ -2354,8 +2354,7 @@ skip_to_page (uintmax_t page)
           /* It's very helpful, normally the total number of pages is
              not known in advance.  */
           error (0, 0,
-                 _("starting page number %"PRIuMAX
-                   " exceeds page count %"PRIuMAX),
+                 _("starting page number %ju exceeds page count %ju"),
                  page, n);
           break;
         }
@@ -2384,9 +2383,9 @@ print_header (void)
     error (EXIT_FAILURE, 0, _("page number overflow"));
 
   /* The translator must ensure that formatting the translation of
-     "Page %"PRIuMAX does not generate more than (sizeof page_text - 1)
+     "Page %ju" does not generate more than (sizeof page_text - 1)
      bytes.  */
-  sprintf (page_text, _("Page %"PRIuMAX), page_number);
+  sprintf (page_text, _("Page %ju"), page_number);
   available_width = header_width_available - mbswidth (page_text, 0);
   available_width = MAX (0, available_width);
   lhs_spaces = available_width >> 1;
@@ -2426,7 +2425,7 @@ static bool
 read_line (COLUMN *p)
 {
   int c;
-  int chars;
+  int chars IF_LINT (= 0);
   int last_input_position;
   int j, k;
   COLUMN *q;

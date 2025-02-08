@@ -1,5 +1,5 @@
 /* cp.c  -- file copying (main routines)
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -68,7 +68,8 @@ enum
   REFLINK_OPTION,
   SPARSE_OPTION,
   STRIP_TRAILING_SLASHES_OPTION,
-  UNLINK_DEST_BEFORE_OPENING
+  UNLINK_DEST_BEFORE_OPENING,
+  KEEP_DIRECTORY_SYMLINK_OPTION
 };
 
 /* True if the kernel is SELinux enabled.  */
@@ -122,7 +123,7 @@ static struct option const long_opts[] =
   {"force", no_argument, nullptr, 'f'},
   {"interactive", no_argument, nullptr, 'i'},
   {"link", no_argument, nullptr, 'l'},
-  {"no-clobber", no_argument, nullptr, 'n'},
+  {"no-clobber", no_argument, nullptr, 'n'},   /* Deprecated.  */
   {"no-dereference", no_argument, nullptr, 'P'},
   {"no-preserve", required_argument, nullptr, NO_PRESERVE_ATTRIBUTES_OPTION},
   {"no-target-directory", no_argument, nullptr, 'T'},
@@ -141,6 +142,8 @@ static struct option const long_opts[] =
   {"target-directory", required_argument, nullptr, 't'},
   {"update", optional_argument, nullptr, 'u'},
   {"verbose", no_argument, nullptr, 'v'},
+  {"keep-directory-symlink", no_argument, nullptr,
+    KEEP_DIRECTORY_SYMLINK_OPTION},
   {GETOPT_SELINUX_CONTEXT_OPTION_DECL},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
@@ -192,8 +195,8 @@ Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY.\n\
   -L, --dereference            always follow symbolic links in SOURCE\n\
 "), stdout);
       fputs (_("\
-  -n, --no-clobber             do not overwrite an existing file (overrides a\n\
-                                 -u or previous -i option). See also --update\n\
+  -n, --no-clobber             (deprecated) silently skip existing files.\n\
+                                 See also --update\n\
 "), stdout);
       fputs (_("\
   -P, --no-dereference         never follow symbolic links in SOURCE\n\
@@ -225,11 +228,14 @@ Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY.\n\
 "), stdout);
       fputs (_("\
   --update[=UPDATE]            control which existing files are updated;\n\
-                                 UPDATE={all,none,older(default)}.  See below\n\
-  -u                           equivalent to --update[=older]\n\
+                                 UPDATE={all,none,none-fail,older(default)}.\n\
+  -u                           equivalent to --update[=older].  See below\n\
 "), stdout);
       fputs (_("\
   -v, --verbose                explain what is being done\n\
+"), stdout);
+      fputs (_("\
+      --keep-directory-symlink  follow existing symlinks to directories\n\
 "), stdout);
       fputs (_("\
   -x, --one-file-system        stay on this file system\n\
@@ -859,6 +865,7 @@ cp_option_init (struct cp_options *x)
 
   x->update = false;
   x->verbose = false;
+  x->keep_directory_symlink = false;
 
   /* By default, refuse to open a dangling destination symlink, because
      in general one cannot do that safely, give the current semantics of
@@ -977,6 +984,7 @@ main (int argc, char **argv)
   char *target_directory = nullptr;
   bool no_target_directory = false;
   char const *scontext = nullptr;
+  bool no_clobber = false;
 
   initialize_main (&argc, &argv);
   set_program_name (argv[0]);
@@ -1067,7 +1075,9 @@ main (int argc, char **argv)
           break;
 
         case 'n':
-          x.interactive = I_ALWAYS_NO;
+          x.interactive = I_ALWAYS_SKIP;
+          no_clobber = true;
+          x.update = false;
           break;
 
         case 'P':
@@ -1131,13 +1141,12 @@ main (int argc, char **argv)
           break;
 
         case 'u':
-          if (optarg == nullptr)
-            x.update = true;
-          else if (x.interactive != I_ALWAYS_NO)  /* -n takes precedence.  */
+          if (! no_clobber) /* -n > -u */
             {
-              enum Update_type update_opt;
-              update_opt = XARGMATCH ("--update", optarg,
-                                      update_type_string, update_type);
+              enum Update_type update_opt = UPDATE_OLDER;
+              if (optarg)
+                update_opt = XARGMATCH ("--update", optarg,
+                                        update_type_string, update_type);
               if (update_opt == UPDATE_ALL)
                 {
                   /* Default cp operation.  */
@@ -1149,6 +1158,11 @@ main (int argc, char **argv)
                   x.update = false;
                   x.interactive = I_ALWAYS_SKIP;
                 }
+              else if (update_opt == UPDATE_NONE_FAIL)
+                {
+                  x.update = false;
+                  x.interactive = I_ALWAYS_NO;
+                }
               else if (update_opt == UPDATE_OLDER)
                 {
                   x.update = true;
@@ -1159,6 +1173,10 @@ main (int argc, char **argv)
 
         case 'v':
           x.verbose = true;
+          break;
+
+        case KEEP_DIRECTORY_SYMLINK_OPTION:
+          x.keep_directory_symlink = true;
           break;
 
         case 'x':
@@ -1214,13 +1232,12 @@ main (int argc, char **argv)
       usage (EXIT_FAILURE);
     }
 
-  if (x.interactive == I_ALWAYS_NO)
-    x.update = false;
-
-  if (make_backups && x.interactive == I_ALWAYS_NO)
+  if (make_backups
+      && (x.interactive == I_ALWAYS_SKIP
+          || x.interactive == I_ALWAYS_NO))
     {
       error (0, 0,
-             _("options --backup and --no-clobber are mutually exclusive"));
+             _("--backup is mutually exclusive with -n or --update=none-fail"));
       usage (EXIT_FAILURE);
     }
 

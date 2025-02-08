@@ -1,7 +1,7 @@
 #!/bin/sh
 # 'b2sum' tests
 
-# Copyright (C) 2016-2023 Free Software Foundation, Inc.
+# Copyright (C) 2016-2024 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -64,6 +64,10 @@ returns_ 1 $prog -c crash.check || fail=1
 # which would trigger with ASAN or valgrind
 printf '0A0BA0' > overflow.check || framework_failure_
 returns_ 1 $prog -c overflow.check || fail=1
+
+# This would fail before coreutil-9.4
+# Only validate the last specified, used length
+$prog -l 123 -l 128 /dev/null || fail=1
 
 done
 

@@ -1,5 +1,5 @@
 /* dircolors - output commands to set the LS_COLOR environment variable
-   Copyright (C) 1996-2023 Free Software Foundation, Inc.
+   Copyright (C) 1996-2024 Free Software Foundation, Inc.
    Copyright (C) 1994, 1995, 1997, 1998, 1999, 2000 H. Peter Anvin
 
    This program is free software: you can redistribute it and/or modify
@@ -23,6 +23,7 @@
 
 #include "system.h"
 #include "dircolors.h"
+#include "c-ctype.h"
 #include "c-strcase.h"
 #include "obstack.h"
 #include "quote.h"
@@ -152,7 +153,7 @@ parse_line (char const *line, char **keyword, char **arg)
   *keyword = nullptr;
   *arg = nullptr;
 
-  for (p = line; isspace (to_uchar (*p)); ++p)
+  for (p = line; c_isspace (to_uchar (*p)); ++p)
     continue;
 
   /* Ignore blank lines and shell-style comments.  */
@@ -161,7 +162,7 @@ parse_line (char const *line, char **keyword, char **arg)
 
   keyword_start = p;
 
-  while (!isspace (to_uchar (*p)) && *p != '\0')
+  while (!c_isspace (to_uchar (*p)) && *p != '\0')
     {
       ++p;
     }
@@ -174,7 +175,7 @@ parse_line (char const *line, char **keyword, char **arg)
     {
       ++p;
     }
-  while (isspace (to_uchar (*p)));
+  while (c_isspace (to_uchar (*p)));
 
   if (*p == '\0' || *p == '#')
     return;
@@ -184,7 +185,7 @@ parse_line (char const *line, char **keyword, char **arg)
   while (*p != '\0' && *p != '#')
     ++p;
 
-  for (--p; isspace (to_uchar (*p)); --p)
+  for (--p; c_isspace (to_uchar (*p)); --p)
     continue;
   ++p;
 

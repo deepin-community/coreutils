@@ -1,5 +1,5 @@
 /* 'rm' file deletion utility for GNU.
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -165,6 +165,11 @@ Remove (unlink) the FILE(s).\n\
 By default, rm does not remove directories.  Use the --recursive (-r or -R)\n\
 option to remove each listed directory, too, along with all of its contents.\n\
 "), stdout);
+      fputs (_("\
+\n\
+Any attempt to remove a file whose last file name component is '.' or '..'\n\
+is rejected with a diagnostic.\n\
+"), stdout);
       printf (_("\
 \n\
 To remove a file whose name starts with a '-', for example '-foo',\n\
@@ -176,9 +181,9 @@ use one of these commands:\n\
               program_name, program_name);
       fputs (_("\
 \n\
-Note that if you use rm to remove a file, it might be possible to recover\n\
+If you use rm to remove a file, it might be possible to recover\n\
 some of its contents, given sufficient expertise and/or time.  For greater\n\
-assurance that the contents are truly unrecoverable, consider using shred(1).\n\
+assurance that the contents are unrecoverable, consider using shred(1).\n\
 "), stdout);
       emit_ancillary_info (PROGRAM_NAME);
     }
@@ -352,11 +357,11 @@ main (int argc, char **argv)
     {
       fprintf (stderr,
                (x.recursive
-                ? ngettext ("%s: remove %"PRIuMAX" argument recursively? ",
-                            "%s: remove %"PRIuMAX" arguments recursively? ",
+                ? ngettext ("%s: remove %ju argument recursively? ",
+                            "%s: remove %ju arguments recursively? ",
                             select_plural (n_files))
-                : ngettext ("%s: remove %"PRIuMAX" argument? ",
-                            "%s: remove %"PRIuMAX" arguments? ",
+                : ngettext ("%s: remove %ju argument? ",
+                            "%s: remove %ju arguments? ",
                             select_plural (n_files))),
                program_name, n_files);
       if (!yesno ())

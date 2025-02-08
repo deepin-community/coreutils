@@ -1,5 +1,5 @@
 /* GNU's uptime.
-   Copyright (C) 1992-2023 Free Software Foundation, Inc.
+   Copyright (C) 1992-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,7 +18,6 @@
 
 #include <config.h>
 
-#include <stdckdint.h>
 #include <stdio.h>
 #include <sys/types.h>
 
@@ -87,8 +86,8 @@ print_uptime (idx_t n, struct gl_utmp const *utmp_buf)
       int uphours = uptime % 86400 / 3600;
       int upmins = uptime % 86400 % 3600 / 60;
       if (0 < updays)
-        printf (ngettext ("up %"PRIdMAX" day %2d:%02d,  ",
-                          "up %"PRIdMAX" days %2d:%02d,  ",
+        printf (ngettext ("up %jd day %2d:%02d,  ",
+                          "up %jd days %2d:%02d,  ",
                           select_plural (updays)),
                 updays, uphours, upmins);
       else

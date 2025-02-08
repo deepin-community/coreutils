@@ -1,7 +1,7 @@
 #!/bin/sh
 # Detect printf(3) failure even when it doesn't set stream error indicator
 
-# Copyright (C) 2007-2023 Free Software Foundation, Inc.
+# Copyright (C) 2007-2024 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ prog=printf
 print_ver_ printf
 
 vm=$(get_min_ulimit_v_ env $prog %20f 0) \
-  || skip_ "this shell lacks ulimit support"
+  || skip_ 'shell lacks ulimit, or ASAN enabled'
 
 # Up to coreutils-6.9, "printf %.Nf 0" would encounter an ENOMEM internal
 # error from glibc's printf(3) function whenever N was large relative to

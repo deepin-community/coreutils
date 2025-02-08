@@ -1,6 +1,6 @@
 /* Compare numeric strings.  This is an internal include file.
 
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -114,8 +114,8 @@ static inline int _GL_ATTRIBUTE_PURE
 numcompare (char const *a, char const *b,
             int decimal_point, int thousands_sep)
 {
-  unsigned char tmpa = *a;
-  unsigned char tmpb = *b;
+  char tmpa = *a;
+  char tmpb = *b;
   int tmp;
   size_t log_a;
   size_t log_b;

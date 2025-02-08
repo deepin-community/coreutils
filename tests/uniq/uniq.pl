@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # Test uniq.
 
-# Copyright (C) 2008-2023 Free Software Foundation, Inc.
+# Copyright (C) 2008-2024 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,6 +25,12 @@ my $try = "Try '$prog --help' for more information.\n";
 
 # Turn off localization of executable's output.
 @ENV{qw(LANGUAGE LANG LC_ALL)} = ('C') x 3;
+
+my $mb_locale;
+#Comment out next line to disable multibyte tests
+$mb_locale = $ENV{LOCALE_FR_UTF8};
+! defined $mb_locale || $mb_locale eq 'none'
+  and $mb_locale = 'C';
 
 # When possible, create a "-z"-testing variant of each test.
 sub add_z_variants($)
@@ -237,8 +243,9 @@ if ( defined $locale && $locale ne 'none' )
   {
     # I've only ever triggered the problem in a non-C locale.
 
-    # See if isblank returns true for nbsp.
-    my $x = qx!env printf '\xa0'| LC_ALL=$locale tr '[:blank:]' x!;
+    # See if nbsp is considered a blank character
+    my $x = qx!env printf 'x\xa0y'| LC_ALL=$locale join -a2 -o2.1 /dev/null -!;
+    chomp $x;
     # If so, expect just one line of output in the schar test.
     # Otherwise, expect two.
     my $in = " y z\n\xa0 y z\n";
@@ -261,6 +268,50 @@ foreach my $t (@Tests)
     $t->[0] =~ /^obs-plus/
       and push @$t, {ENV=>'_POSIX2_VERSION=199209'};
   }
+
+if ($mb_locale ne 'C')
+  {
+    # Duplicate each test vector, appending "-mb" to the test name and
+    # inserting {ENV => "LC_ALL=$mb_locale"} in the copy, so that we
+    # provide coverage for multi-byte code paths.
+    my @new;
+    foreach my $t (@Tests)
+      {
+        my @new_t = @$t;
+        my $test_name = shift @new_t;
+
+        # In test #145, replace the each ‘...’ by '...'.
+        if ($test_name =~ "145")
+          {
+            my $sub = { ERR_SUBST => "s/‘([^’]+)’/'\$1'/g"};
+            push @new_t, $sub;
+            push @$t, $sub;
+          }
+        next if (   $test_name =~ "schar"
+                 or $test_name =~ "^obs-plus"
+                 or $test_name =~ "119");
+        push @new, ["$test_name-mb", @new_t, {ENV => "LC_ALL=$mb_locale"}];
+      }
+    push @Tests, @new;
+
+    # Test that -w counts characters, not bytes.
+    my $trouble_with_w1 = "à\ná\n";
+    my @Locale_Tests =
+    (
+      ['w1-mb', '-w1',  {IN => $trouble_with_w1}, {OUT => $trouble_with_w1},
+        {ENV => "LC_ALL=$mb_locale"}]
+    );
+    push @Tests, @Locale_Tests;
+   }
+
+# Remember that triple_test creates from each test with exactly one "IN"
+# file two more tests (.p and .r suffix on name) corresponding to reading
+# input from a file and from a pipe.  The pipe-reading test would fail
+# due to a race condition about 1 in 20 times.
+# Remove the IN_PIPE version of the "output-is-input" test above.
+# The others aren't susceptible because they have three inputs each.
+
+@Tests = grep {$_->[0] ne 'output-is-input.p'} @Tests;
 
 @Tests = add_z_variants \@Tests;
 @Tests = triple_test \@Tests;

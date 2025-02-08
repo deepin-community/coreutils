@@ -1,5 +1,5 @@
 /* nohup -- run a command immune to hangups, with output to a non-tty
-   Copyright (C) 2003-2023 Free Software Foundation, Inc.
+   Copyright (C) 2003-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -72,7 +72,8 @@ To save output to FILE, use '%s COMMAND > FILE'.\n"),
   exit (status);
 }
 
-/* GCC 13 gets confused by the dup2 calls.  */
+/* GCC 13 gets confused by the dup2 calls
+   <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=109839>.  */
 #if 13 <= __GNUC__
 # pragma GCC diagnostic ignored "-Wanalyzer-fd-leak"
 #endif

@@ -1,5 +1,5 @@
 /* GNU fmt -- simple text formatter.
-   Copyright (C) 1994-2023 Free Software Foundation, Inc.
+   Copyright (C) 1994-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
 /* Written by Ross Paterson <rap@doc.ic.ac.uk>.  */
 
 #include <config.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <getopt.h>
@@ -909,7 +910,7 @@ fmt_paragraph (void)
 }
 
 /* Work around <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=109628>.  */
-#if 13 <= __GNUC__
+#if __GNUC__ == 13
 # pragma GCC diagnostic ignored "-Wanalyzer-use-of-uninitialized-value"
 #endif
 

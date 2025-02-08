@@ -1,5 +1,5 @@
 # Customize maint.mk                           -*- makefile -*-
-# Copyright (C) 2003-2023 Free Software Foundation, Inc.
+# Copyright (C) 2003-2024 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ export VERBOSE = yes
 # 4914152 9e
 export XZ_OPT = -8e
 
-old_NEWS_hash = c550e6659b8350f62d9cd0483bf0c199
+old_NEWS_hash = d66ee7a9fdb974017a4a17cf358d047d
 
 # Add an exemption for sc_makefile_at_at_check.
 _makefile_at_at_check_exceptions = \
@@ -841,7 +841,8 @@ exclude_file_name_regexp--sc_trailing_blank = \
 exclude_file_name_regexp--sc_system_h_headers = \
   ^src/((system|copy|chown-core|find-mount-point)\.h|make-prime-list\.c)$$
 
-_src = (false|lbracket|ls-(dir|ls|vdir)|tac-pipe|uname-(arch|uname))
+_src := (false|lbracket|chown-(chgrp|chown)
+_src := $(_src)|ls-(dir|ls|vdir)|tac-pipe|uname-(arch|uname))
 _gl_src = (xdecto.max|cl-strtold)
 exclude_file_name_regexp--sc_require_config_h_first = \
   (^lib/buffer-lcm\.c|gl/lib/$(_gl_src)\.c|src/$(_src)\.c)$$
@@ -926,6 +927,9 @@ _gl_TS_other_headers = $(srcdir)/src/*.h src/*.h
 # Normally, the rule would detect its declaration, but that uses a
 # different name, __clz_tab.
 _gl_TS_unmarked_extern_vars = factor_clz_tab
+# Avoid tight_scope rule stating these should be static
+# as there is no way to achieve that with the way these are defined.
+_gl_TS_unmarked_extern_vars += ptr_MD5_.*
 # Other tight_scope settings
 _gl_TS_dir = .
 _gl_TS_obj_files = src/*.$(OBJEXT)

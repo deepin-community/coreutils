@@ -1,6 +1,6 @@
 /* GNU's read utmp module.
 
-   Copyright (C) 1992-2001, 2003-2006, 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 1992-2001, 2003-2006, 2009-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -795,7 +795,7 @@ read_utmp_from_systemd (idx_t *n_entries, STRUCT_UTMP **utmp_buf, int options)
     {
       char **sessions;
       int num_sessions = sd_get_sessions (&sessions);
-      if (num_sessions >= 0)
+      if (num_sessions >= 0 && sessions != NULL)
         {
           char **session_ptr;
           for (session_ptr = sessions; *session_ptr != NULL; session_ptr++)
@@ -873,7 +873,10 @@ read_utmp_from_systemd (idx_t *n_entries, STRUCT_UTMP **utmp_buf, int options)
                           char *display;
                           if (sd_session_get_display (session, &display) < 0)
                             display = NULL;
-                          host = display;
+                          /* Workaround: gdm "forgets" to pass the display to
+                             systemd, thus display may be NULL here.  */
+                          if (display != NULL)
+                            host = display;
                         }
                     }
                   else

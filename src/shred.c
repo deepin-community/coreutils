@@ -1,6 +1,6 @@
 /* shred.c - overwrite files and devices to make it harder to recover data
 
-   Copyright (C) 1999-2023 Free Software Foundation, Inc.
+   Copyright (C) 1999-2024 Free Software Foundation, Inc.
    Copyright (C) 1997, 1998, 1999 Colin Plumb.
 
    This program is free software: you can redistribute it and/or modify
@@ -300,7 +300,6 @@ dosync (int fd, char const *qname)
 {
   int err;
 
-#if HAVE_FDATASYNC
   if (fdatasync (fd) == 0)
     return 0;
   err = errno;
@@ -310,7 +309,6 @@ dosync (int fd, char const *qname)
       errno = err;
       return -1;
     }
-#endif
 
   if (fsync (fd) == 0)
     return 0;
@@ -864,12 +862,12 @@ do_wipefd (int fd, char const *qname, struct randint_source *s,
           if (! flags->exact)
             {
               /* Round up to the nearest block size to clear slack space.  */
-              off_t remainder = size % ST_BLKSIZE (st);
-              if (size && size < ST_BLKSIZE (st))
+              off_t remainder = size % STP_BLKSIZE (&st);
+              if (size && size < STP_BLKSIZE (&st))
                 i_size = size;
               if (remainder != 0)
                 {
-                  off_t size_incr = ST_BLKSIZE (st) - remainder;
+                  off_t size_incr = STP_BLKSIZE (&st) - remainder;
                   size += MIN (size_incr, OFF_T_MAX - size);
                 }
             }
@@ -889,7 +887,7 @@ do_wipefd (int fd, char const *qname, struct randint_source *s,
         }
     }
   else if (S_ISREG (st.st_mode)
-           && st.st_size < MIN (ST_BLKSIZE (st), size))
+           && st.st_size < MIN (STP_BLKSIZE (&st), size))
     i_size = st.st_size;
 
   /* Schedule the passes in random order. */
@@ -1163,7 +1161,7 @@ int
 main (int argc, char **argv)
 {
   bool ok = true;
-  struct Options flags = { 0, };
+  struct Options flags = {0};
   char **file;
   int n_files;
   int c;

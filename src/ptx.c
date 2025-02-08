@@ -1,5 +1,5 @@
 /* Permuted index for GNU, with keywords in their context.
-   Copyright (C) 1990-2023 Free Software Foundation, Inc.
+   Copyright (C) 1990-2024 Free Software Foundation, Inc.
    François Pinard <pinard@iro.umontreal.ca>, 1988.
 
    This program is free software: you can redistribute it and/or modify
@@ -19,11 +19,13 @@
 
 #include <config.h>
 
+#include <ctype.h>
 #include <getopt.h>
 #include <sys/types.h>
 #include "system.h"
 #include <regex.h>
 #include "argmatch.h"
+#include "c-ctype.h"
 #include "fadvise.h"
 #include "quote.h"
 #include "read-file.h"
@@ -308,7 +310,7 @@ unescape_string (char *string)
             case 'x':		/* \xhhh escape, 3 chars maximum */
               value = 0;
               for (length = 0, string++;
-                   length < 3 && isxdigit (to_uchar (*string));
+                   length < 3 && c_isxdigit (to_uchar (*string));
                    length++, string++)
                 value = value * 16 + HEXTOBIN (*string);
               if (length == 0)
@@ -1111,7 +1113,7 @@ fix_output_parameters (void)
           if (file_index > 0)
             line_ordinal -= file_line_count[file_index - 1];
           char ordinal_string[INT_BUFSIZE_BOUND (intmax_t)];
-          reference_width = sprintf (ordinal_string, "%"PRIdMAX, line_ordinal);
+          reference_width = sprintf (ordinal_string, "%jd", line_ordinal);
           if (input_file_name[file_index])
             reference_width += strlen (input_file_name[file_index]);
           if (reference_width > reference_max_width)
@@ -1427,7 +1429,7 @@ define_all_fields (OCCURS *occurs)
         line_ordinal -= file_line_count[occurs->file_index - 1];
 
       char *file_end = stpcpy (reference.start, file_name);
-      reference.end = file_end + sprintf (file_end, ":%"PRIdMAX, line_ordinal);
+      reference.end = file_end + sprintf (file_end, ":%jd", line_ordinal);
     }
   else if (input_reference)
     {

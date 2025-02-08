@@ -2,7 +2,7 @@
 # verify that multiple -t specifiers to od align well
 # This would fail before coreutils-6.13.
 
-# Copyright (C) 2008-2023 Free Software Foundation, Inc.
+# Copyright (C) 2008-2024 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@ seq 19 > in || framework_failure_
 test $(wc -c < in) -eq 48 || framework_failure_
 
 
-list='a c dC dS dI dL oC oS oI oL uC uS uI uL xC xS xI xL fF fD fL'
+list='a c dC dS dI dL oC oS oI oL uC uS uI uL xC xS xI xL fF fD'
 for format1 in $list; do
   for format2 in $list; do
     od -An -t${format1}z -t${format2}z in > out-raw || fail=1

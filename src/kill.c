@@ -1,5 +1,5 @@
 /* kill -- send a signal to a process
-   Copyright (C) 2002-2023 Free Software Foundation, Inc.
+   Copyright (C) 2002-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,7 +17,6 @@
 /* Written by Paul Eggert.  */
 
 #include <config.h>
-#include <stdckdint.h>
 #include <stdio.h>
 #include <getopt.h>
 #include <sys/types.h>
@@ -32,24 +31,6 @@
 #define PROGRAM_NAME "kill"
 
 #define AUTHORS proper_name ("Paul Eggert")
-
-#if ! (HAVE_DECL_STRSIGNAL || defined strsignal)
-# if ! (HAVE_DECL_SYS_SIGLIST || defined sys_siglist)
-#  if HAVE_DECL__SYS_SIGLIST || defined _sys_siglist
-#   define sys_siglist _sys_siglist
-#  elif HAVE_DECL___SYS_SIGLIST || defined __sys_siglist
-#   define sys_siglist __sys_siglist
-#  endif
-# endif
-# if HAVE_DECL_SYS_SIGLIST || defined sys_siglist
-#  define strsignal(signum) (0 <= (signum) && (signum) <= SIGNUM_BOUND \
-                             ? sys_siglist[signum] \
-                             : 0)
-# endif
-# ifndef strsignal
-#  define strsignal(signum) 0
-# endif
-#endif
 
 static char const short_options[] =
   "0::1::2::3::4::5::6::7::8::9::"
@@ -150,11 +131,15 @@ list_signals (bool table, char *const *argv)
       if (argv)
         for (; *argv; argv++)
           {
-            signum = operand2sig (*argv, signame);
+            signum = operand2sig (*argv);
             if (signum < 0)
               status = EXIT_FAILURE;
             else
-              print_table_row (num_width, signum, name_width, signame);
+              {
+                if (sig2str (signum, signame) != 0)
+                  snprintf (signame, sizeof signame, "SIG%d", signum);
+                print_table_row (num_width, signum, name_width, signame);
+              }
           }
       else
         for (signum = 1; signum <= SIGNUM_BOUND; signum++)
@@ -166,16 +151,18 @@ list_signals (bool table, char *const *argv)
       if (argv)
         for (; *argv; argv++)
           {
-            signum = operand2sig (*argv, signame);
+            signum = operand2sig (*argv);
             if (signum < 0)
               status = EXIT_FAILURE;
-            else
+            else if (ISDIGIT (**argv))
               {
-                if (ISDIGIT (**argv))
+                if (sig2str (signum, signame) == 0)
                   puts (signame);
                 else
                   printf ("%d\n", signum);
               }
+            else
+              printf ("%d\n", signum);
           }
       else
         for (signum = 1; signum <= SIGNUM_BOUND; signum++)
@@ -209,7 +196,10 @@ send_signals (int signum, char *const *argv)
         }
       else if (kill (pid, signum) != 0)
         {
-          error (0, errno, "%s", quote (arg));
+          if (errno == EINVAL)
+            error (0, errno, "%d", signum);
+          else
+            error (0, errno, "%s", quote (arg));
           status = EXIT_FAILURE;
         }
     }
@@ -225,7 +215,6 @@ main (int argc, char **argv)
   bool list = false;
   bool table = false;
   int signum = -1;
-  char signame[SIG2STR_MAX];
 
   initialize_main (&argc, &argv);
   set_program_name (argv[0]);
@@ -270,7 +259,7 @@ main (int argc, char **argv)
             error (0, 0, _("%s: multiple signals specified"), quote (optarg));
             usage (EXIT_FAILURE);
           }
-        signum = operand2sig (optarg, signame);
+        signum = operand2sig (optarg);
         if (signum < 0)
           usage (EXIT_FAILURE);
         break;

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Ensure that cut does not allocate mem for large ranges
 
-# Copyright (C) 2012-2023 Free Software Foundation, Inc.
+# Copyright (C) 2012-2024 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@ print_ver_ cut
 getlimits_
 
 vm=$(get_min_ulimit_v_ returns_ 0 cut -b1 /dev/null) \
-  || skip_ "this shell lacks ulimit support"
+  || skip_ 'shell lacks ulimit, or ASAN enabled'
 
 # Ensure we can cut up to our sentinel value.
 # Don't use expr to subtract one,

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Test the --pid option of tail.
 
-# Copyright (C) 2003-2023 Free Software Foundation, Inc.
+# Copyright (C) 2003-2024 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -32,6 +32,10 @@ for mode in '' '---disable-inotify'; do
 
   # Ensure that tail --pid=PID does not exit when PID is alive.
   returns_ 124 timeout 1 tail -f -s.1 --pid=$pid $mode here || fail=1
+
+  # Ensure that tail --pid=PID does not exit when at least one PID is alive.
+  returns_ 124 timeout 1 tail -f -s.1 --pid=$PID_T_MAX --pid=$pid $mode here \
+   || fail=1
 
   cleanup_
 

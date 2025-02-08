@@ -1,5 +1,5 @@
 /* iopoll.c -- broken pipe detection / non blocking output handling
-   Copyright (C) 2022 Free Software Foundation, Inc.
+   Copyright (C) 2022-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -113,7 +113,7 @@ iopoll_internal (int fdin, int fdout, bool block, bool broken_output)
       if (0 <= fdout)
         FD_SET (fdout, &fds);
 
-      struct timeval delay = { .tv_sec = 0, .tv_usec = 0 };
+      struct timeval delay = {0};
       ret = select (nfds,
                     broken_output ? &fds : nullptr,
                     broken_output ? nullptr : &fds,

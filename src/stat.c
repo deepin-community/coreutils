@@ -1,5 +1,5 @@
 /* stat.c -- display file or file system status
-   Copyright (C) 2001-2023 Free Software Foundation, Inc.
+   Copyright (C) 2001-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -53,15 +53,16 @@
 # include <fs_info.h>
 #endif
 #include <selinux/selinux.h>
+#include <getopt.h>
 
 #include "system.h"
 
 #include "areadlink.h"
 #include "argmatch.h"
+#include "c-ctype.h"
 #include "file-type.h"
 #include "filemode.h"
 #include "fs.h"
-#include "getopt.h"
 #include "mountlist.h"
 #include "quote.h"
 #include "stat-size.h"
@@ -693,25 +694,25 @@ out_string (char *pformat, size_t prefix_len, char const *arg)
 static int
 out_int (char *pformat, size_t prefix_len, intmax_t arg)
 {
-  make_format (pformat, prefix_len, "'-+ 0", PRIdMAX);
+  make_format (pformat, prefix_len, "'-+ 0", "jd");
   return printf (pformat, arg);
 }
 static int
 out_uint (char *pformat, size_t prefix_len, uintmax_t arg)
 {
-  make_format (pformat, prefix_len, "'-0", PRIuMAX);
+  make_format (pformat, prefix_len, "'-0", "ju");
   return printf (pformat, arg);
 }
 static void
 out_uint_o (char *pformat, size_t prefix_len, uintmax_t arg)
 {
-  make_format (pformat, prefix_len, "-#0", PRIoMAX);
+  make_format (pformat, prefix_len, "-#0", "jo");
   printf (pformat, arg);
 }
 static void
 out_uint_x (char *pformat, size_t prefix_len, uintmax_t arg)
 {
-  make_format (pformat, prefix_len, "-#0", PRIxMAX);
+  make_format (pformat, prefix_len, "-#0", "jx");
   printf (pformat, arg);
 }
 static int
@@ -972,7 +973,7 @@ find_bind_mount (char const * name)
           struct stat dev_stats;
 
           if (stat (me->me_devname, &dev_stats) == 0
-              && SAME_INODE (name_stats, dev_stats))
+              && psame_inode (&name_stats, &dev_stats))
             {
               bind_mount = me->me_devname;
               break;
@@ -1039,7 +1040,7 @@ neg_to_zero (struct timespec ts)
 {
   if (0 <= ts.tv_nsec)
     return ts;
-  struct timespec z = {0, 0};
+  struct timespec z = {0};
   return z;
 }
 
@@ -1139,8 +1140,8 @@ print_it (char const *format, int fd, char const *filename,
   enum
     {
       MAX_ADDITIONAL_BYTES =
-        (MAX (sizeof PRIdMAX,
-              MAX (sizeof PRIoMAX, MAX (sizeof PRIuMAX, sizeof PRIxMAX)))
+        (MAX (sizeof "jd",
+              MAX (sizeof "jo", MAX (sizeof "ju", sizeof "jx")))
          - 1)
     };
   size_t n_alloc = strlen (format) + MAX_ADDITIONAL_BYTES + 1;
@@ -1215,13 +1216,13 @@ print_it (char const *format, int fd, char const *filename,
               putchar (esc_value);
               --b;
             }
-          else if (*b == 'x' && isxdigit (to_uchar (b[1])))
+          else if (*b == 'x' && c_isxdigit (to_uchar (b[1])))
             {
               int esc_value = hextobin (b[1]);	/* Value of \xhh escape. */
               /* A hexadecimal \xhh escape sequence must have
                  1 or 2 hex. digits.  */
               ++b;
-              if (isxdigit (to_uchar (b[1])))
+              if (c_isxdigit (to_uchar (b[1])))
                 {
                   ++b;
                   esc_value = esc_value * 16 + hextobin (*b);
@@ -1370,11 +1371,11 @@ do_stat (char const *filename, char const *format, char const *format2)
   int fd = STREQ (filename, "-") ? 0 : AT_FDCWD;
   int flags = 0;
   struct stat st;
-  struct statx stx = { 0, };
+  struct statx stx = {0};
   char const *pathname = filename;
   struct print_args pa;
   pa.st = &st;
-  pa.btime = (struct timespec) {-1, -1};
+  pa.btime = (struct timespec) {.tv_sec = -1, .tv_nsec = -1};
 
   if (AT_FDCWD != fd)
     {
@@ -1460,7 +1461,7 @@ do_stat (char const *filename, char const *format,
   struct stat statbuf;
   struct print_args pa;
   pa.st = &statbuf;
-  pa.btime = (struct timespec) {-1, -1};
+  pa.btime = (struct timespec) {.tv_sec = -1, .tv_nsec = -1};
 
   if (0 <= fd)
     {
@@ -1603,10 +1604,10 @@ print_stat (char *pformat, size_t prefix_len, char mod, char m,
       out_uint (pformat, prefix_len, ST_NBLOCKSIZE);
       break;
     case 'b':
-      out_uint (pformat, prefix_len, ST_NBLOCKS (*statbuf));
+      out_uint (pformat, prefix_len, STP_NBLOCKS (statbuf));
       break;
     case 'o':
-      out_uint (pformat, prefix_len, ST_BLKSIZE (*statbuf));
+      out_uint (pformat, prefix_len, STP_BLKSIZE (statbuf));
       break;
     case 'w':
       {
@@ -1788,7 +1789,7 @@ The MODE argument of --cached can be: always, never, or default.\n\
       fputs (_("\n\
 The valid format sequences for files (without --file-system):\n\
 \n\
-  %a   permission bits in octal (note '#' and '0' printf flags)\n\
+  %a   permission bits in octal (see '#' and '0' printf flags)\n\
   %A   permission bits and file type in human readable form\n\
   %b   number of blocks allocated (see %B)\n\
   %B   the size in bytes of each block reported by %b\n\

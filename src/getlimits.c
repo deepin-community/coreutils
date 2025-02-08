@@ -1,5 +1,5 @@
 /* getlimits - print various platform dependent limits.
-   Copyright (C) 2008-2023 Free Software Foundation, Inc.
+   Copyright (C) 2008-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -130,12 +130,12 @@ main (int argc, char **argv)
                                    (char const *) nullptr);
 
 #define print_int(TYPE)                                                  \
-  sprintf (limit + 1, "%"PRIuMAX, (uintmax_t) TYPE##_MAX);               \
+  sprintf (limit + 1, "%ju", (uintmax_t) TYPE##_MAX);               \
   printf (#TYPE"_MAX=%s\n", limit + 1);                                  \
   printf (#TYPE"_OFLOW=%s\n", decimal_absval_add_one (limit));           \
   if (TYPE##_MIN)                                                        \
     {                                                                    \
-      sprintf (limit + 1, "%"PRIdMAX, (intmax_t) TYPE##_MIN);            \
+      sprintf (limit + 1, "%jd", (intmax_t) TYPE##_MIN);            \
       printf (#TYPE"_MIN=%s\n", limit + 1);                              \
       printf (#TYPE"_UFLOW=%s\n", decimal_absval_add_one (limit));       \
     }

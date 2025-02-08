@@ -1,5 +1,5 @@
 /* Compute checksums of files or strings.
-   Copyright (C) 1995-2023 Free Software Foundation, Inc.
+   Copyright (C) 1995-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -23,9 +23,14 @@
 
 #include "system.h"
 #include "argmatch.h"
+#include "c-ctype.h"
 #include "quote.h"
 #include "xdectoint.h"
 #include "xstrtol.h"
+
+#ifndef HASH_ALGO_CKSUM
+# define HASH_ALGO_CKSUM 0
+#endif
 
 #if HASH_ALGO_SUM || HASH_ALGO_CKSUM
 # include "sum.h"
@@ -545,7 +550,7 @@ The default mode is to print a line with: checksum, a space,\n\
 a character indicating input mode ('*' for binary, ' ' for text\n\
 or where binary is insignificant), and name for each FILE.\n\
 \n\
-Note: There is no difference between binary mode and text mode on GNU systems.\
+There is no difference between binary mode and text mode on GNU systems.\
 \n"), stdout);
 #endif
 #if HASH_ALGO_CKSUM
@@ -660,7 +665,7 @@ valid_digits (unsigned char const *s, size_t len)
     {
       for (idx_t i = 0; i < digest_hex_bytes; i++)
         {
-          if (!isxdigit (*s))
+          if (!c_isxdigit (*s))
             return false;
           ++s;
         }
@@ -856,7 +861,7 @@ split_3 (char *s, size_t s_len,
 # endif
   unsigned char const *hp = *digest;
   digest_hex_bytes = 0;
-  while (isxdigit (*hp++))
+  while (c_isxdigit (*hp++))
     digest_hex_bytes++;
   if (digest_hex_bytes < 2 || digest_hex_bytes % 2
       || BLAKE2B_MAX_LEN * 2 < digest_hex_bytes)
@@ -1052,12 +1057,12 @@ output_file (char const *file, int binary_file, void const *digest,
       fputs (DIGEST_TYPE_STRING, stdout);
 # if HASH_ALGO_BLAKE2
       if (digest_length < BLAKE2B_MAX_LEN * 8)
-        printf ("-%"PRIuMAX, digest_length);
+        printf ("-%ju", digest_length);
 # elif HASH_ALGO_CKSUM
       if (cksum_algorithm == blake2b)
         {
           if (digest_length < BLAKE2B_MAX_LEN * 8)
-            printf ("-%"PRIuMAX, digest_length);
+            printf ("-%ju", digest_length);
         }
 # endif
       fputs (" (", stdout);
@@ -1120,9 +1125,9 @@ hex_equal (unsigned char const *hex_digest, unsigned char const *bin_buffer)
   size_t cnt;
   for (cnt = 0; cnt < digest_bin_bytes; ++cnt)
     {
-      if (tolower (hex_digest[2 * cnt])
+      if (c_tolower (hex_digest[2 * cnt])
           != bin2hex[bin_buffer[cnt] >> 4]
-          || (tolower (hex_digest[2 * cnt + 1])
+          || (c_tolower (hex_digest[2 * cnt + 1])
               != (bin2hex[bin_buffer[cnt] & 0xf])))
         break;
     }
@@ -1205,7 +1210,7 @@ digest_check (char const *checkfile_name)
           if (warn)
             {
               error (0, 0,
-                     _("%s: %" PRIuMAX
+                     _("%s: %ju"
                        ": improperly formatted %s checksum line"),
                      quotef (checkfile_name), line_number,
                      DIGEST_TYPE_STRING);
@@ -1301,24 +1306,24 @@ digest_check (char const *checkfile_name)
           if (n_misformatted_lines != 0)
             error (0, 0,
                    (ngettext
-                    ("WARNING: %" PRIuMAX " line is improperly formatted",
-                     "WARNING: %" PRIuMAX " lines are improperly formatted",
+                    ("WARNING: %ju line is improperly formatted",
+                     "WARNING: %ju lines are improperly formatted",
                      select_plural (n_misformatted_lines))),
                    n_misformatted_lines);
 
           if (n_open_or_read_failures != 0)
             error (0, 0,
                    (ngettext
-                    ("WARNING: %" PRIuMAX " listed file could not be read",
-                     "WARNING: %" PRIuMAX " listed files could not be read",
+                    ("WARNING: %ju listed file could not be read",
+                     "WARNING: %ju listed files could not be read",
                      select_plural (n_open_or_read_failures))),
                    n_open_or_read_failures);
 
           if (n_mismatched_checksums != 0)
             error (0, 0,
                    (ngettext
-                    ("WARNING: %" PRIuMAX " computed checksum did NOT match",
-                     "WARNING: %" PRIuMAX " computed checksums did NOT match",
+                    ("WARNING: %ju computed checksum did NOT match",
+                     "WARNING: %ju computed checksums did NOT match",
                      select_plural (n_mismatched_checksums))),
                    n_mismatched_checksums);
 
@@ -1345,11 +1350,7 @@ main (int argc, char **argv)
   int opt;
   bool ok = true;
   int binary = -1;
-#if HASH_ALGO_CKSUM
-  bool prefix_tag = true;
-#else
-  bool prefix_tag = false;
-#endif
+  int prefix_tag = -1;
 
   /* Setting values of global variables.  */
   initialize_main (&argc, &argv);
@@ -1396,11 +1397,6 @@ main (int argc, char **argv)
         digest_length = xdectoumax (optarg, 0, UINTMAX_MAX, "",
                                 _("invalid length"), 0);
         digest_length_str = optarg;
-        if (digest_length % 8 != 0)
-          {
-            error (0, 0, _("invalid length: %s"), quote (digest_length_str));
-            error (EXIT_FAILURE, 0, _("length is not a multiple of 8"));
-          }
         break;
 #endif
 #if !HASH_ALGO_SUM
@@ -1442,11 +1438,13 @@ main (int argc, char **argv)
         raw_digest = true;
         break;
       case UNTAG_OPTION:
-        prefix_tag = false;
+        if (prefix_tag == 1)
+          binary = -1;
+        prefix_tag = 0;
         break;
 # endif
       case TAG_OPTION:
-        prefix_tag = true;
+        prefix_tag = 1;
         binary = 1;
         break;
       case 'z':
@@ -1475,6 +1473,11 @@ main (int argc, char **argv)
     error (EXIT_FAILURE, 0,
            _("--length is only supported with --algorithm=blake2b"));
 # endif
+  if (digest_length % 8 != 0)
+    {
+      error (0, 0, _("invalid length: %s"), quote (digest_length_str));
+      error (EXIT_FAILURE, 0, _("length is not a multiple of 8"));
+    }
   if (digest_length > BLAKE2B_MAX_LEN * 8)
     {
       error (0, 0, _("invalid length: %s"), quote (digest_length_str));
@@ -1516,6 +1519,9 @@ main (int argc, char **argv)
      usage (EXIT_FAILURE);
    }
 #endif
+
+  if (prefix_tag == -1)
+    prefix_tag = HASH_ALGO_CKSUM;
 
   if (prefix_tag && !binary)
    {

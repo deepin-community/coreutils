@@ -1,5 +1,5 @@
 /* GNU's pinky.
-   Copyright (C) 1992-2023 Free Software Foundation, Inc.
+   Copyright (C) 1992-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,9 +17,9 @@
 /* Created by hacking who.c by Kaveh Ghazi ghazi@caip.rutgers.edu */
 
 #include <config.h>
+#include <ctype.h>
 #include <getopt.h>
 #include <pwd.h>
-#include <stdckdint.h>
 #include <stdio.h>
 
 #include <sys/types.h>
@@ -61,6 +61,9 @@ static bool include_home_and_shell = true;
 /* if true, use the "short" output format. */
 static bool do_short_format = true;
 
+/* If true, attempt to canonicalize hostnames via a DNS lookup. */
+static bool do_lookup;
+
 /* if true, display the ut_host field. */
 #if HAVE_STRUCT_XTMP_UT_HOST
 static bool include_where = true;
@@ -71,8 +74,15 @@ static bool include_where = true;
 static char const *time_format;
 static int time_format_width;
 
+/* for long options with no corresponding short option, use enum */
+enum
+{
+  LOOKUP_OPTION = CHAR_MAX + 1
+};
+
 static struct option const longopts[] =
 {
+  {"lookup", no_argument, nullptr, LOOKUP_OPTION},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
   {nullptr, 0, nullptr, 0}
@@ -81,15 +91,12 @@ static struct option const longopts[] =
 /* Count and return the number of ampersands in STR.  */
 
 ATTRIBUTE_PURE
-static size_t
+static idx_t
 count_ampersands (char const *str)
 {
-  size_t count = 0;
-  do
-    {
-      if (*str == '&')
-        count++;
-    } while (*str++);
+  idx_t count = 0;
+  for (; *str; str++)
+    count += *str == '&';
   return count;
 }
 
@@ -102,16 +109,16 @@ count_ampersands (char const *str)
 static char *
 create_fullname (char const *gecos_name, char const *user_name)
 {
-  size_t rsize = strlen (gecos_name) + 1;
+  idx_t rsize = strlen (gecos_name) + 1;
   char *result;
   char *r;
-  size_t ampersands = count_ampersands (gecos_name);
+  idx_t ampersands = count_ampersands (gecos_name);
 
   if (ampersands != 0)
     {
-      size_t ulen = strlen (user_name);
-      size_t product;
-      if (ckd_mul (&product, ulen, ampersands - 1)
+      idx_t ulen = strlen (user_name);
+      ptrdiff_t product;
+      if (ckd_mul (&product, ulen - 1, ampersands)
           || ckd_add (&rsize, rsize, product))
         xalloc_die ();
     }
@@ -165,7 +172,7 @@ idle_string (time_t when)
   else
     {
       intmax_t days = seconds_idle / (24 * 60 * 60);
-      sprintf (buf, "%"PRIdMAX"d", days);
+      sprintf (buf, "%jdd", days);
     }
   return buf;
 }
@@ -282,7 +289,7 @@ print_entry (struct gl_utmp const *utmp_ent)
       if (display)
         *display++ = '\0';
 
-      if (*ut_host)
+      if (*ut_host && do_lookup)
         /* See if we can canonicalize it.  */
         host = canon_host (ut_host);
       if ( ! host)
@@ -503,6 +510,9 @@ usage (int status)
   -q              omit the user's full name, remote host and idle time\n\
                   in short format\n\
 "), stdout);
+      fputs (_("\
+      --lookup    attempt to canonicalize hostnames via DNS\n\
+"), stdout);
       fputs (HELP_OPTION_DESCRIPTION, stdout);
       fputs (VERSION_OPTION_DESCRIPTION, stdout);
       printf (_("\
@@ -575,6 +585,10 @@ main (int argc, char **argv)
 
         case 'b':
           include_home_and_shell = false;
+          break;
+
+        case LOOKUP_OPTION:
+          do_lookup = true;
           break;
 
         case_GETOPT_HELP_CHAR;

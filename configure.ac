@@ -1,7 +1,7 @@
 # -*- autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-# Copyright (C) 1991-2023 Free Software Foundation, Inc.
+# Copyright (C) 1991-2024 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -55,7 +55,6 @@ gl_ASSERT_NO_GNULIB_POSIXCHECK])
 AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_CPP
-AC_PROG_GCC_TRADITIONAL
 AC_PROG_RANLIB
 AC_PROG_EGREP
 AC_PROG_LN_S
@@ -63,6 +62,26 @@ gl_EARLY
 gl_SET_CRYPTO_CHECK_DEFAULT([auto-gpl-compat])
 gl_INIT
 coreutils_MACROS
+
+# These are safe, since 'sort', coreutils's only multithreaded app,
+# does not use the relevant modules.
+AC_DEFINE([GNULIB_EXCLUDE_SINGLE_THREAD], [1],
+  [Define to 1 if apps call 'exclude' functions from a single thread.])
+AC_DEFINE([GNULIB_REGEX_SINGLE_THREAD], [1],
+  [Define to 1 if apps call 'regex' functions from a single thread.])
+# Although 'sort' is multithreaded and can use these functions,
+# it uses them only from the main thread.
+AC_DEFINE([GNULIB_MBRTOWC_SINGLE_THREAD], [1],
+  [Define to 1 if apps call mbrtowc, mbrtoc32, and 'regex' functions
+   from a single thread.])
+# This is safe, since all apps set locale early.
+AC_DEFINE([GNULIB_WCHAR_SINGLE_LOCALE], [1],
+  [Define to 1 if apps don't set the locale after calling
+   locale-sensitive functions like mbrtowc and wcwidth.])
+
+AC_DEFINE([GNULIB_MBRTOC32_REGULAR], [1],
+  [Do not worry about rare encodings like CP864, EBCDIC, Johab, and Shift JIS
+   that glibc does not support.])
 
 # The test suite needs to know if we have a working perl.
 AM_CONDITIONAL([HAVE_PERL], [test "$gl_cv_prog_perl" != no])
@@ -153,6 +172,13 @@ AC_ARG_ENABLE([gcc-warnings],
                           && gl_gcc_warnings=yes])]
 )
 
+# clang is unduly picky about some things, even by default.
+if test "$gl_cv_compiler_clang" = yes; then
+  gl_WARN_ADD([-Wno-format-extra-args])
+  gl_WARN_ADD([-Wno-implicit-const-int-float-conversion])
+  gl_WARN_ADD([-Wno-tautological-constant-out-of-range-compare])
+fi
+
 if test $gl_gcc_warnings != no; then
   gl_WARN_ADD([-Werror], [WERROR_CFLAGS])
   AC_SUBST([WERROR_CFLAGS])
@@ -212,21 +238,6 @@ if test $gl_gcc_warnings != no; then
   gl_WARN_ADD([-Wno-sign-compare])     # Too many warnings for now
   gl_WARN_ADD([-Wno-unused-parameter]) # Too many warnings for now
   gl_WARN_ADD([-Wno-format-nonliteral])
-
-  # clang is unduly picky about some things.
-  AC_CACHE_CHECK([whether the compiler is clang], [utils_cv_clang],
-    [AC_COMPILE_IFELSE(
-       [AC_LANG_PROGRAM([[
-            #ifndef __clang__
-              #error "not clang"
-            #endif
-          ]])],
-       [utils_cv_clang=yes],
-       [utils_cv_clang=no])])
-  if test $utils_cv_clang = yes; then
-    gl_WARN_ADD([-Wno-format-extra-args])
-    gl_WARN_ADD([-Wno-tautological-constant-out-of-range-compare])
-  fi
 
   gl_WARN_ADD([-fdiagnostics-show-option])
   gl_WARN_ADD([-funit-at-a-time])
@@ -339,6 +350,51 @@ AC_MSG_RESULT([$utils_cv_localtime_cache])
 if test $utils_cv_localtime_cache = yes; then
   AC_DEFINE([LOCALTIME_CACHE], [1], [FIXME])
 fi
+
+# Find the library for dynamic loading of shared libraries.
+AC_SEARCH_LIBS([dlopen], [dl])
+AS_CASE([$ac_cv_search_dlopen],
+  [no | 'none required'],
+    [LIB_DL=],
+  [*],
+    [LIB_DL="$ac_cv_search_dlopen"])
+AC_SUBST([LIB_DL])
+
+# Should 'sort' link libcrypto dynamically?
+AS_CASE([$LIB_CRYPTO],
+  [-lcrypto],
+    [# Check for dlopen and libcrypto dynamic linking in one program,
+     # as there's little point to checking them separately.
+     AC_CACHE_CHECK([for dlopen and whether libcrypto is linked dynamically],
+       [utils_cv_dlopen_libcrypto],
+       [utils_cv_dlopen_libcrypto=no
+        saved_LIBS=$LIBS
+        LIBS="$LIBS $LIB_DL $LIB_CRYPTO"
+        AC_LINK_IFELSE(
+          [AC_LANG_PROGRAM(
+             [[#include <dlfcn.h>
+               #include <openssl/sha.h>
+               /* Use SHA512 rather than MD5 here to avoid deprecation warnings.
+                  So need to check HAVE_OPENSSL_MD5.. with DLOPEN_LIBCRYPTO. */
+             ]],
+             [[return !(dlopen ("libcrypto.so", RTLD_LAZY | RTLD_GLOBAL)
+                        && SHA512 (0, 0, 0));]])],
+          [# readelf works with cross-builds; ldd works on more platforms.
+           LIBCRYPTO_SONAME="`(readelf -d conftest$EXEEXT || ldd conftest$EXEEXT
+                              ) 2>/dev/null |
+                              sed -n 's/.*\(libcrypto\.so\.[[.0-9]]*\).*/\1/p'`"
+           AS_CASE([$LIBCRYPTO_SONAME],
+             [*libcrypto*],
+               [utils_cv_dlopen_libcrypto=yes])])
+        LIBS=$saved_LIBS])
+     AS_CASE([$utils_cv_dlopen_libcrypto],
+       [yes],
+         [AC_DEFINE([DLOPEN_LIBCRYPTO], [1],
+                    [Define to 1 if dlopen exists and libcrypto is
+                     linked dynamically.])
+          AC_DEFINE_UNQUOTED([LIBCRYPTO_SONAME], ["$LIBCRYPTO_SONAME"],
+                             [versioned libcrypto])
+         ])])
 
 # macOS >= 10.12
 AC_CHECK_FUNCS([fclonefileat])
@@ -471,11 +527,6 @@ if test $gl_cv_sys_tiocgwinsz_needs_termios_h = no && \
                    [Define if your system defines TIOCGWINSZ in sys/pty.h.])
 fi
 
-# For src/kill.c.
-AC_CHECK_DECLS([strsignal, sys_siglist, _sys_siglist, __sys_siglist], , ,
-  [AC_INCLUDES_DEFAULT
-#include <signal.h>])
-
 # Build df only if there's a point to it.
 if test $gl_cv_list_mounted_fs = yes && test $gl_cv_fs_space = yes; then
   gl_ADD_PROG([optional_bin_progs], [df])
@@ -493,7 +544,8 @@ gl_WARN_ADD([-errwarn], [CFLAGS])
 AC_MSG_CHECKING([whether this system supports stdbuf])
 CFLAGS="-fPIC $CFLAGS"
 LDFLAGS="-shared $LDFLAGS"
-stdbuf_supported=no
+AC_CACHE_VAL([utils_cv_stdbuf_supported],[
+utils_cv_stdbuf_supported=no
 # Note we only LINK here rather than RUN to support cross compilation
 AC_LINK_IFELSE(
   [AC_LANG_PROGRAM([[
@@ -507,18 +559,68 @@ AC_LINK_IFELSE(
     if (stdbuf != 1)
       return 1;]])
   ],
-  [stdbuf_supported=yes])
-AC_MSG_RESULT([$stdbuf_supported])
-if test "$stdbuf_supported" = "yes" && test -z "$EXEEXT"; then
+  [utils_cv_stdbuf_supported=yes])])
+AC_MSG_RESULT([$utils_cv_stdbuf_supported])
+if test "$utils_cv_stdbuf_supported" = "yes" && test -z "$EXEEXT"; then
   gl_ADD_PROG([optional_bin_progs], [stdbuf])
 fi
 CFLAGS=$ac_save_CFLAGS
 LDFLAGS=$ac_save_LDFLAGS
 ac_c_werror_flag=$cu_save_c_werror_flag
 
+# Test compiler support for half precision floating point types (for od)
+AC_MSG_CHECKING([IEEE 16 bit floating point])
+AC_CACHE_VAL([utils_cv_ieee_16_bit_supported],[
+ AC_RUN_IFELSE(
+   [AC_LANG_SOURCE([[
+     int
+     main (void)
+     {
+        volatile _Float16 hf = 1;
+        float f = hf;  /* Ensure compiler can promote to float.  */
+        return !(f == 1.0f);
+     }
+  ]])
+  ],[
+    utils_cv_ieee_16_bit_supported=yes
+  ],[
+    utils_cv_ieee_16_bit_supported=no
+  ],[
+    utils_cv_ieee_16_bit_supported=no
+  ])])
+AC_MSG_RESULT([$utils_cv_ieee_16_bit_supported])
+if test $utils_cv_ieee_16_bit_supported = yes; then
+  AC_DEFINE([FLOAT16_SUPPORTED], [1], [IEEE 16 bit float supported])
+fi
+
+AC_MSG_CHECKING([Brain 16 bit floating point])
+AC_CACHE_VAL([utils_cv_brain_16_bit_supported],[
+ AC_RUN_IFELSE(
+   [AC_LANG_SOURCE([[
+     int
+     main (void)
+     {
+        volatile __bf16 hf = 1;
+        float f = hf;  /* Ensure compiler can promote to float.  */
+        return !(f == 1.0f);
+     }
+  ]])
+  ],[
+    utils_cv_brain_16_bit_supported=yes
+  ],[
+    utils_cv_brain_16_bit_supported=no
+  ],[
+    utils_cv_brain_16_bit_supported=no
+  ])])
+AC_MSG_RESULT([$utils_cv_brain_16_bit_supported])
+if test $utils_cv_brain_16_bit_supported = yes; then
+  AC_DEFINE([BF16_SUPPORTED], [1], [Brain 16 bit float supported])
+fi
+
 ac_save_CFLAGS=$CFLAGS
 CFLAGS="-mavx -mpclmul $CFLAGS"
 AC_MSG_CHECKING([if pclmul intrinsic exists])
+AC_CACHE_VAL([utils_cv_pclmul_intrinsic_exists],[
 AC_LINK_IFELSE(
   [AC_LANG_SOURCE([[
     #include <x86intrin.h>
@@ -533,21 +635,22 @@ AC_LINK_IFELSE(
     }
   ]])
   ],[
-    pclmul_intrinsic_exists=yes
+    utils_cv_pclmul_intrinsic_exists=yes
   ],[
-    pclmul_intrinsic_exists=no
-  ])
-AC_MSG_RESULT([$pclmul_intrinsic_exists])
-if test $pclmul_intrinsic_exists = yes; then
+    utils_cv_pclmul_intrinsic_exists=no
+  ])])
+AC_MSG_RESULT([$utils_cv_pclmul_intrinsic_exists])
+if test $utils_cv_pclmul_intrinsic_exists = yes; then
   AC_DEFINE([USE_PCLMUL_CRC32], [1],
             [CRC32 calculation by pclmul hardware instruction enabled])
 fi
 AM_CONDITIONAL([USE_PCLMUL_CRC32],
-               [test $pclmul_intrinsic_exists = yes])
+               [test $utils_cv_pclmul_intrinsic_exists = yes])
 CFLAGS=$ac_save_CFLAGS
 
 CFLAGS="-mavx2 $CFLAGS"
 AC_MSG_CHECKING([for avx2 intrinsics])
+AC_CACHE_VAL([utils_cv_avx2_intrinsic_exists],[
 AC_LINK_IFELSE(
   [AC_LANG_SOURCE([[
     #include <x86intrin.h>
@@ -561,16 +664,16 @@ AC_LINK_IFELSE(
     }
   ]])
   ],[
-    avx2_intrinsic_exists=yes
+    utils_cv_avx2_intrinsic_exists=yes
   ],[
-    avx2_intrinsic_exists=no
-  ])
-AC_MSG_RESULT([$avx2_intrinsic_exists])
-if test $avx2_intrinsic_exists = yes; then
+    utils_cv_avx2_intrinsic_exists=no
+  ])])
+AC_MSG_RESULT([$utils_cv_avx2_intrinsic_exists])
+if test $utils_cv_avx2_intrinsic_exists = yes; then
   AC_DEFINE([USE_AVX2_WC_LINECOUNT], [1], [Counting lines with AVX2 enabled])
 fi
 AM_CONDITIONAL([USE_AVX2_WC_LINECOUNT],
-               [test $avx2_intrinsic_exists = yes])
+               [test $utils_cv_avx2_intrinsic_exists = yes])
 
 CFLAGS=$ac_save_CFLAGS
 

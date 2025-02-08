@@ -1,5 +1,5 @@
 /* df - summarize free file system space
-   Copyright (C) 1991-2023 Free Software Foundation, Inc.
+   Copyright (C) 1991-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -23,15 +23,13 @@
 #include <sys/types.h>
 #include <getopt.h>
 #include <c-ctype.h>
-#include <wchar.h>
-#include <wctype.h>
+#include <uchar.h>
 
 #include "system.h"
 #include "assure.h"
 #include "canonicalize.h"
 #include "fsusage.h"
 #include "human.h"
-#include "mbsalign.h"
 #include "mbswidth.h"
 #include "mountlist.h"
 #include "quote.h"
@@ -169,48 +167,48 @@ struct field_data_t
   char const *arg;
   field_type_t field_type;
   char const *caption;/* nullptr means use default header of this field.  */
-  size_t width;       /* Auto adjusted (up) widths used to align columns.  */
-  mbs_align_t align;  /* Alignment for this field.  */
+  int width;          /* Auto adjusted (up) widths used to align columns.  */
+  bool align_right;   /* Whether to right-align columns, not left-align.  */
   bool used;
 };
 
 /* Header strings, minimum width and alignment for the above fields.  */
 static struct field_data_t field_data[] = {
   [SOURCE_FIELD] = { SOURCE_FIELD,
-    "source", OTHER_FLD, N_("Filesystem"), 14, MBS_ALIGN_LEFT,  false },
+    "source", OTHER_FLD, N_("Filesystem"), 14, false,  false },
 
   [FSTYPE_FIELD] = { FSTYPE_FIELD,
-    "fstype", OTHER_FLD, N_("Type"),        4, MBS_ALIGN_LEFT,  false },
+    "fstype", OTHER_FLD, N_("Type"),        4, false,  false },
 
   [SIZE_FIELD] = { SIZE_FIELD,
-    "size",   BLOCK_FLD, N_("blocks"),      5, MBS_ALIGN_RIGHT, false },
+    "size",   BLOCK_FLD, N_("blocks"),      5, true, false },
 
   [USED_FIELD] = { USED_FIELD,
-    "used",   BLOCK_FLD, N_("Used"),        5, MBS_ALIGN_RIGHT, false },
+    "used",   BLOCK_FLD, N_("Used"),        5, true, false },
 
   [AVAIL_FIELD] = { AVAIL_FIELD,
-    "avail",  BLOCK_FLD, N_("Available"),   5, MBS_ALIGN_RIGHT, false },
+    "avail",  BLOCK_FLD, N_("Available"),   5, true, false },
 
   [PCENT_FIELD] = { PCENT_FIELD,
-    "pcent",  BLOCK_FLD, N_("Use%"),        4, MBS_ALIGN_RIGHT, false },
+    "pcent",  BLOCK_FLD, N_("Use%"),        4, true, false },
 
   [ITOTAL_FIELD] = { ITOTAL_FIELD,
-    "itotal", INODE_FLD, N_("Inodes"),      5, MBS_ALIGN_RIGHT, false },
+    "itotal", INODE_FLD, N_("Inodes"),      5, true, false },
 
   [IUSED_FIELD] = { IUSED_FIELD,
-    "iused",  INODE_FLD, N_("IUsed"),       5, MBS_ALIGN_RIGHT, false },
+    "iused",  INODE_FLD, N_("IUsed"),       5, true, false },
 
   [IAVAIL_FIELD] = { IAVAIL_FIELD,
-    "iavail", INODE_FLD, N_("IFree"),       5, MBS_ALIGN_RIGHT, false },
+    "iavail", INODE_FLD, N_("IFree"),       5, true, false },
 
   [IPCENT_FIELD] = { IPCENT_FIELD,
-    "ipcent", INODE_FLD, N_("IUse%"),       4, MBS_ALIGN_RIGHT, false },
+    "ipcent", INODE_FLD, N_("IUse%"),       4, true, false },
 
   [TARGET_FIELD] = { TARGET_FIELD,
-    "target", OTHER_FLD, N_("Mounted on"),  0, MBS_ALIGN_LEFT,  false },
+    "target", OTHER_FLD, N_("Mounted on"),  0, false,  false },
 
   [FILE_FIELD] = { FILE_FIELD,
-    "file",   OTHER_FLD, N_("File"),        0, MBS_ALIGN_LEFT,  false }
+    "file",   OTHER_FLD, N_("File"),        0, false,  false }
 };
 
 static char const *all_args_string =
@@ -295,6 +293,8 @@ automount_stat_err (char const *file, struct stat *st)
     }
 }
 
+enum { MBSWIDTH_FLAGS = MBSW_REJECT_INVALID | MBSW_REJECT_UNPRINTABLE };
+
 /* Replace problematic chars with '?'.
    Since only control characters are currently considered,
    this should work in all encodings.  */
@@ -318,18 +318,18 @@ replace_invalid_chars (char *cell)
 {
   char *srcend = cell + strlen (cell);
   char *dst = cell;
-  mbstate_t mbstate = { 0, };
+  mbstate_t mbstate; mbszero (&mbstate);
   size_t n;
 
   for (char *src = cell; src != srcend; src += n)
     {
-      wchar_t wc;
+      char32_t wc;
       size_t srcbytes = srcend - src;
-      n = mbrtowc (&wc, src, srcbytes, &mbstate);
+      n = mbrtoc32 (&wc, src, srcbytes, &mbstate);
       bool ok = n <= srcbytes;
 
       if (ok)
-        ok = !iswcntrl (wc);
+        ok = !c32iscntrl (wc);
       else
         n = 1;
 
@@ -392,15 +392,15 @@ print_table (void)
           if (col != 0)
             putchar (' ');
 
-          int flags = 0;
-          if (col == ncolumns - 1) /* The last one.  */
-            flags = MBA_NO_RIGHT_PAD;
-
-          size_t width = columns[col]->width;
-          cell = ambsalign (cell, &width, columns[col]->align, flags);
-          /* When ambsalign fails, output unaligned data.  */
-          fputs (cell ? cell : table[row][col], stdout);
-          free (cell);
+          int width = mbswidth (cell, MBSWIDTH_FLAGS);
+          int fill = width < 0 ? 0 : columns[col]->width - width;
+          if (columns[col]->align_right)
+            for (; 0 < fill; fill--)
+              putchar (' ');
+          fputs (cell, stdout);
+          if (col + 1 < ncolumns)
+            for (; 0 < fill; fill--)
+              putchar (' ');
         }
       putchar ('\n');
     }
@@ -638,7 +638,7 @@ get_header (void)
 
       table[nrows - 1][col] = cell;
 
-      size_t cell_width = mbswidth (cell, 0);
+      int cell_width = mbswidth (cell, MBSWIDTH_FLAGS);
       columns[col]->width = MAX (columns[col]->width, cell_width);
     }
 }
@@ -1252,7 +1252,7 @@ get_dev (char const *device, char const *mount_point, char const *file,
       affirm (cell);
 
       replace_problematic_chars (cell);
-      size_t cell_width = mbswidth (cell, 0);
+      int cell_width = mbswidth (cell, MBSWIDTH_FLAGS);
       columns[col]->width = MAX (columns[col]->width, cell_width);
       table[nrows - 1][col] = cell;
     }

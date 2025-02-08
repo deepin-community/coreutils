@@ -1,6 +1,6 @@
 /* Convert decimal strings with bounds checking and exit on error.
 
-   Copyright (C) 2014-2023 Free Software Foundation, Inc.
+   Copyright (C) 2014-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -24,9 +24,9 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "error.h"
-#include "quote.h"
-#include "xstrtol.h"
+#include <error.h>
+#include <quote.h>
+#include <xstrtol.h>
 
 /* Parse numeric string N_STR of base BASE, and return the value.
    Exit on parse error or if MIN or MAX are exceeded.

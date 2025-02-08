@@ -1,8 +1,26 @@
-coreutils (9.4-2-1deepin1) unstable; urgency=low
+coreutils (9.5-1) unstable; urgency=low
 
-  * feat: usec: cp光盘内容产生审计日志. add cp copy audit
+  * New upstream version (Closes: #1033277)
+  * drop cp -n patch
+  * drop non-essential attributes in upstream/signing-key.asc to reduce size
+  * update watch file to use https rather than ftp
 
- -- zhangya <zhangya@uniontech.com>  Wed, 04 Sep 2024 16:37:49 -0500
+ -- Michael Stone <mstone@debian.org>  Wed, 23 Oct 2024 09:08:43 -0400
+
+coreutils (9.4-3.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * DEP17: Move files to /usr. (Closes: #1061274, #1057250)
+
+ -- Helmut Grohne <helmut@subdivi.de>  Sat, 09 Mar 2024 18:42:01 +0100
+
+coreutils (9.4-3) unstable; urgency=low
+
+  * remove arch restriction from libssl-dev build-depend
+  * revert cp -n behavior to debian 12 & prior (Closes: #1058752)
+  * add deprecation/compatibility warning for above
+
+ -- Michael Stone <mstone@debian.org>  Tue, 02 Jan 2024 08:54:03 -0500
 
 coreutils (9.4-2) unstable; urgency=low
 

@@ -1,5 +1,5 @@
 /* sort - sort lines of text (with all kinds of options).
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@
 
 #include <config.h>
 
+#include <ctype.h>
 #include <getopt.h>
 #include <pthread.h>
 #include <sys/resource.h>
@@ -38,7 +39,6 @@
 #include "hash.h"
 #include "heap.h"
 #include "ignore-value.h"
-#include "md5.h"
 #include "mbswidth.h"
 #include "nproc.h"
 #include "physmem.h"
@@ -444,7 +444,8 @@ Ordering options:\n\
   -h, --human-numeric-sort    compare human readable numbers (e.g., 2K 1G)\n\
 "), stdout);
       fputs (_("\
-  -n, --numeric-sort          compare according to string numerical value\n\
+  -n, --numeric-sort          compare according to string numerical value;\n\
+                                see manual for which strings are supported\n\
   -R, --random-sort           shuffle, but group identical keys.  See shuf(1)\n\
       --random-source=FILE    get random bytes from FILE\n\
   -r, --reverse               reverse the result of comparisons\n\
@@ -1291,9 +1292,9 @@ inittables (void)
 
   for (i = 0; i < UCHAR_LIM; ++i)
     {
-      blanks[i] = field_sep (i);
+      blanks[i] = i == '\n' || isblank (i);
+      nondictionary[i] = ! blanks[i] && ! isalnum (i);
       nonprinting[i] = ! isprint (i);
-      nondictionary[i] = ! isalnum (i) && ! field_sep (i);
       fold_toupper[i] = toupper (i);
     }
 
@@ -2083,6 +2084,56 @@ getmonth (char const *month, char **ea)
   return 0;
 }
 
+/* When using the OpenSSL implementation, dynamically link only if -R.
+   This saves startup time in the usual (sans -R) case.  */
+
+#if DLOPEN_LIBCRYPTO && HAVE_OPENSSL_MD5
+/* In the typical case where md5.h does not #undef HAVE_OPENSSL_MD5,
+   trick md5.h into declaring and using pointers to functions not functions.
+   This causes the compiler's -lcrypto option to have no effect,
+   as sort.o no longer uses any crypto symbols statically.  */
+# define MD5_Init (*ptr_MD5_Init)
+# define MD5_Update (*ptr_MD5_Update)
+# define MD5_Final (*ptr_MD5_Final)
+#endif
+
+#include "md5.h"
+
+#if DLOPEN_LIBCRYPTO && HAVE_OPENSSL_MD5
+# include <dlfcn.h>
+
+/* Diagnose a dynamic linking failure.  */
+static void
+link_failure (void)
+{
+  error (SORT_FAILURE, 0, "%s", dlerror ());
+}
+
+/* Return a function pointer in HANDLE for SYMBOL.  */
+static void *
+symbol_address (void *handle, char const *symbol)
+{
+  void *address = dlsym (handle, symbol);
+  if (!address)
+    link_failure ();
+  return address;
+}
+#endif
+
+/* Dynamically link the crypto library, if it needs linking.  */
+static void
+link_libcrypto (void)
+{
+#if DLOPEN_LIBCRYPTO && HAVE_OPENSSL_MD5
+  void *handle = dlopen (LIBCRYPTO_SONAME, RTLD_LAZY | RTLD_GLOBAL);
+  if (!handle)
+    link_failure ();
+  ptr_MD5_Init = symbol_address (handle, "MD5_Init");
+  ptr_MD5_Update = symbol_address (handle, "MD5_Update");
+  ptr_MD5_Final = symbol_address (handle, "MD5_Final");
+#endif
+}
+
 /* A randomly chosen MD5 state, used for random comparison.  */
 static struct md5_ctx random_md5_state;
 
@@ -2098,6 +2149,7 @@ random_md5_state_init (char const *random_source)
   randread (r, buf, sizeof buf);
   if (randread_free (r) != 0)
     sort_die (_("close failed"), random_source);
+  link_libcrypto ();
   md5_init_ctx (&random_md5_state);
   md5_process_bytes (buf, sizeof buf, &random_md5_state);
 }
@@ -3806,7 +3858,7 @@ avoid_trashing_input (struct sortfile *files, size_t ntemps,
                     ? fstat (STDIN_FILENO, &instat)
                     : stat (files[i].name, &instat))
                    == 0)
-                  && SAME_INODE (instat, *outst));
+                  && psame_inode (&instat, outst));
         }
 
       if (same)

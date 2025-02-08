@@ -1,5 +1,5 @@
 /* uniq -- remove duplicate lines from a sorted file
-   Copyright (C) 1986-2023 Free Software Foundation, Inc.
+   Copyright (C) 1986-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -25,7 +25,9 @@
 #include "argmatch.h"
 #include "linebuffer.h"
 #include "fadvise.h"
+#include "mcel.h"
 #include "posixver.h"
+#include "skipchars.h"
 #include "stdio--.h"
 #include "xstrtol.h"
 #include "memcasecmp.h"
@@ -38,41 +40,33 @@
   proper_name ("Richard M. Stallman"), \
   proper_name ("David MacKenzie")
 
-#define SWAP_LINES(A, B)			\
-  do						\
-    {						\
-      struct linebuffer *_tmp;			\
-      _tmp = (A);				\
-      (A) = (B);				\
-      (B) = _tmp;				\
-    }						\
-  while (0)
+static void
+swap_lines (struct linebuffer **a, struct linebuffer **b)
+{
+  struct linebuffer *tmp = *a;
+  *a = *b;
+  *b = tmp;
+}
 
 /* Number of fields to skip on each line when doing comparisons. */
-static size_t skip_fields;
+static idx_t skip_fields = false;
 
 /* Number of chars to skip after skipping any fields. */
-static size_t skip_chars;
+static idx_t skip_chars = false;
 
 /* Number of chars to compare. */
-static size_t check_chars;
+static idx_t check_chars = IDX_MAX;
 
-enum countmode
-{
-  count_occurrences,		/* -c Print count before output lines. */
-  count_none			/* Default.  Do not print counts. */
-};
-
-/* Whether and how to precede the output lines with a count of the number of
+/* Whether to precede the output lines with a count of the number of
    times they occurred in the input. */
-static enum countmode countmode;
+static bool count_occurrences = false;
 
 /* Which lines to output: unique lines, the first of a group of
    repeated lines, and the second and subsequent of a group of
    repeated lines.  */
-static bool output_unique;
-static bool output_first_repeated;
-static bool output_later_repeated;
+static bool output_unique = true;
+static bool output_first_repeated = true;
+static bool output_later_repeated = false;
 
 /* If true, ignore case when comparing.  */
 static bool ignore_case;
@@ -100,7 +94,7 @@ static enum delimit_method const delimit_method_map[] =
 };
 
 /* Select whether/how to delimit groups of duplicate lines.  */
-static enum delimit_method delimit_groups;
+static enum delimit_method delimit_groups = DM_NONE;
 
 enum grouping_method
 {
@@ -211,7 +205,7 @@ characters.  Fields are skipped before chars.\n\
 "), stdout);
      fputs (_("\
 \n\
-Note: 'uniq' does not detect repeated lines unless they are adjacent.\n\
+'uniq' does not detect repeated lines unless they are adjacent.\n\
 You may want to sort the input first, or use 'sort -u' without 'uniq'.\n\
 "), stdout);
       emit_ancillary_info (PROGRAM_NAME);
@@ -226,50 +220,60 @@ strict_posix2 (void)
   return 200112 <= posix_ver && posix_ver < 200809;
 }
 
-/* Convert OPT to size_t, reporting an error using MSGID if OPT is
-   invalid.  Silently convert too-large values to SIZE_MAX.  */
+/* Convert OPT to idx_t, reporting an error using MSGID if OPT is
+   invalid.  Silently convert too-large values to IDX_MAX.  */
 
-static size_t
+static idx_t
 size_opt (char const *opt, char const *msgid)
 {
-  uintmax_t size;
+  intmax_t size;
+  if (LONGINT_OVERFLOW < xstrtoimax (opt, nullptr, 10, &size, "")
+      || size < 0)
+    error (EXIT_FAILURE, 0, "%s: %s", opt, _(msgid));
+  return MIN (size, IDX_MAX);
+}
 
-  switch (xstrtoumax (opt, nullptr, 10, &size, ""))
-    {
-    case LONGINT_OK:
-    case LONGINT_OVERFLOW:
-      break;
-
-    default:
-      error (EXIT_FAILURE, 0, "%s: %s", opt, _(msgid));
-    }
-
-  return MIN (size, SIZE_MAX);
+static bool
+newline_or_blank (mcel_t g)
+{
+  return g.ch == '\n' || c32isblank (g.ch);
 }
 
 /* Given a linebuffer LINE,
-   return a pointer to the beginning of the line's field to be compared. */
+   return a pointer to the beginning of the line's field to be compared.
+   Store into *PLEN the length in bytes of FIELD.  */
 
-ATTRIBUTE_PURE
 static char *
-find_field (struct linebuffer const *line)
+find_field (struct linebuffer const *line, idx_t *plen)
 {
-  size_t count;
-  char const *lp = line->buffer;
-  size_t size = line->length - 1;
-  size_t i = 0;
+  char *lp = line->buffer;
+  char const *lim = lp + line->length - 1;
 
-  for (count = 0; count < skip_fields && i < size; count++)
+  for (idx_t i = skip_fields; 0 < i && lp < lim; i--)
     {
-      while (i < size && field_sep (lp[i]))
-        i++;
-      while (i < size && !field_sep (lp[i]))
-        i++;
+      lp = skip_buf_matching (lp, lim, newline_or_blank, true);
+      lp = skip_buf_matching (lp, lim, newline_or_blank, false);
     }
 
-  i += MIN (skip_chars, size - i);
+  for (idx_t i = skip_chars; 0 < i && lp < lim; i--)
+    lp += mcel_scan (lp, lim).len;
 
-  return line->buffer + i;
+  /* Compute the length in bytes cheaply if possible; otherwise, scan.  */
+  idx_t len;
+  if (lim - lp <= check_chars)
+    len = lim - lp;
+  else if (MB_CUR_MAX <= 1)
+    len = check_chars;
+  else
+    {
+      char *ep = lp;
+      for (idx_t i = check_chars; 0 < i && lp < lim; i--)
+        ep += mcel_scan (lp, lim).len;
+      len = ep - lp;
+    }
+
+  *plen = len;
+  return lp;
 }
 
 /* Return false if two strings OLD and NEW match, true if not.
@@ -278,13 +282,8 @@ find_field (struct linebuffer const *line)
    OLDLEN and NEWLEN are their lengths. */
 
 static bool
-different (char *old, char *new, size_t oldlen, size_t newlen)
+different (char *old, char *new, idx_t oldlen, idx_t newlen)
 {
-  if (check_chars < oldlen)
-    oldlen = check_chars;
-  if (check_chars < newlen)
-    newlen = check_chars;
-
   if (ignore_case)
     return oldlen != newlen || memcasecmp (old, new, oldlen);
   else
@@ -299,15 +298,15 @@ different (char *old, char *new, size_t oldlen, size_t newlen)
 
 static void
 writeline (struct linebuffer const *line,
-           bool match, uintmax_t linecount)
+           bool match, intmax_t linecount)
 {
   if (! (linecount == 0 ? output_unique
          : !match ? output_first_repeated
          : output_later_repeated))
     return;
 
-  if (countmode == count_occurrences)
-    printf ("%7" PRIuMAX " ", linecount + 1);
+  if (count_occurrences)
+    printf ("%7jd ", linecount + 1);
 
   if (fwrite (line->buffer, sizeof (char), line->length, stdout)
       != line->length)
@@ -351,26 +350,20 @@ check_file (char const *infile, char const *outfile, char delimiter)
 
      3. All other cases.
   */
-  if (output_unique && output_first_repeated && countmode == count_none)
+  if (output_unique && output_first_repeated && !count_occurrences)
     {
       char *prevfield = nullptr;
-      size_t prevlen;
+      idx_t prevlen;
       bool first_group_printed = false;
 
-      while (!feof (stdin))
+      while (!feof (stdin)
+             && readlinebuffer_delim (thisline, stdin, delimiter) != 0)
         {
-          char *thisfield;
-          size_t thislen;
-          bool new_group;
-
-          if (readlinebuffer_delim (thisline, stdin, delimiter) == 0)
-            break;
-
-          thisfield = find_field (thisline);
-          thislen = thisline->length - 1 - (thisfield - thisline->buffer);
-
-          new_group = (!prevfield
-                       || different (thisfield, prevfield, thislen, prevlen));
+          idx_t thislen;
+          char *thisfield = find_field (thisline, &thislen);
+          bool new_group = (!prevfield
+                            || different (thisfield, prevfield,
+                                          thislen, prevlen));
 
           if (new_group && grouping != GM_NONE
               && (grouping == GM_PREPEND || grouping == GM_BOTH
@@ -384,7 +377,7 @@ check_file (char const *infile, char const *outfile, char delimiter)
                   stdout) != thisline->length)
                 write_error ();
 
-              SWAP_LINES (prevline, thisline);
+              swap_lines (&prevline, &thisline);
               prevfield = thisfield;
               prevlen = thislen;
               first_group_printed = true;
@@ -395,33 +388,28 @@ check_file (char const *infile, char const *outfile, char delimiter)
     }
   else
     {
-      char *prevfield;
-      size_t prevlen;
-      uintmax_t match_count = 0;
-      bool first_delimiter = true;
-
       if (readlinebuffer_delim (prevline, stdin, delimiter) == 0)
         goto closefiles;
-      prevfield = find_field (prevline);
-      prevlen = prevline->length - 1 - (prevfield - prevline->buffer);
+
+      idx_t prevlen;
+      char *prevfield = find_field (prevline, &prevlen);
+      intmax_t match_count = 0;
+      bool first_delimiter = true;
 
       while (!feof (stdin))
         {
-          bool match;
-          char *thisfield;
-          size_t thislen;
           if (readlinebuffer_delim (thisline, stdin, delimiter) == 0)
             {
               if (ferror (stdin))
                 goto closefiles;
               break;
             }
-          thisfield = find_field (thisline);
-          thislen = thisline->length - 1 - (thisfield - thisline->buffer);
-          match = !different (thisfield, prevfield, thislen, prevlen);
+          idx_t thislen;
+          char *thisfield = find_field (thisline, &thislen);
+          bool match = !different (thisfield, prevfield, thislen, prevlen);
           match_count += match;
 
-          if (match_count == UINTMAX_MAX)
+          if (match_count == INTMAX_MAX)
             {
               if (count_occurrences)
                 error (EXIT_FAILURE, 0, _("too many repeated lines"));
@@ -447,7 +435,7 @@ check_file (char const *infile, char const *outfile, char delimiter)
           if (!match || output_later_repeated)
             {
               writeline (prevline, match, match_count);
-              SWAP_LINES (prevline, thisline);
+              swap_lines (&prevline, &thisline);
               prevfield = thisfield;
               prevlen = thislen;
               if (!match)
@@ -481,7 +469,7 @@ main (int argc, char **argv)
   int optc = 0;
   bool posixly_correct = (getenv ("POSIXLY_CORRECT") != nullptr);
   enum Skip_field_option_type skip_field_option_type = SFO_NONE;
-  unsigned int nfiles = 0;
+  int nfiles = 0;
   char const *file[2];
   char delimiter = '\n';	/* change with --zero-terminated, -z */
   bool output_option_used = false;   /* if true, one of -u/-d/-D/-c was used */
@@ -494,14 +482,6 @@ main (int argc, char **argv)
   textdomain (PACKAGE);
 
   atexit (close_stdout);
-
-  skip_chars = 0;
-  skip_fields = 0;
-  check_chars = SIZE_MAX;
-  output_unique = output_first_repeated = true;
-  output_later_repeated = false;
-  countmode = count_none;
-  delimit_groups = DM_NONE;
 
   while (true)
     {
@@ -529,12 +509,12 @@ main (int argc, char **argv)
         {
         case 1:
           {
-            uintmax_t size;
+            intmax_t size;
             if (optarg[0] == '+'
                 && ! strict_posix2 ()
-                && xstrtoumax (optarg, nullptr, 10, &size, "") == LONGINT_OK
-                && size <= SIZE_MAX)
-              skip_chars = size;
+                && (xstrtoimax (optarg, nullptr, 10, &size, "")
+                    <= LONGINT_OVERFLOW))
+              skip_chars = MIN (size, IDX_MAX);
             else if (nfiles == 2)
               {
                 error (0, 0, _("extra operand %s"), quote (optarg));
@@ -559,15 +539,15 @@ main (int argc, char **argv)
             if (skip_field_option_type == SFO_NEW)
               skip_fields = 0;
 
-            if (!DECIMAL_DIGIT_ACCUMULATE (skip_fields, optc - '0', size_t))
-              skip_fields = SIZE_MAX;
+            if (!DECIMAL_DIGIT_ACCUMULATE (skip_fields, optc - '0'))
+              skip_fields = IDX_MAX;
 
             skip_field_option_type = SFO_OBSOLETE;
           }
           break;
 
         case 'c':
-          countmode = count_occurrences;
+          count_occurrences = true;
           output_option_used = true;
           break;
 
@@ -645,14 +625,14 @@ main (int argc, char **argv)
       usage (EXIT_FAILURE);
     }
 
-  if (grouping != GM_NONE && countmode != count_none)
+  if (grouping != GM_NONE && count_occurrences)
     {
       error (0, 0,
            _("grouping and printing repeat counts is meaningless"));
       usage (EXIT_FAILURE);
     }
 
-  if (countmode == count_occurrences && output_later_repeated)
+  if (count_occurrences && output_later_repeated)
     {
       error (0, 0,
            _("printing all duplicated lines and repeat counts is meaningless"));

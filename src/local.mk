@@ -1,7 +1,7 @@
 # Make coreutils programs.                             -*-Makefile-*-
 # This is included by the top-level Makefile.am.
 
-## Copyright (C) 1990-2023 Free Software Foundation, Inc.
+## Copyright (C) 1990-2024 Free Software Foundation, Inc.
 
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -40,6 +40,7 @@ noinst_PROGRAMS =		\
   src/make-prime-list
 
 noinst_HEADERS =		\
+  src/chown.h			\
   src/chown-core.h		\
   src/copy.h			\
   src/cp-hash.h			\
@@ -60,7 +61,8 @@ noinst_HEADERS =		\
   src/statx.h			\
   src/system.h			\
   src/temp-stream.h		\
-  src/uname.h
+  src/uname.h			\
+  src/wc.h
 
 EXTRA_DIST +=		\
   src/dcgen		\
@@ -104,7 +106,7 @@ src_basenc_LDADD = $(LDADD)
 src_basename_LDADD = $(LDADD)
 src_cat_LDADD = $(LDADD)
 src_chcon_LDADD = $(LDADD)
-src_chgrp_LDADD = $(LDADD)
+# See chgrp_LDADD below
 src_chmod_LDADD = $(LDADD)
 src_chown_LDADD = $(LDADD)
 src_chroot_LDADD = $(LDADD)
@@ -218,6 +220,7 @@ src_yes_LDADD = $(LDADD)
 src___LDADD = $(src_test_LDADD)
 src_dir_LDADD = $(src_ls_LDADD)
 src_vdir_LDADD = $(src_ls_LDADD)
+src_chgrp_LDADD = $(src_chown_LDADD)
 
 src_cp_LDADD += $(copy_ldadd)
 src_ginstall_LDADD += $(copy_ldadd)
@@ -263,7 +266,7 @@ src_pr_LDADD += $(CLOCK_TIME_LIB)
 src_sort_LDADD += $(CLOCK_TIME_LIB)
 src_split_LDADD += $(CLOCK_TIME_LIB)
 src_tac_LDADD += $(CLOCK_TIME_LIB)
-src_timeout_LDADD += $(LIB_TIMER_TIME)
+src_timeout_LDADD += $(TIMER_TIME_LIB)
 src_touch_LDADD += $(CLOCK_TIME_LIB)
 
 # for gethrxtime
@@ -273,9 +276,9 @@ src_dd_LDADD += $(GETHRXTIME_LIB)
 src_ls_LDADD += $(LIB_CAP)
 
 # for fdatasync
-src_dd_LDADD += $(LIB_FDATASYNC)
-src_shred_LDADD += $(LIB_FDATASYNC)
-src_sync_LDADD += $(LIB_FDATASYNC)
+src_dd_LDADD += $(FDATASYNC_LIB)
+src_shred_LDADD += $(FDATASYNC_LIB)
+src_sync_LDADD += $(FDATASYNC_LIB)
 
 # for xnanosleep
 src_sleep_LDADD += $(NANOSLEEP_LIB)
@@ -301,7 +304,7 @@ src_printf_LDADD += $(LIBICONV)
 
 # for libcrypto hash routines
 src_md5sum_LDADD += $(LIB_CRYPTO)
-src_sort_LDADD += $(LIB_CRYPTO)
+src_sort_LDADD += $(LIB_DL) $(LIB_CRYPTO)
 src_sha1sum_LDADD += $(LIB_CRYPTO)
 src_sha224sum_LDADD += $(LIB_CRYPTO)
 src_sha256sum_LDADD += $(LIB_CRYPTO)
@@ -378,8 +381,8 @@ src_ls_SOURCES = src/ls.c src/ls-ls.c
 src_ln_SOURCES = src/ln.c \
   src/force-link.c src/force-link.h \
   src/relpath.c src/relpath.h
-src_chown_SOURCES = src/chown.c src/chown-core.c
-src_chgrp_SOURCES = src/chgrp.c src/chown-core.c
+src_chown_SOURCES = src/chown.c src/chown-core.c src/chown-chown.c
+src_chgrp_SOURCES = src/chown.c src/chown-core.c src/chown-chgrp.c
 src_kill_SOURCES = src/kill.c src/operand2sig.c
 src_realpath_SOURCES = src/realpath.c src/relpath.c src/relpath.h
 src_timeout_SOURCES = src/timeout.c src/operand2sig.c
