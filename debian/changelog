@@ -1,3 +1,15 @@
+coreutils (9.4-3.1deepin2) unstable; urgency=medium
+
+  * feat: add sw64 support
+
+ -- Deepin Packages Builder <packages@deepin.org>  Tue, 27 May 2025 14:10:04 +0800
+
+coreutils (9.4-3.1deepin1) unstable; urgency=medium
+
+  * chore: add missing patch
+
+ -- Deepin Packages Builder <packages@deepin.org>  Tue, 27 May 2025 14:08:19 +0800
+
 coreutils (9.4-3.1) unstable; urgency=medium
 
   * Non-maintainer upload.
