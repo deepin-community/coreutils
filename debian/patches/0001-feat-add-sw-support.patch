@@ -1,0 +1,39 @@
+From c2bb797d73eaf587077d16c9889e895c8f374147 Mon Sep 17 00:00:00 2001
+From: hudeng <hudeng@deepin.org>
+Date: Tue, 27 May 2025 05:21:09 +0000
+Subject: [PATCH] feat: add sw support
+
+---
+ build-aux/config.guess | 3 +++
+ build-aux/config.sub   | 1 +
+ 2 files changed, 4 insertions(+)
+
+diff --git a/build-aux/config.guess b/build-aux/config.guess
+index b187213..ec592ca 100755
+--- a/build-aux/config.guess
++++ b/build-aux/config.guess
+@@ -1175,6 +1175,9 @@ EOF
+     sh*:Linux:*:*)
+ 	GUESS=$UNAME_MACHINE-unknown-linux-$LIBC
+ 	;;
++    sw_64*:Linux:*:*)
++	GUESS=$UNAME_MACHINE-unknown-linux-$LIBC
++	;;
+     sparc:Linux:*:* | sparc64:Linux:*:*)
+ 	GUESS=$UNAME_MACHINE-unknown-linux-$LIBC
+ 	;;
+diff --git a/build-aux/config.sub b/build-aux/config.sub
+index 6ae2502..5faf152 100755
+--- a/build-aux/config.sub
++++ b/build-aux/config.sub
+@@ -1238,6 +1238,7 @@ case $cpu-$vendor in
+ 			| rl78 | romp | rs6000 | rx \
+ 			| s390 | s390x \
+ 			| score \
++			| sw_64 \
+ 			| sh | shl \
+ 			| sh[1234] | sh[24]a | sh[24]ae[lb] | sh[23]e | she[lb] | sh[lb]e \
+ 			| sh[1234]e[lb] |  sh[12345][lb]e | sh[23]ele | sh64 | sh64le \
+-- 
+2.43.4
+
