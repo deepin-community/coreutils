@@ -2,3 +2,4 @@
 cp-n.diff
 81_uniontech-add-cp-copy-audit-support.patch
 0001-feat-add-sw-support.patch
+82_uos_adapt_usec_label.patch
