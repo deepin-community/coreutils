@@ -1,3 +1,9 @@
+coreutils (9.4-3.1deepin3) unstable; urgency=medium
+
+  * feat: adapt usec.
+
+ -- zhangya <zhangya@uniontech.com>  Thu, 12 Jun 2025 15:08:01 +0100
+
 coreutils (9.4-3.1deepin2) unstable; urgency=medium
 
   * feat: add sw64 support
