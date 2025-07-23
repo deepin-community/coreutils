@@ -1,3 +1,21 @@
+coreutils (9.4-3-1deepin5) unstable; urgency=medium
+
+  * feat: show default security.usec_smodel i16384,s16384 to i15,s0
+
+ -- zhangya <zhangya@uniontech.com>  Mon, 14 Jul 2025 10:27:01 +0100
+
+coreutils (9.4-3-1deepin4) unstable; urgency=medium
+
+  * feat: 保密性完整性标签.
+
+ -- zhangya <zhangya@uniontech.com>  Wed, 18 Jun 2025 15:36:01 +0100
+
+coreutils (9.4-3-1deepin3) unstable; urgency=medium
+
+  * feat: adapt usec.
+
+ -- zhangya <zhangya@uniontech.com>  Thu, 12 Jun 2025 15:08:01 +0100
+
 coreutils (9.4-3.1deepin2) unstable; urgency=medium
 
   * feat: add sw64 support

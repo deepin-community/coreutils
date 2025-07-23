@@ -1,0 +1,437 @@
+Index: coreutils_new_commit/src/id.c
+===================================================================
+--- coreutils_new_commit.orig/src/id.c
++++ coreutils_new_commit/src/id.c
+@@ -57,6 +57,10 @@ static bool ok = true;
+ static bool multiple_users = false;
+ /* If true, output user/group name instead of ID number. -n */
+ static bool use_name = false;
++static bool usec_user_context = false;
++static bool usec_slevel_context = false;
++static bool usec_ilevel_context = false;
++
+ 
+ /* The real and effective IDs of the user to print. */
+ static uid_t ruid, euid;
+@@ -65,6 +69,8 @@ static gid_t rgid, egid;
+ /* The SELinux context.  Start with a known invalid value so print_full_info
+    knows when 'context' has not been set to a meaningful value.  */
+ static char *context = nullptr;
++unsigned int usec_user_value = 0;
++unsigned short int usec_model_value = 0;
+ 
+ static void print_user (uid_t uid);
+ static void print_full_info (char const *username);
+@@ -79,6 +85,9 @@ static struct option const longopts[] =
+   {"real", no_argument, nullptr, 'r'},
+   {"user", no_argument, nullptr, 'u'},
+   {"zero", no_argument, nullptr, 'z'},
++  {"usec-user", no_argument, nullptr, GETOPT_USEC_USER},
++  {"usec-slevel", no_argument, nullptr, GETOPT_USEC_SLEVEL},
++  {"usec-ilevel", no_argument, nullptr, GETOPT_USEC_ILEVEL},
+   {GETOPT_HELP_OPTION_DECL},
+   {GETOPT_VERSION_OPTION_DECL},
+   {nullptr, 0, nullptr, 0}
+@@ -119,6 +128,26 @@ Without any OPTION, print some useful se
+   exit (status);
+ }
+ 
++static int usec_getcon_uint16(unsigned short int* con, const char* file)
++{
++    size_t len;
++    int fd;
++
++    *con = 0;
++    fd = open(file, O_RDONLY);
++    if (fd == -1) {
++        return -1;
++    }
++
++    len = read(fd, con, sizeof(*con));
++    close(fd);
++    if (len == -1) {
++        return -1;
++    }
++
++    return 0;
++}
++
+ int
+ main (int argc, char **argv)
+ {
+@@ -175,6 +204,15 @@ main (int argc, char **argv)
+         case 'G':
+           just_group_list = true;
+           break;
++        case GETOPT_USEC_USER:
++          usec_user_context = true;
++          break;
++        case GETOPT_USEC_SLEVEL:
++          usec_slevel_context = true;
++          break;
++        case GETOPT_USEC_ILEVEL:
++          usec_ilevel_context = true;
++          break;
+         case_GETOPT_HELP_CHAR;
+         case_GETOPT_VERSION_CHAR (PROGRAM_NAME, AUTHORS);
+         default:
+@@ -184,17 +222,20 @@ main (int argc, char **argv)
+ 
+   size_t n_ids = argc - optind;
+ 
+-  if (n_ids && just_context)
++  if (n_ids && (just_context || usec_user_context || usec_slevel_context || usec_ilevel_context))
+     error (EXIT_FAILURE, 0,
+            _("cannot print security context when user specified"));
+ 
+-  if (just_user + just_group + just_group_list + just_context > 1)
++  if (just_user + just_group + just_group_list + just_context + usec_user_context + usec_slevel_context + usec_ilevel_context> 1)
+     error (EXIT_FAILURE, 0, _("cannot print \"only\" of more than one choice"));
+ 
+   bool default_format = ! (just_user
+                            || just_group
+                            || just_group_list
+-                           || just_context);
++                           || just_context
++                           || usec_user_context
++                           || usec_slevel_context
++                           || usec_ilevel_context);
+ 
+   if (default_format && (use_real || use_name))
+     error (EXIT_FAILURE, 0,
+@@ -221,6 +262,22 @@ main (int argc, char **argv)
+         error (EXIT_FAILURE, 0, _("can't get process context"));
+     }
+ 
++  if (n_ids == 0 && usec_user_context) {
++    if (usec_user_getcon(&usec_user_value))
++      error (EXIT_FAILURE, 0, _("can't get usec user context"));
++  }
++
++  if (n_ids == 0 && usec_slevel_context) {
++    if (usec_getcon_uint16(&usec_model_value, "/proc/self/attr/usec/slevel"))
++      error (EXIT_FAILURE, 0, _("can't get usec slevel context"));
++  }
++
++  if (n_ids == 0 && usec_ilevel_context) {
++    if (usec_getcon_uint16(&usec_model_value, "/proc/self/attr/usec/ilevel"))
++      error (EXIT_FAILURE, 0, _("can't get usec ilevel context"));
++  }
++
++
+   if (n_ids >= 1)
+     {
+       multiple_users = n_ids > 1 ? true : false;
+@@ -446,6 +503,33 @@ print_stuff (char const *pw_name)
+                             use_name, opt_zero ? '\0' : ' ');
+   else if (just_context)
+     fputs (context, stdout);
++  else if (usec_user_context) {
++    struct passwd *pwd;
++    pwd = getpwuid (ruid);
++    unsigned int first_8_bits = (usec_user_value >> 24);
++    if (pwd)
++      fprintf (stdout, "%s security.usec_user=0x%02X", pwd->pw_name, first_8_bits);
++    else
++      fprintf (stdout, "security.usec_user=0x%02X", first_8_bits);
++  }
++  else if (usec_slevel_context)
++  {
++    struct passwd *pwd;
++    pwd = getpwuid (ruid);
++    if (pwd)
++        fprintf (stdout, "%s security.usec_slevel=s%d", pwd->pw_name, usec_model_value);
++      else
++        fprintf (stdout, "security.usec_slevel=s%d", usec_model_value);
++  }
++  else if (usec_ilevel_context)
++  {
++    struct passwd *pwd;
++    pwd = getpwuid (ruid);
++    if (pwd)
++        fprintf (stdout, "%s security.usec_ilevel=i%d", pwd->pw_name, usec_model_value);
++      else
++        fprintf (stdout, "security.usec_ilevel=i%d", usec_model_value);
++  }
+   else
+     print_full_info (pw_name);
+ 
+Index: coreutils_new_commit/src/ls.c
+===================================================================
+--- coreutils_new_commit.orig/src/ls.c
++++ coreutils_new_commit/src/ls.c
+@@ -214,6 +214,7 @@ struct fileinfo
+     /* security context.  */
+     char *scontext;
+ 
++    char *usec_context;
+     bool stat_ok;
+ 
+     /* For symbolic link and color printing, true if linked-to file
+@@ -388,6 +389,11 @@ static struct pending *pending_dirs;
+ static struct timespec current_time;
+ 
+ static bool print_scontext;
++static bool print_usecuser;
++static bool print_usecproc;
++static bool print_usecfile;
++static bool print_usecslevel;
++static bool print_usecilevel;
+ static char UNKNOWN_SECURITY_CONTEXT[] = "?";
+ 
+ /* Whether any of the files has an ACL.  This affects the width of the
+@@ -843,6 +849,11 @@ enum
+   TIME_OPTION,
+   TIME_STYLE_OPTION,
+   ZERO_OPTION,
++  USEC_USER_OPTION,
++  USEC_PROC_OPTION,
++  USEC_FILE_OPTION,
++  USEC_SLEVEL_OPTION,
++  USEC_ILEVEL_OPTION,
+ };
+ 
+ static struct option const long_options[] =
+@@ -890,6 +901,11 @@ static struct option const long_options[
+   {"hyperlink", optional_argument, nullptr, HYPERLINK_OPTION},
+   {"block-size", required_argument, nullptr, BLOCK_SIZE_OPTION},
+   {"context", no_argument, 0, 'Z'},
++  {"usec-file", no_argument, nullptr, USEC_FILE_OPTION},
++  {"usec-proc", no_argument, nullptr, USEC_PROC_OPTION},
++  {"usec-user", no_argument, nullptr, USEC_USER_OPTION},
++  {"usec-slevel", no_argument, nullptr, USEC_SLEVEL_OPTION},
++  {"usec-ilevel", no_argument, nullptr, USEC_ILEVEL_OPTION},
+   {"author", no_argument, nullptr, AUTHOR_OPTION},
+   {GETOPT_HELP_OPTION_DECL},
+   {GETOPT_VERSION_OPTION_DECL},
+@@ -1719,6 +1735,7 @@ main (int argc, char **argv)
+   format_needs_stat = sort_type == sort_time || sort_type == sort_size
+     || format == long_format
+     || print_scontext
++    || print_usecuser || print_usecfile || print_usecproc || print_usecslevel || print_usecilevel
+     || print_block_size;
+   format_needs_type = (! format_needs_stat
+                        && (recursive
+@@ -2223,6 +2240,21 @@ decode_switches (int argc, char **argv)
+         case 'Z':
+           print_scontext = true;
+           break;
++        case USEC_USER_OPTION:
++          print_usecuser = true;
++          break;
++        case USEC_PROC_OPTION:
++          print_usecproc = true;
++          break;
++        case USEC_FILE_OPTION:
++          print_usecfile = true;
++          break;
++        case USEC_SLEVEL_OPTION:
++          print_usecslevel = true;
++          break;
++        case USEC_ILEVEL_OPTION:
++          print_usecilevel = true;
++          break;
+ 
+         case ZERO_OPTION:
+           eolbyte = 0;
+@@ -3242,6 +3274,7 @@ free_ent (struct fileinfo *f)
+       else
+         freecon (f->scontext);
+     }
++  free (f->usec_context);
+ }
+ 
+ /* Empty the table of files.  */
+@@ -3307,6 +3340,13 @@ getfilecon_cache (char const *file, stru
+   return r;
+ }
+ 
++static int usec_getfilecon_cache (char const *file,  struct fileinfo *f, bool deref, const char* attr_name)
++{
++   deref
++   ? usec_getfilecon (file, attr_name, &f->usec_context)
++   : usec_lgetfilecon (file, attr_name, &f->usec_context);
++ return 0;
++}
+ /* Cache file_has_acl failure, when it's trivial to do.
+    Like file_has_acl, but when F's st_dev says it's on a file
+    system lacking ACL support, return 0 with ENOTSUP immediately.  */
+@@ -3521,6 +3561,19 @@ gobble_file (char const *name, enum file
+       if ((type == normal || S_ISREG (f->stat.st_mode))
+           && print_with_color && is_colored (C_CAP))
+         f->has_capability = has_capability_cache (full_name, f);
++     if (format == long_format)
++     {
++       getfilecon_cache (full_name, f, do_deref);
++     }
++   
++     if (print_usecuser)
++       usec_getfilecon_cache(full_name, f, do_deref, "security.usec_user");
++     else if (print_usecfile)
++       usec_getfilecon_cache(full_name, f, do_deref, "security.usec_file");
++     else if (print_usecproc)
++       usec_getfilecon_cache(full_name, f, do_deref, "security.usec_proc");
++     else if (print_usecslevel || print_usecilevel)
++       usec_getfilecon_cache(full_name, f, do_deref, "security.usec_smodel");
+ 
+       if (format == long_format || print_scontext)
+         {
+@@ -4299,6 +4352,71 @@ format_inode (char buf[INT_BUFSIZE_BOUND
+           : (char *) "?");
+ }
+ 
++static int charPtrToUint32(const char* str, unsigned int *value) {
++    if (str == NULL) {
++        return -1;
++    }
++    long longValue = 0;
++    char* endptr;
++    if (strncmp(str, "0x", 2) == 0 || strncmp(str, "0X", 2) == 0)
++        longValue = strtoull(str + 2, &endptr, 16);
++    else
++        longValue = strtoull(str, &endptr, 10);
++
++    if (endptr == str) {
++        return -EINVAL;
++    }
++
++    if (*endptr != '\0') {
++        return -EINVAL;
++    }
++
++    if (errno == ERANGE || longValue > 0xffffffff) {
++        return -EINVAL;
++    }
++
++    *value = (unsigned int)longValue;
++    return 0;
++}
++
++static int trim_usec_attr(const char *full_context, char *output_buffer, size_t buffer_size)
++{
++    if (full_context == NULL || output_buffer == NULL || buffer_size == 0) {
++        return -1;
++    }
++
++    const char *first_colon = strchr(full_context, ':');
++    if (first_colon == NULL) {
++        return -1;
++    }
++
++    const char *second_colon = strchr(first_colon + 1, ':');
++    if (second_colon == NULL) {
++        return -1;
++    }
++
++    const char *third_colon = strchr(second_colon + 1, ':');
++    size_t type_start_index = (second_colon - full_context) + 1;
++    size_t type_end_index;
++
++    if (third_colon != NULL) {
++        type_end_index = (third_colon - full_context);
++    } else {
++        type_end_index = strlen(full_context);
++    }
++
++    size_t type_length = type_end_index - type_start_index;
++
++    if (type_length >= buffer_size) {
++        return -1;
++    }
++
++    strncpy(output_buffer, full_context + type_start_index, type_length);
++    output_buffer[type_length] = '\0';
++
++    return 0;
++}
++
+ /* Print information about F in long format.  */
+ static void
+ print_long_format (const struct fileinfo *f)
+@@ -4390,7 +4508,7 @@ print_long_format (const struct fileinfo
+ 
+   dired_indent ();
+ 
+-  if (print_owner || print_group || print_author || print_scontext)
++  if (print_owner || print_group || print_author || print_scontext || print_usecuser || print_usecfile || print_usecproc || print_usecslevel || print_usecilevel)
+     {
+       dired_outbuf (buf, p - buf);
+ 
+@@ -4405,6 +4523,26 @@ print_long_format (const struct fileinfo
+ 
+       if (print_scontext)
+         format_user_or_group (f->scontext, 0, scontext_width);
++      if (print_usecuser)
++        printf ("%s ", f->usec_context ? f->usec_context: "0xffffff");
++      if (print_usecproc || print_usecfile) {
++        char context[256];
++        if (trim_usec_attr(f->usec_context, context, sizeof(context)) == 0) {
++            printf ("%s ", context);
++        } else {
++            printf ("%s ", f->usec_context ? f->usec_context: "-");
++        }
++      }
++      if (print_usecslevel || print_usecilevel) {
++        unsigned int model = 0;
++        if ( 0 != charPtrToUint32(f->usec_context, &model)) {
++            printf ("%s ", "-");
++        } else {
++            unsigned short ilevel = (model >> 16) & 0xFFFF;
++            unsigned short slevel = model & 0xFFFF;
++            printf ("%c%d ", print_usecslevel?'s':'i', print_usecslevel? (slevel!=16384?slevel:0):(ilevel!=16384?ilevel:15));
++        }
++      }
+ 
+       p = buf;
+     }
+@@ -4887,6 +5025,19 @@ print_file_name_and_frills (const struct
+   if (print_scontext)
+     printf ("%*s ", format == with_commas ? 0 : scontext_width, f->scontext);
+ 
++  if (print_usecuser || print_usecproc || print_usecfile)
++    printf ("%s ", f->usec_context);
++  if (print_usecslevel || print_usecilevel) {
++    unsigned model = 0;
++    if ( 0 != charPtrToUint32(f->usec_context, &model)) {
++      printf ("%s ", "-");
++    } else {
++      unsigned short ilevel = (model >> 16) & 0xFFFF;
++      unsigned short slevel = model & 0xFFFF;
++      printf ("%c%d ", print_usecslevel?'s':'i', print_usecslevel? slevel:ilevel);
++    }
++  }
++
+   size_t width = print_name_with_quoting (f, false, nullptr, start_col);
+ 
+   if (indicator_style != none)
+@@ -5121,6 +5272,14 @@ length_of_file_name_and_frills (const st
+   if (print_scontext)
+     len += 1 + (format == with_commas ? strlen (f->scontext) : scontext_width);
+ 
++  if (print_usecuser)
++    len += 11;
++   
++  if (print_usecfile || print_usecproc)
++    len += 1 + strlen (f->usec_context);
++  if (print_usecslevel || print_usecilevel)
++    len += 7;
++
+   len += fileinfo_name_width (f);
+ 
+   if (indicator_style != none)
+Index: coreutils_new_commit/src/system.h
+===================================================================
+--- coreutils_new_commit.orig/src/system.h
++++ coreutils_new_commit/src/system.h
+@@ -334,7 +334,10 @@ directory_status (int fd_cwd, char const
+ enum
+ {
+   GETOPT_HELP_CHAR = (CHAR_MIN - 2),
+-  GETOPT_VERSION_CHAR = (CHAR_MIN - 3)
++  GETOPT_VERSION_CHAR = (CHAR_MIN - 3),
++  GETOPT_USEC_USER = (CHAR_MIN - 4),
++  GETOPT_USEC_SLEVEL = (CHAR_MIN - 5),
++  GETOPT_USEC_ILEVEL = (CHAR_MIN - 6),
+ };
+ 
+ #define GETOPT_HELP_OPTION_DECL \
