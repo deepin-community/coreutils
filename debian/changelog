@@ -1,3 +1,10 @@
+coreutils (9.4-2-1deepin2) unstable; urgency=medium
+
+  * Bump version to 9.4-2-1deepin2 to mitigate previous packaging issue.
+    https://github.com/deepin-community/coreutils/pull/3
+
+ -- Tianyu Chen <sweetyfish@deepin.org>  Thu, 21 Aug 2025 10:47:12 +0800
+
 coreutils (9.4-3.1deepin2) unstable; urgency=medium
 
   * feat: add sw64 support
