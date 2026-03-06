@@ -19,7 +19,12 @@ BIN_PROGS = cat chgrp chmod chown cp date dd df dir echo false ln ls mkdir \
 d=debian/coreutils
 
 override_dh_auto_configure:
+ifeq ($(shell if [ -f /etc/os-release ]; then grep -iq "uos" /etc/os-release; echo $$?; fi),0)
+	$(info Detected UOS system, enabling usec library support)
+	dh_auto_configure -- --enable-install-program=arch --with-openssl=auto-gpl-compat --with-usec
+else
 	dh_auto_configure -- --enable-install-program=arch --with-openssl=auto-gpl-compat
+endif
 
 %:
 	dh $@ --with autoreconf

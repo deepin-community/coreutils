@@ -1,3 +1,9 @@
+coreutils (9.4-2-1deepin4) unstable; urgency=medium
+
+  * implement USEC with libusec.so
+
+ -- zhouzilong <zhouzilong@uniontech.com>  Fri, 06 Mar 2026 17:44:51 +0800
+
 coreutils (9.4-2-1deepin3) unstable; urgency=medium
 
   * fix CVE-2024-0684 
