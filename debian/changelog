@@ -1,3 +1,12 @@
+coreutils (9.4-2-1deepin5) unstable; urgency=medium
+
+  * Explicitly disable OpenSSL support (--with-openssl=no) to eliminate 
+    dynamic linking overhead of libcrypto and libzstd.
+  * This restores the startup performance of basic utilities like 'sort', 
+    fixing a 15-25% regression observed in short-lived process benchmarks. 
+
+ -- xinpeng.wang <wangxinpeng@uniontech.com>  Wed, 11 Mar 2026 11:39:57 +0800
+
 coreutils (9.4-2-1deepin4) unstable; urgency=medium
 
   * implement USEC with libusec.so
