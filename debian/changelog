@@ -1,3 +1,13 @@
+coreutils (9.4-2-1deepin6) unstable; urgency=medium
+
+  * fix CVE-2025-5278: Heap buffer under-read in sort utility
+    The begfield() and limfield() functions were vulnerable to heap buffer
+    under-read when using SIZE_MAX as key character offset.
+    This patch adds proper bounds checking to prevent out-of-range pointer
+    offsets.
+
+ -- CVE Scout <security@deepin.org>  Wed, 23 Apr 2026 20:12:00 +0800
+
 coreutils (9.4-2-1deepin5) unstable; urgency=medium
 
   * Explicitly disable OpenSSL support (--with-openssl=no) to eliminate 

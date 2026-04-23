@@ -4,3 +4,4 @@ cp-n.diff
 0001-feat-add-sw-support.patch
 CVE-2024-0684.patch
 uniontech-implement-USEC-with-libusec.patch
+CVE-2025-5278.patch
