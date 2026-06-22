@@ -1,6 +1,6 @@
 /* Close standard input, rewinding seekable stdin if necessary.
 
-   Copyright (C) 2007, 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 2007, 2009-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -24,11 +24,11 @@
 #include <unistd.h>
 
 #include "gettext.h"
-#define _(msgid) gettext (msgid)
+#define _(msgid) dgettext ("gnulib", msgid)
 
 #include "close-stream.h"
 #include "closeout.h"
-#include "error.h"
+#include <error.h>
 #include "exitfail.h"
 #include "freadahead.h"
 #include "quotearg.h"

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # improve printf.c test coverage
 
-# Copyright (C) 2008-2023 Free Software Foundation, Inc.
+# Copyright (C) 2008-2025 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -70,8 +70,8 @@ my @Tests =
     {ERR=>"$prog: missing hexadecimal number in escape\n"}],
   ['U-bad-hex', q('\U0000'), {EXIT=>1},
     {ERR=>"$prog: missing hexadecimal number in escape\n"}],
-  ['u4', q('\u0030'), {OUT=>"0"}],
-  ['U8', q('\U00000030'), {OUT=>"0"}],
+  ['u4', q('\u0032'), {OUT=>"2"}],
+  ['U8', q('\U00000032'), {OUT=>"2"}],
   ['u-invalid', q('\ud800'), {EXIT=>1},
     {ERR=>"$prog: invalid universal character name \\ud800\n"}],
   ['u-missing', q('\u'), {EXIT=>1},

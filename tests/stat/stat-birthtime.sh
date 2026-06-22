@@ -1,7 +1,7 @@
 #!/bin/sh
 # ensure that stat attempts birthtime access
 
-# Copyright (C) 2010-2023 Free Software Foundation, Inc.
+# Copyright (C) 2010-2025 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -42,7 +42,7 @@ check_timestamps_updated()
   touch a || fail=1
 
   test "x$btime" = x$(stat --format %W a) &&
-  test "x$atime" != x$(stat --format %X a) &&
+  { test "x$atime" != x$(stat --format %X a) || test "x$atime" = x0; } &&
   test "x$mtime" != x$(stat --format %Y a) &&
   test "x$ctime" != x$(stat --format %Z a)
 }

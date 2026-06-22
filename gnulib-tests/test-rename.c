@@ -1,5 +1,5 @@
 /* Test of rename() function.
-   Copyright (C) 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -42,5 +42,6 @@ main (void)
   /* Remove any garbage left from previous partial runs.  */
   ignore_value (system ("rm -rf " BASE "*"));
 
-  return test_rename (rename, true);
+  int result = test_rename (rename, true);
+  return (result ? result : test_exit_status);
 }

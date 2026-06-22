@@ -1,5 +1,5 @@
 /* Tests of fchownat.
-   Copyright (C) 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -100,5 +100,6 @@ main (_GL_UNUSED int argc, char *argv[])
   ASSERT (close (dfd) == 0);
 
   /* FIXME - add additional tests of dfd not at current directory.  */
-  return result1 | result2;
+  int result = result1 | result2;
+  return (result ? result : test_exit_status);
 }

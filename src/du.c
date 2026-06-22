@@ -1,5 +1,5 @@
 /* du -- summarize device usage
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -32,18 +32,16 @@
 #include "assure.h"
 #include "di-set.h"
 #include "exclude.h"
-#include "fprintftime.h"
 #include "human.h"
 #include "mountlist.h"
 #include "quote.h"
+#include "show-date.h"
 #include "stat-size.h"
 #include "stat-time.h"
 #include "stdio--.h"
 #include "xfts.h"
 #include "xstrtol.h"
 #include "xstrtol-error.h"
-
-extern bool fts_debug;
 
 /* The official name of this program (e.g., no 'g' prefix).  */
 #define PROGRAM_NAME "du"
@@ -54,12 +52,6 @@ extern bool fts_debug;
   proper_name ("Paul Eggert"), \
   proper_name ("Jim Meyering")
 
-#if DU_DEBUG
-# define FTS_CROSS_CHECK(Fts) fts_cross_check (Fts)
-#else
-# define FTS_CROSS_CHECK(Fts)
-#endif
-
 /* A set of dev/ino pairs to help identify files and directories
    whose sizes have already been counted.  */
 static struct di_set *di_files;
@@ -69,7 +61,7 @@ static struct di_set *di_mnt;
 
 /* Keep track of the preceding "level" (depth in hierarchy)
    from one call of process_file to the next.  */
-static size_t prev_level;
+static idx_t prev_level;
 
 /* Define a class for collecting directory information. */
 struct duinfo
@@ -206,7 +198,9 @@ enum
   EXCLUDE_OPTION,
   FILES0_FROM_OPTION,
   HUMAN_SI_OPTION,
+#if GNULIB_FTS_DEBUG
   FTS_DEBUG,
+#endif
   TIME_OPTION,
   TIME_STYLE_OPTION,
   INODES_OPTION
@@ -219,7 +213,9 @@ static struct option const long_options[] =
   {"block-size", required_argument, nullptr, 'B'},
   {"bytes", no_argument, nullptr, 'b'},
   {"count-links", no_argument, nullptr, 'l'},
-  /* {"-debug", no_argument, nullptr, FTS_DEBUG}, */
+#if GNULIB_FTS_DEBUG
+  {"-debug", no_argument, nullptr, FTS_DEBUG},
+#endif
   {"dereference", no_argument, nullptr, 'L'},
   {"dereference-args", no_argument, nullptr, 'D'},
   {"exclude", required_argument, nullptr, EXCLUDE_OPTION},
@@ -370,25 +366,6 @@ hash_ins (struct di_set *di_set, ino_t ino, dev_t dev)
   return inserted;
 }
 
-/* FIXME: this code is nearly identical to code in date.c  */
-/* Display the date and time in WHEN according to the format specified
-   in FORMAT.  */
-
-static void
-show_date (char const *format, struct timespec when, timezone_t tz)
-{
-  struct tm tm;
-  if (localtime_rz (tz, &when.tv_sec, &tm))
-    fprintftime (stdout, format, &tm, tz, when.tv_nsec);
-  else
-    {
-      char buf[INT_BUFSIZE_BOUND (intmax_t)];
-      char *when_str = timetostr (when.tv_sec, buf);
-      error (0, 0, _("time %s is out of range"), quote (when_str));
-      fputs (when_str, stdout);
-    }
-}
-
 /* Print N_BYTES.  Convert it to a readable value before printing.  */
 
 static void
@@ -414,7 +391,13 @@ print_size (const struct duinfo *pdui, char const *string)
   if (opt_time)
     {
       putchar ('\t');
-      show_date (time_format, pdui->tmax, localtz);
+      bool ok = show_date (time_format, pdui->tmax, localtz);
+      if (!ok)
+        {
+          /* If failed to format date, print raw seconds instead.  */
+          char buf[INT_BUFSIZE_BOUND (intmax_t)];
+          fputs (timetostr (pdui->tmax.tv_sec, buf), stdout);
+        }
     }
   printf ("\t%s%c", string, opt_nul_terminate_output ? '\0' : '\n');
   fflush (stdout);
@@ -489,8 +472,7 @@ process_file (FTS *fts, FTSENT *ent)
   bool ok = true;
   struct duinfo dui;
   struct duinfo dui_to_print;
-  size_t level;
-  static size_t n_alloc;
+  static idx_t n_alloc;
   /* First element of the structure contains:
      The sum of the sizes of all entries in the single directory
      at the corresponding level.  Although this does include the sizes
@@ -587,12 +569,12 @@ process_file (FTS *fts, FTSENT *ent)
   duinfo_set (&dui,
               (apparent_size
                ? (usable_st_size (sb) ? MAX (0, sb->st_size) : 0)
-               : (uintmax_t) ST_NBLOCKS (*sb) * ST_NBLOCKSIZE),
+               : (uintmax_t) STP_NBLOCKS (sb) * ST_NBLOCKSIZE),
               (time_type == time_mtime ? get_stat_mtime (sb)
                : time_type == time_atime ? get_stat_atime (sb)
                : get_stat_ctime (sb)));
 
-  level = ent->fts_level;
+  idx_t level = ent->fts_level;
   dui_to_print = dui;
 
   if (n_alloc == 0)
@@ -614,12 +596,10 @@ process_file (FTS *fts, FTSENT *ent)
              e.g., from 1 to 10.  */
 
           if (n_alloc <= level)
-            {
-              dulvl = xnrealloc (dulvl, level, 2 * sizeof *dulvl);
-              n_alloc = level * 2;
-            }
+            dulvl = xpalloc (dulvl, &n_alloc, level - n_alloc + 1, -1,
+                             sizeof *dulvl);
 
-          for (size_t i = prev_level + 1; i <= level; i++)
+          for (idx_t i = prev_level + 1; i <= level; i++)
             {
               duinfo_init (&dulvl[i].ent);
               duinfo_init (&dulvl[i].subdir);
@@ -702,7 +682,11 @@ du_files (char **files, int bit_flags)
               prev_level = 0;
               break;
             }
-          FTS_CROSS_CHECK (fts);
+
+#if GNULIB_FTS_DEBUG
+          if (fts_debug)
+            fts_cross_check (fts);
+#endif
 
           ok &= process_file (fts, ent);
         }
@@ -761,7 +745,7 @@ main (int argc, char **argv)
 
       switch (c)
         {
-#if DU_DEBUG
+#if GNULIB_FTS_DEBUG
         case FTS_DEBUG:
           fts_debug = true;
           break;
@@ -1076,7 +1060,7 @@ main (int argc, char **argv)
               goto argv_iter_done;
             case AI_ERR_MEM:
               xalloc_die ();
-            default:
+            case AI_ERR_OK: default:
               affirm (!"unexpected error code from argv_iter");
             }
         }

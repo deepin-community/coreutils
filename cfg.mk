@@ -1,5 +1,5 @@
 # Customize maint.mk                           -*- makefile -*-
-# Copyright (C) 2003-2023 Free Software Foundation, Inc.
+# Copyright (C) 2003-2025 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ export VERBOSE = yes
 # 4914152 9e
 export XZ_OPT = -8e
 
-old_NEWS_hash = c550e6659b8350f62d9cd0483bf0c199
+old_NEWS_hash = be5016485c56f34b60ba4e6d3b407489
 
 # Add an exemption for sc_makefile_at_at_check.
 _makefile_at_at_check_exceptions = \
@@ -56,6 +56,11 @@ _makefile_at_at_check_exceptions = \
 
 # Our help-version script is in a slightly different location.
 _hv_file ?= $(srcdir)/tests/misc/help-version
+
+world:
+	./bootstrap && \
+	./configure --quiet && \
+	$(MAKE) $(AM_MAKEFLAGS) -j $$(nproc 2>/dev/null || echo 1)
 
 # Ensure that the list of O_ symbols used to compute O_FULLBLOCK is complete.
 dd = $(srcdir)/src/dd.c
@@ -116,7 +121,7 @@ sc_tests_list_consistency:
 	  cd $(top_srcdir);						\
 	  $(SHELL) build-aux/vc-list-files tests			\
 	    | grep -Ev '^tests/(factor/(run|create-test)|init)\.sh$$'	\
-	    | grep -E "$$test_extensions_rx\$$";			\
+	    | grep -E "($$test_extensions_rx)$$";			\
 	} | sort | uniq -u | grep . && exit 1; :
 
 # Ensure that all version-controlled test scripts are executable.
@@ -493,6 +498,12 @@ sc_prohibit_NULL:
 	halt='use nullptr instead'					\
 	  $(_sc_search_regexp)
 
+sc_prohibit_bare_set:
+	@prohibit='^ *set [`$$]'					\
+	in_vc_files='\.sh$$'						\
+	halt='use set -- $$args instead of set $$args'			\
+	  $(_sc_search_regexp)
+
 # Don't use "indent-tabs-mode: nil" anymore.  No longer needed.
 sc_prohibit_emacs__indent_tabs_mode__setting:
 	@prohibit='^( *[*#] *)?indent-tabs-mode:'			\
@@ -814,6 +825,21 @@ sc_gitignore_missing:
 #	    sort | uniq -d | grep . && { echo '$(ME): Remove above'	\
 #	      'entries from .gitignore' >&2; exit 1; } || :
 
+# Ensure gl/ files are distributed
+sc_gldist_missing:
+	@cd $(srcdir);							\
+	grep '^gl/' gl/local.mk > $@.a;					\
+	find gl '(' -name Makefile.am ')' -prune -o -type f		\
+		'!' '(' -name '*.orig' -or -name '*~' -or		\
+		        -name 'ChangeLog.*' ')' -printf '%p\n' |	\
+	LC_ALL=C sort | tr '\012' @ | sed 's/@$$/%/;s/@/ \\@/g' |	\
+	tr @% '\012\012' > $@.e;					\
+	diff -u $@.a $@.e; diff=$$?;					\
+	rm -f $@.a $@.e;						\
+	test "$$diff" = 0						\
+	  || { echo '$(ME): Inconsistent EXTRA_DIST in gl/local.mk'>&2;	\
+	       exit 1; }
+
 sc_prohibit-form-feed:
 	@prohibit=$$'\f' \
 	in_vc_files='\.[chly]$$' \
@@ -841,7 +867,8 @@ exclude_file_name_regexp--sc_trailing_blank = \
 exclude_file_name_regexp--sc_system_h_headers = \
   ^src/((system|copy|chown-core|find-mount-point)\.h|make-prime-list\.c)$$
 
-_src = (false|lbracket|ls-(dir|ls|vdir)|tac-pipe|uname-(arch|uname))
+_src := (false|lbracket|chown-(chgrp|chown)
+_src := $(_src)|ls-(dir|ls|vdir)|tac-pipe|uname-(arch|uname))
 _gl_src = (xdecto.max|cl-strtold)
 exclude_file_name_regexp--sc_require_config_h_first = \
   (^lib/buffer-lcm\.c|gl/lib/$(_gl_src)\.c|src/$(_src)\.c)$$
@@ -899,7 +926,7 @@ exclude_file_name_regexp--sc_prohibit-gl-attributes = ^src/libstdbuf\.c$$
 exclude_file_name_regexp--sc_prohibit_uppercase_id_est = \.diff$$
 exclude_file_name_regexp--sc_ensure_dblspace_after_dot_before_id_est = \.diff$$
 exclude_file_name_regexp--sc_ensure_comma_after_id_est = \.diff|$(_ll)$$
-exclude_file_name_regexp--sc_long_lines = \.diff$$|$(_ll)|$(_cksum)
+exclude_file_name_regexp--sc_long_lines = \.diff$$|$(_ll)|$(_cksum)|bootstrap
 
 # `grep . -q` is not exactly equivalent to `grep . >/dev/null`
 # and this difference is significant in the NEWS description
@@ -922,10 +949,15 @@ _gl_TS_unmarked_extern_functions = main usage
 _gl_TS_unmarked_extern_functions += single_binary_main_.* _usage_.*
 # Headers to search for single line extern _data_ declarations.
 _gl_TS_other_headers = $(srcdir)/src/*.h src/*.h
-# Tell the tight_scope rule about an exceptional "extern" variable.
-# Normally, the rule would detect its declaration, but that uses a
-# different name, __clz_tab.
-_gl_TS_unmarked_extern_vars = factor_clz_tab
+# Avoid tight_scope rule stating these should be static
+# as there is no way to achieve that with the way these are defined.
+_gl_TS_unmarked_extern_vars = ptr_MD5_.*
 # Other tight_scope settings
 _gl_TS_dir = .
 _gl_TS_obj_files = src/*.$(OBJEXT)
+# Settings for running codespell.
+csiwl_1 = debbugs,clen,te,bu,shs,linke,fo,souch,inout,outin
+csiwl_2 = kno,ois,afile,whats,hda,indx,ot,nam
+codespell_ignore_words_list = $(csiwl_1),$(csiwl_2)
+exclude_file_name_regexp--sc_codespell = \
+  ^(THANKS\.in|tests/pr/.*(F|tn?|l(o|m|i)|bl))$$

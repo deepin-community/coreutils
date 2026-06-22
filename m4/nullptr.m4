@@ -1,9 +1,12 @@
-# Check for nullptr that conforms to C23 and C++11.
-
-dnl Copyright 2023 Free Software Foundation, Inc.
+# nullptr.m4
+# serial 2
+dnl Copyright 2023-2025 Free Software Foundation, Inc.
 dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
 dnl with or without modifications, as long as this notice is preserved.
+dnl This file is offered as-is, without any warranty.
+
+# Check for nullptr that conforms to C23 and C++11.
 
 AC_DEFUN([gl_NULLPTR],
 [
@@ -12,7 +15,21 @@ AC_DEFUN([gl_NULLPTR],
      AC_CACHE_CHECK([for C nullptr], [gl_cv_c_nullptr],
        [AC_COMPILE_IFELSE(
           [AC_LANG_SOURCE([[int *p = nullptr;]])],
-          [gl_cv_c_nullptr=yes],
+          [gl_cv_c_nullptr=yes
+           # Work around <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=114780>.
+           gl_saved_CFLAGS=$CFLAGS
+           CFLAGS="$CFLAGS -Wall -Werror"
+           AC_COMPILE_IFELSE(
+             [AC_LANG_PROGRAM(
+                [[void f (char const *, ...) __attribute__ ((sentinel));]],
+                [[f ("", nullptr);]])],
+             [],
+             [AC_COMPILE_IFELSE(
+                [AC_LANG_PROGRAM(
+                   [[void f (char const *, ...) __attribute__ ((sentinel));]],
+                   [[f ("", (void *) 0);]])],
+                [gl_cv_c_nullptr='not as a sentinel'])])
+           CFLAGS=$gl_saved_CFLAGS],
           [gl_cv_c_nullptr=no])])
       gl_c_nullptr=$gl_cv_c_nullptr
       AC_LANG_POP([C])],

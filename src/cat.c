@@ -1,5 +1,5 @@
 /* cat -- concatenate files and print on the standard output.
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@
 
 #include <config.h>
 
-#include <stdckdint.h>
 #include <stdio.h>
 #include <getopt.h>
 #include <sys/types.h>
@@ -162,8 +161,8 @@ simple_cat (char *buf, idx_t bufsize)
     {
       /* Read a block of input.  */
 
-      size_t n_read = safe_read (input_desc, buf, bufsize);
-      if (n_read == SAFE_READ_ERROR)
+      ptrdiff_t n_read = safe_read (input_desc, buf, bufsize);
+      if (n_read < 0)
         {
           error (0, errno, "%s", quotef (infile));
           return false;
@@ -311,8 +310,8 @@ cat (char *inbuf, idx_t insize, char *outbuf, idx_t outsize,
 
               /* Read more input into INBUF.  */
 
-              size_t n_read = safe_read (input_desc, inbuf, insize);
-              if (n_read == SAFE_READ_ERROR)
+              ptrdiff_t n_read = safe_read (input_desc, inbuf, insize);
+              if (n_read < 0)
                 {
                   error (0, errno, "%s", quotef (infile));
                   write_pending (outbuf, &bpout);
@@ -644,11 +643,18 @@ main (int argc, char **argv)
     error (EXIT_FAILURE, errno, _("standard output"));
 
   /* Optimal size of i/o operations of output.  */
-  idx_t outsize = io_blksize (stat_buf);
+  idx_t outsize = io_blksize (&stat_buf);
 
-  /* Device and I-node number of the output.  */
-  dev_t out_dev = stat_buf.st_dev;
-  ino_t out_ino = stat_buf.st_ino;
+  /* Device, I-node number and lazily-acquired flags of the output.  */
+  dev_t out_dev;
+  ino_t out_ino;
+  int out_flags = -2;
+  bool have_out_dev = ! (S_TYPEISSHM (&stat_buf) || S_TYPEISTMO (&stat_buf));
+  if (have_out_dev)
+    {
+      out_dev = stat_buf.st_dev;
+      out_ino = stat_buf.st_ino;
+   }
 
   /* True if the output is a regular file.  */
   bool out_isreg = S_ISREG (stat_buf.st_mode) != 0;
@@ -698,21 +704,34 @@ main (int argc, char **argv)
         }
 
       /* Optimal size of i/o operations of input.  */
-      idx_t insize = io_blksize (stat_buf);
+      idx_t insize = io_blksize (&stat_buf);
 
       fdadvise (input_desc, 0, 0, FADVISE_SEQUENTIAL);
 
-      /* Don't copy a nonempty regular file to itself, as that would
-         merely exhaust the output device.  It's better to catch this
-         error earlier rather than later.  */
+      /* Don't copy a file to itself if that would merely exhaust the
+         output device.  It's better to catch this error earlier
+         rather than later.  */
 
-      if (out_isreg
-          && stat_buf.st_dev == out_dev && stat_buf.st_ino == out_ino
-          && lseek (input_desc, 0, SEEK_CUR) < stat_buf.st_size)
+      if (! (S_ISFIFO (stat_buf.st_mode) || S_ISSOCK (stat_buf.st_mode)
+             || S_TYPEISSHM (&stat_buf) || S_TYPEISTMO (&stat_buf))
+          && have_out_dev
+          && stat_buf.st_dev == out_dev && stat_buf.st_ino == out_ino)
         {
-          error (0, 0, _("%s: input file is output file"), quotef (infile));
-          ok = false;
-          goto contin;
+          off_t in_pos = lseek (input_desc, 0, SEEK_CUR);
+          if (0 <= in_pos)
+            {
+              if (out_flags < -1)
+                out_flags = fcntl (STDOUT_FILENO, F_GETFL);
+              int whence = (0 <= out_flags && out_flags & O_APPEND
+                            ? SEEK_END : SEEK_CUR);
+              if (in_pos < lseek (STDOUT_FILENO, 0, whence))
+                {
+                  error (0, 0, _("%s: input file is output file"),
+                         quotef (infile));
+                  ok = false;
+                  goto contin;
+                }
+            }
         }
 
       /* Pointer to the input buffer.  */

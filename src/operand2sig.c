@@ -1,5 +1,5 @@
 /* operand2sig.c -- common function for parsing signal specifications
-   Copyright (C) 2008-2023 Free Software Foundation, Inc.
+   Copyright (C) 2008-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,8 +18,8 @@
    FIXME: Move this to gnulib/str2sig.c */
 
 
-/* Convert OPERAND to a signal number with printable representation SIGNAME.
-   Return the signal number, or -1 if unsuccessful.  */
+/* Convert OPERAND to a signal number.  Return the signal number, or -1 if
+   unsuccessful.  */
 
 #include <config.h>
 #include <stdio.h>
@@ -27,16 +27,17 @@
 #include <sys/wait.h>
 
 #include "system.h"
+#include "c-ctype.h"
 #include "quote.h"
 #include "sig2str.h"
 #include "operand2sig.h"
 
 extern int
-operand2sig (char const *operand, char *signame)
+operand2sig (char const *operand)
 {
   int signum;
 
-  if (ISDIGIT (*operand))
+  if (c_isdigit (*operand))
     {
       /* Note we don't put a limit on the maximum value passed,
          because we're checking shell $? values here, and ksh for
@@ -82,7 +83,7 @@ operand2sig (char const *operand, char *signame)
       free (upcased);
     }
 
-  if (signum < 0 || sig2str (signum, signame) != 0)
+  if (0 > signum || signum > SIGNUM_BOUND)
     {
       error (0, 0, _("%s: invalid signal"), quote (operand));
       return -1;

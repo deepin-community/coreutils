@@ -1,5 +1,5 @@
 /* Tests of futimens.
-   Copyright (C) 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -46,5 +46,6 @@ main (void)
   /* Clean up any trash from prior testsuite runs.  */
   ignore_value (system ("rm -rf " BASE "*"));
 
-  return test_futimens (futimens, true);
+  int result = test_futimens (futimens, true);
+  return (result ? result : test_exit_status);
 }

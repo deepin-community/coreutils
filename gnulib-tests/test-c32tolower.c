@@ -1,5 +1,5 @@
 /* Test of c32tolower() function.
-   Copyright (C) 2020-2023 Free Software Foundation, Inc.
+   Copyright (C) 2020-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -154,7 +154,7 @@ main (int argc, char *argv[])
       {
       case '0':
         /* C locale; tested above.  */
-        return 0;
+        return test_exit_status;
 
       case '1':
         /* Locale encoding is ISO-8859-1 or ISO-8859-15.  */
@@ -184,7 +184,7 @@ main (int argc, char *argv[])
           ASSERT (mb.nbytes == 1);
           ASSERT (memcmp (mb.buf, "\377", 1) == 0);
         }
-        return 0;
+        return test_exit_status;
 
       case '2':
         /* Locale encoding is EUC-JP.  */
@@ -242,7 +242,7 @@ main (int argc, char *argv[])
           ASSERT (mb.nbytes == 2);
           ASSERT (memcmp (mb.buf, "\243\347", 2) == 0);
         }
-        return 0;
+        return test_exit_status;
 
       case '3':
         /* Locale encoding is UTF-8.  */
@@ -255,12 +255,10 @@ main (int argc, char *argv[])
           mb = for_character ("\302\265", 2);
           ASSERT (mb.nbytes == 2);
           ASSERT (memcmp (mb.buf, "\302\265", 2) == 0);
-        #if !(defined _WIN32 && !defined __CYGWIN__)
           /* U+00C9 LATIN CAPITAL LETTER E WITH ACUTE */
           mb = for_character ("\303\211", 2);
           ASSERT (mb.nbytes == 2);
           ASSERT (memcmp (mb.buf, "\303\251", 2) == 0);
-        #endif
           /* U+00DF LATIN SMALL LETTER SHARP S */
           mb = for_character ("\303\237", 2);
           ASSERT (mb.nbytes == 2);
@@ -332,11 +330,13 @@ main (int argc, char *argv[])
           ASSERT (mb.nbytes == 4);
           ASSERT (memcmp (mb.buf, "\363\240\201\241", 4) == 0);
         }
-        return 0;
+        return test_exit_status;
 
       case '4':
         /* Locale encoding is GB18030.  */
-        #if (defined __GLIBC__ && __GLIBC__ == 2 && __GLIBC_MINOR__ >= 13 && __GLIBC_MINOR__ <= 15) || (GL_CHAR32_T_IS_UNICODE && (defined __NetBSD__ || defined __sun))
+        #if (defined __GLIBC__ && __GLIBC__ == 2 && __GLIBC_MINOR__ >= 13 && __GLIBC_MINOR__ <= 15) || (GL_CHAR32_T_IS_UNICODE && (defined __FreeBSD__ || defined __NetBSD__ || defined __sun))
+        if (test_exit_status != EXIT_SUCCESS)
+          return test_exit_status;
         fputs ("Skipping test: The GB18030 converter in this system's iconv is broken.\n", stderr);
         return 77;
         #endif
@@ -432,7 +432,7 @@ main (int argc, char *argv[])
           ASSERT (mb.nbytes == 4);
           ASSERT (memcmp (mb.buf, "\323\066\237\065", 4) == 0);
         }
-        return 0;
+        return test_exit_status;
 
       }
 

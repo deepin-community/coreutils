@@ -1,7 +1,7 @@
 #!/bin/sh
 # ensure that --follow=name does not imply --retry
 
-# Copyright (C) 2011-2023 Free Software Foundation, Inc.
+# Copyright (C) 2011-2025 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,13 +23,25 @@ cat <<\EOF > exp || framework_failure_
 tail: cannot open 'no-such' for reading: No such file or directory
 tail: no files remaining
 EOF
-
 returns_ 1 timeout 10 tail --follow=name no-such > out 2> err || fail=1
-
 # Remove an inconsequential inotify warning so
 # we can compare against the above error
 sed '/inotify cannot be used/d' err > k && mv k err
-
 compare exp err || fail=1
+
+# Between coreutils 8.34 and 9.5 inclusive, with inotify, tail would
+# have waited indefinitely when a file was moved to the same file system.
+# Also without inotify tail would have exited with success.
+cleanup_() { kill $pid 2>/dev/null && wait $pid; }
+fastpoll='-s.1 --max-unchanged-stats=1'  # speedup non inotify systems
+for inotify in '' '---disable-inotify'; do
+  touch file || framework_failure_
+  timeout 10 tail --follow=name $fastpoll file & pid=$!
+  sleep .1 # Usually in tail_forever{,_inotify}() here
+  mv file file.unfollow || framework_failure_
+  wait $pid
+  test $? = 1 || fail=1
+  rm -f file file.unfollow || framework_failure_
+done
 
 Exit $fail

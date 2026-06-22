@@ -1,13 +1,13 @@
 /* Iteration over virtual memory areas.
-   Copyright (C) 2011-2023 Free Software Foundation, Inc.
+   Copyright (C) 2011-2025 Free Software Foundation, Inc.
    Written by Bruno Haible <bruno@clisp.org>, 2011-2017.
 
-   This program is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
+   This file is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published
+   by the Free Software Foundation; either version 2 of the License,
+   or (at your option) any later version.
 
-   This program is distributed in the hope that it will be useful,
+   This file is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
@@ -60,6 +60,7 @@
 #if defined __FreeBSD__ || defined __FreeBSD_kernel__ /* FreeBSD, GNU/kFreeBSD */
 # include <sys/types.h>
 # include <sys/mman.h> /* mmap, munmap */
+# include <sys/param.h> /* prerequisite of <sys/user.h> */
 # include <sys/user.h> /* struct kinfo_vmentry */
 # include <sys/sysctl.h> /* sysctl */
 #endif
@@ -100,7 +101,7 @@
 # include <mach/mach.h>
 #endif
 
-#if defined __GNU__ /* GNU/Hurd */
+#if defined __gnu_hurd__ /* GNU/Hurd */
 # include <mach/mach.h>
 #endif
 
@@ -1584,7 +1585,7 @@ vma_iterate (vma_iterate_callback_fn callback, void *data)
     }
   return 0;
 
-#elif defined __GNU__ /* GNU/Hurd */
+#elif defined __gnu_hurd__ /* GNU/Hurd */
 
   /* The Hurd has a /proc/self/maps that looks like the Linux one, but it
      lacks the VMAs created through anonymous mmap.  Therefore use the Mach
@@ -1691,9 +1692,11 @@ vma_iterate (vma_iterate_callback_fn callback, void *data)
       end = start + info.size;
       flags = 0;
       if (info.protection & B_READ_AREA)
-        flags |= VMA_PROT_READ | VMA_PROT_EXECUTE;
+        flags |= VMA_PROT_READ;
       if (info.protection & B_WRITE_AREA)
         flags |= VMA_PROT_WRITE;
+      if (info.protection & B_EXECUTE_AREA)
+        flags |= VMA_PROT_EXECUTE;
 
       if (callback (data, start, end, flags))
         break;

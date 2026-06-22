@@ -1,5 +1,5 @@
 /* Declarations for error-reporting functions.
-   Copyright (C) 1995-1997, 2003, 2006, 2008-2023 Free Software Foundation,
+   Copyright (C) 1995-1997, 2003, 2006, 2008-2025 Free Software Foundation,
    Inc.
    This file is part of the GNU C Library.
 
@@ -23,18 +23,21 @@
    or error_at_line(...) invocations.  */
 
 /* The include_next requires a split double-inclusion guard.  */
-#if @HAVE_ERROR_H@
+#if @HAVE_ERROR_H@ && !defined __MINGW32__
 # @INCLUDE_NEXT@ @NEXT_ERROR_H@
 #endif
 
 #ifndef _@GUARD_PREFIX@_ERROR_H
 #define _@GUARD_PREFIX@_ERROR_H
 
-/* This file uses _GL_ATTRIBUTE_ALWAYS_INLINE, _GL_ATTRIBUTE_FORMAT,
-  _GL_ATTRIBUTE_MAYBE_UNUSED.  */
+/* This file uses _GL_ATTRIBUTE_ALWAYS_INLINE, _GL_ATTRIBUTE_COLD,
+   _GL_ATTRIBUTE_FORMAT, _GL_ATTRIBUTE_MAYBE_UNUSED.  */
 #if !_GL_CONFIG_H_INCLUDED
  #error "Please include config.h first."
 #endif
+
+/* Get va_list.  */
+#include <stdarg.h>
 
 /* Get 'unreachable'.  */
 #include <stddef.h>
@@ -53,7 +56,7 @@
 /* Helper macro for supporting the compiler's control flow analysis better.
    It evaluates its arguments only once.
    Test case: Compile copy-file.c with "gcc -Wimplicit-fallthrough".  */
-#ifdef __GNUC__
+#if defined __GNUC__ || defined __clang__
 /* Use 'unreachable' to tell the compiler when the function call does not
    return.  */
 # define __gl_error_call1(function, status, ...) \
@@ -66,11 +69,12 @@
    would trigger a -Wimplicit-fallthrough warning even when STATUS is != 0,
    when not optimizing.  This causes STATUS to be evaluated twice, but
    that's OK since it does not have side effects.  */
-# define __gl_error_call(function, status, ...) \
-    (__builtin_constant_p (status) \
-     ? __gl_error_call1 (function, status, __VA_ARGS__) \
-     : ({ \
-         int const __errstatus = status; \
+# define __gl_error_call(function, status, ...)                 \
+    (__builtin_constant_p (status)                              \
+     ? __gl_error_call1 (function, status, __VA_ARGS__)         \
+     : __extension__                                            \
+       ({                                                       \
+         int const __errstatus = status;                        \
          __gl_error_call1 (function, __errstatus, __VA_ARGS__); \
        }))
 #else
@@ -91,7 +95,8 @@ extern "C" {
 #  define error rpl_error
 # endif
 _GL_FUNCDECL_RPL (error, void,
-                  (int __status, int __errnum, const char *__format, ...)
+                  (int __status, int __errnum, const char *__format, ...),
+                  _GL_ATTRIBUTE_COLD
                   _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_ERROR, 3, 4)));
 _GL_CXXALIAS_RPL (error, void,
                   (int __status, int __errnum, const char *__format, ...));
@@ -103,7 +108,8 @@ _GL_CXXALIAS_RPL (error, void,
 #else
 # if ! @HAVE_ERROR@
 _GL_FUNCDECL_SYS (error, void,
-                  (int __status, int __errnum, const char *__format, ...)
+                  (int __status, int __errnum, const char *__format, ...),
+                  _GL_ATTRIBUTE_COLD
                   _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_ERROR, 3, 4)));
 # endif
 _GL_CXXALIAS_SYS (error, void,
@@ -116,7 +122,7 @@ _GL_CXXALIAS_SYS (error, void,
 #    pragma GCC diagnostic ignored "-Wattributes"
 _GL_ATTRIBUTE_MAYBE_UNUSED
 static void
-_GL_ATTRIBUTE_ALWAYS_INLINE
+_GL_ATTRIBUTE_ALWAYS_INLINE _GL_ATTRIBUTE_COLD
 _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_ERROR, 3, 4))
 _gl_inline_error (int __status, int __errnum, const char *__format, ...)
 {
@@ -146,7 +152,8 @@ _GL_CXXALIASWARN (error);
 # endif
 _GL_FUNCDECL_RPL (error_at_line, void,
                   (int __status, int __errnum, const char *__filename,
-                   unsigned int __lineno, const char *__format, ...)
+                   unsigned int __lineno, const char *__format, ...),
+                  _GL_ATTRIBUTE_COLD
                   _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_ERROR, 5, 6)));
 _GL_CXXALIAS_RPL (error_at_line, void,
                   (int __status, int __errnum, const char *__filename,
@@ -160,7 +167,8 @@ _GL_CXXALIAS_RPL (error_at_line, void,
 # if ! @HAVE_ERROR_AT_LINE@
 _GL_FUNCDECL_SYS (error_at_line, void,
                   (int __status, int __errnum, const char *__filename,
-                   unsigned int __lineno, const char *__format, ...)
+                   unsigned int __lineno, const char *__format, ...),
+                  _GL_ATTRIBUTE_COLD
                   _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_ERROR, 5, 6)));
 # endif
 _GL_CXXALIAS_SYS (error_at_line, void,
@@ -174,7 +182,7 @@ _GL_CXXALIAS_SYS (error_at_line, void,
 #    pragma GCC diagnostic ignored "-Wattributes"
 _GL_ATTRIBUTE_MAYBE_UNUSED
 static void
-_GL_ATTRIBUTE_ALWAYS_INLINE
+_GL_ATTRIBUTE_ALWAYS_INLINE _GL_ATTRIBUTE_COLD
 _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_ERROR, 5, 6))
 _gl_inline_error_at_line (int __status, int __errnum, const char *__filename,
                           unsigned int __lineno, const char *__format, ...)
@@ -194,6 +202,44 @@ _gl_inline_error_at_line (int __status, int __errnum, const char *__filename,
 # endif
 #endif
 _GL_CXXALIASWARN (error_at_line);
+
+/* Print a message with 'vfprintf (stderr, FORMAT, ARGS)';
+   if ERRNUM is nonzero, follow it with ": " and strerror (ERRNUM).
+   If STATUS is nonzero, terminate the program with 'exit (STATUS)'.
+   Use the globals error_print_progname and error_message_count similarly
+   to error().  */
+
+extern void verror (int __status, int __errnum, const char *__format,
+                    va_list __args)
+     _GL_ATTRIBUTE_COLD
+     _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_STANDARD, 3, 0));
+#ifndef _GL_NO_INLINE_ERROR
+# ifndef verror
+#  define verror(status, ...) \
+     __gl_error_call (verror, status, __VA_ARGS__)
+#  define GNULIB_defined_verror 1
+# endif
+#endif
+
+/* Print a message with 'vfprintf (stderr, FORMAT, ARGS)';
+   if ERRNUM is nonzero, follow it with ": " and strerror (ERRNUM).
+   If STATUS is nonzero, terminate the program with 'exit (STATUS)'.
+   If FNAME is not NULL, prepend the message with "FNAME:LINENO:".
+   Use the globals error_print_progname, error_message_count, and
+   error_one_per_line similarly to error_at_line().  */
+
+extern void verror_at_line (int __status, int __errnum, const char *__fname,
+                            unsigned int __lineno, const char *__format,
+                            va_list __args)
+     _GL_ATTRIBUTE_COLD
+     _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_STANDARD, 5, 0));
+#ifdef _GL_NO_INLINE_ERROR
+# ifndef verror_at_line
+#  define verror_at_line(status, ...) \
+     __gl_error_call (verror_at_line, status, __VA_ARGS__)
+#  define GNULIB_defined_verror_at_line 1
+# endif
+#endif
 
 /* If NULL, error will flush stdout, then print on stderr the program
    name, a colon and a space.  Otherwise, error will call this

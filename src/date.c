@@ -1,5 +1,5 @@
 /* date - print or set the system date and time
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -29,15 +29,15 @@
 #include "parse-datetime.h"
 #include "posixtm.h"
 #include "quote.h"
+#include "show-date.h"
 #include "stat-time.h"
-#include "fprintftime.h"
 
 /* The official name of this program (e.g., no 'g' prefix).  */
 #define PROGRAM_NAME "date"
 
 #define AUTHORS proper_name ("David MacKenzie")
 
-static bool show_date (char const *, struct timespec, timezone_t);
+static bool show_date_helper (char const *, struct timespec, timezone_t);
 
 enum Time_spec
 {
@@ -200,13 +200,13 @@ FORMAT controls the output.  Interpreted sequences are:\n\
       fputs (_("\
   %C   century; like %Y, except omit last two digits (e.g., 20)\n\
   %d   day of month (e.g., 01)\n\
-  %D   date; same as %m/%d/%y\n\
+  %D   date (ambiguous); same as %m/%d/%y\n\
   %e   day of month, space padded; same as %_d\n\
 "), stdout);
       fputs (_("\
   %F   full date; like %+4Y-%m-%d\n\
-  %g   last two digits of year of ISO week number (see %G)\n\
-  %G   year of ISO week number (see %V); normally useful only with %V\n\
+  %g   last two digits of year of ISO week number (ambiguous; 00-99); see %G\n\
+  %G   year of ISO week number; normally useful only with %V\n\
 "), stdout);
       fputs (_("\
   %h   same as %b\n\
@@ -243,9 +243,9 @@ FORMAT controls the output.  Interpreted sequences are:\n\
   %W   week number of year, with Monday as first day of week (00..53)\n\
 "), stdout);
       fputs (_("\
-  %x   locale's date representation (e.g., 12/31/99)\n\
+  %x   locale's date (can be ambiguous; e.g., 12/31/99)\n\
   %X   locale's time representation (e.g., 23:13:48)\n\
-  %y   last two digits of year (00..99)\n\
+  %y   last two digits of year (ambiguous; 00..99)\n\
   %Y   year\n\
 "), stdout);
       fputs (_("\
@@ -294,6 +294,7 @@ Show the local time for 9AM next Friday on the west coast of the US\n\
 /* Yield the number of decimal digits needed to output a time with the
    nanosecond resolution RES, without losing information.  */
 
+ATTRIBUTE_CONST
 static int
 res_width (long int res)
 {
@@ -380,7 +381,7 @@ batch_convert (char const *input_filename, char const *format,
         }
       else
         {
-          ok &= show_date (format, when, tz);
+          ok &= show_date_helper (format, when, tz);
         }
     }
 
@@ -642,38 +643,26 @@ main (int argc, char **argv)
             }
         }
 
-      ok &= show_date (format_res, when, tz);
+      ok &= show_date_helper (format_res, when, tz);
     }
 
   main_exit (ok ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
-/* Display the date and/or time in WHEN according to the format specified
-   in FORMAT, followed by a newline.  Return true if successful.  */
-
 static bool
-show_date (char const *format, struct timespec when, timezone_t tz)
+show_date_helper (char const *format, struct timespec when, timezone_t tz)
 {
-  struct tm tm;
-
   if (parse_datetime_flags & PARSE_DATETIME_DEBUG)
     error (0, 0, _("output format: %s"), quote (format));
 
-  if (localtime_rz (tz, &when.tv_sec, &tm))
-    {
-      if (format == rfc_email_format)
-        setlocale (LC_TIME, "C");
-      fprintftime (stdout, format, &tm, tz, when.tv_nsec);
-      if (format == rfc_email_format)
-        setlocale (LC_TIME, "");
-      fputc ('\n', stdout);
-      return true;
-    }
-  else
-    {
-      char buf[INT_BUFSIZE_BOUND (intmax_t)];
-      error (0, 0, _("time %s is out of range"),
-             quote (timetostr (when.tv_sec, buf)));
-      return false;
-    }
+  if (format == rfc_email_format)
+    setlocale (LC_TIME, "C");
+
+  bool ok = show_date (format, when, tz);
+
+  if (format == rfc_email_format)
+    setlocale (LC_TIME, "");
+
+  putchar ('\n');
+  return ok;
 }

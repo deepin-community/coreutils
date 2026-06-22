@@ -1,5 +1,5 @@
 /* id -- print real and effective UIDs and GIDs
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -102,8 +102,8 @@ or (when USER omitted) for the current process.\n\
   -Z, --context  print only the security context of the process\n\
   -g, --group    print only the effective group ID\n\
   -G, --groups   print all group IDs\n\
-  -n, --name     print a name instead of a number, for -ugG\n\
-  -r, --real     print the real ID instead of the effective ID, with -ugG\n\
+  -n, --name     print a name instead of a number, for -u,-g,-G\n\
+  -r, --real     print the real ID instead of the effective ID, with -u,-g,-G\n\
   -u, --user     print only the effective user ID\n\
   -z, --zero     delimit entries with NUL characters, not whitespace;\n\
                    not permitted in default format\n\
@@ -198,7 +198,7 @@ main (int argc, char **argv)
 
   if (default_format && (use_real || use_name))
     error (EXIT_FAILURE, 0,
-           _("cannot print only names or real IDs in default format"));
+           _("printing only names or real IDs requires -u, -g, or -G"));
 
   if (default_format && opt_zero)
     error (EXIT_FAILURE, 0,
@@ -303,28 +303,6 @@ main (int argc, char **argv)
   return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-/* Convert a gid_t to string.  Do not use this function directly.
-   Instead, use it via the gidtostr macro.
-   Beware that it returns a pointer to static storage.  */
-static char *
-gidtostr_ptr (gid_t const *gid)
-{
-  static char buf[INT_BUFSIZE_BOUND (uintmax_t)];
-  return umaxtostr (*gid, buf);
-}
-#define gidtostr(g) gidtostr_ptr (&(g))
-
-/* Convert a uid_t to string.  Do not use this function directly.
-   Instead, use it via the uidtostr macro.
-   Beware that it returns a pointer to static storage.  */
-static char *
-uidtostr_ptr (uid_t const *uid)
-{
-  static char buf[INT_BUFSIZE_BOUND (uintmax_t)];
-  return umaxtostr (*uid, buf);
-}
-#define uidtostr(u) uidtostr_ptr (&(u))
-
 /* Print the name or value of user ID UID. */
 
 static void
@@ -337,14 +315,15 @@ print_user (uid_t uid)
       pwd = getpwuid (uid);
       if (pwd == nullptr)
         {
-          error (0, 0, _("cannot find name for user ID %s"),
-                 uidtostr (uid));
+          error (0, 0, _("cannot find name for user ID %ju"), (uintmax_t) uid);
           ok &= false;
         }
     }
 
-  char *s = pwd ? pwd->pw_name : uidtostr (uid);
-  fputs (s, stdout);
+  if (pwd)
+    printf ("%s", pwd->pw_name);
+  else
+    printf ("%ju", (uintmax_t) uid);
 }
 
 /* Print all of the info about the user's user and group IDs. */
@@ -355,19 +334,19 @@ print_full_info (char const *username)
   struct passwd *pwd;
   struct group *grp;
 
-  printf (_("uid=%s"), uidtostr (ruid));
+  printf (_("uid=%ju"), (uintmax_t) ruid);
   pwd = getpwuid (ruid);
   if (pwd)
     printf ("(%s)", pwd->pw_name);
 
-  printf (_(" gid=%s"), gidtostr (rgid));
+  printf (_(" gid=%ju"), (uintmax_t) rgid);
   grp = getgrgid (rgid);
   if (grp)
     printf ("(%s)", grp->gr_name);
 
   if (euid != ruid)
     {
-      printf (_(" euid=%s"), uidtostr (euid));
+      printf (_(" euid=%ju"), (uintmax_t) euid);
       pwd = getpwuid (euid);
       if (pwd)
         printf ("(%s)", pwd->pw_name);
@@ -375,7 +354,7 @@ print_full_info (char const *username)
 
   if (egid != rgid)
     {
-      printf (_(" egid=%s"), gidtostr (egid));
+      printf (_(" egid=%ju"), (uintmax_t) egid);
       grp = getgrgid (egid);
       if (grp)
         printf ("(%s)", grp->gr_name);
@@ -408,7 +387,7 @@ print_full_info (char const *username)
       {
         if (i > 0)
           putchar (',');
-        fputs (gidtostr (groups[i]), stdout);
+        printf ("%ju", (uintmax_t) groups[i]);
         grp = getgrgid (groups[i]);
         if (grp)
           printf ("(%s)", grp->gr_name);

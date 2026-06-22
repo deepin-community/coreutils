@@ -1,5 +1,5 @@
 /* tee - read from standard input and write to standard output and files.
-   Copyright (C) 1985-2023 Free Software Foundation, Inc.
+   Copyright (C) 1985-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -92,7 +92,7 @@ Copy standard input to each FILE, and also to standard output.\n\
   -i, --ignore-interrupts   ignore interrupt signals\n\
 "), stdout);
       fputs (_("\
-  -p                        operate in a more appropriate MODE with pipes.\n\
+  -p                        operate in a more appropriate MODE with pipes\n\
       --output-error[=MODE]   set behavior on write error.  See MODE below\n\
 "), stdout);
       fputs (HELP_OPTION_DESCRIPTION, stdout);
@@ -185,6 +185,7 @@ main (int argc, char **argv)
 /* Return the index of the first non-null descriptor after idx,
    or -1 if all are null.  */
 
+ATTRIBUTE_PURE
 static int
 get_next_out (FILE **descriptors, int nfiles, int idx)
 {

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Make sure all of these programs diagnose read errors
 
-# Copyright (C) 2023 Free Software Foundation, Inc.
+# Copyright (C) 2023-2025 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@ cat .
 cksum -a blake2b .
 cksum -a bsd .
 cksum -a crc .
+cksum -a crc32b .
 cksum -a md5 .
 cksum -a sha1 .
 cksum -a sha224 .

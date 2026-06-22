@@ -1,5 +1,5 @@
 /* chroot -- run command or shell with special root directory
-   Copyright (C) 1995-2023 Free Software Foundation, Inc.
+   Copyright (C) 1995-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
 /* Written by Roland McGrath.  */
 
 #include <config.h>
+#include <ctype.h>
 #include <getopt.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -92,11 +93,11 @@ setgroups (size_t size, MAYBE_UNUSED gid_t const *list)
 
 static int
 parse_additional_groups (char const *groups, GETGROUPS_T **pgids,
-                         size_t *pn_gids, bool show_errors)
+                         idx_t *pn_gids, bool show_errors)
 {
   GETGROUPS_T *gids = nullptr;
-  size_t n_gids_allocated = 0;
-  size_t n_gids = 0;
+  idx_t n_gids_allocated = 0;
+  idx_t n_gids = 0;
   char *buffer = xstrdup (groups);
   char const *tmp;
   int ret = 0;
@@ -142,7 +143,7 @@ parse_additional_groups (char const *groups, GETGROUPS_T **pgids,
         }
 
       if (n_gids == n_gids_allocated)
-        gids = X2NREALLOC (gids, &n_gids_allocated);
+        gids = xpalloc (gids, &n_gids_allocated, 1, -1, sizeof *gids);
       gids[n_gids++] = value;
     }
 
@@ -229,7 +230,7 @@ main (int argc, char **argv)
   uid_t uid = -1;
   gid_t gid = -1;
   GETGROUPS_T *out_gids = nullptr;
-  size_t n_gids = 0;
+  idx_t n_gids = 0;
 
   initialize_main (&argc, &argv);
   set_program_name (argv[0]);
@@ -250,7 +251,7 @@ main (int argc, char **argv)
             /* Treat 'user:' just like 'user'
                as we lookup the primary group by default
                (and support doing so for UIDs as well as names.  */
-            size_t userlen = strlen (userspec);
+            idx_t userlen = strlen (userspec);
             if (userlen && userspec[userlen - 1] == ':')
               userspec[userlen - 1] = '\0';
             break;
@@ -374,7 +375,8 @@ main (int argc, char **argv)
       else if (gid_unset (gid))
         {
           error (EXIT_CANCELED, errno,
-                 _("no group specified for unknown uid: %d"), (int) uid);
+                 _("no group specified for unknown uid: %ju"),
+                 (uintmax_t) uid);
         }
     }
 

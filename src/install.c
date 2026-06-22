@@ -1,5 +1,5 @@
 /* install - copy files and set attributes
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -142,7 +142,7 @@ have_same_content (int a_fd, int b_fd)
   static char a_buff[CMP_BLOCK_SIZE];
   static char b_buff[CMP_BLOCK_SIZE];
 
-  size_t size;
+  idx_t size;
   while (0 < (size = full_read (a_fd, a_buff, sizeof a_buff))) {
     if (size != full_read (b_fd, b_buff, sizeof b_buff))
       return false;
@@ -177,7 +177,7 @@ need_copy (char const *src_name, char const *dest_name,
     return true;
 
   /* compare files using stat */
-  if (lstat (src_name, &src_sb) != 0)
+  if (stat (src_name, &src_sb) != 0)
     return true;
 
   if (fstatat (dest_dirfd, dest_relname, &dest_sb, AT_SYMLINK_NOFOLLOW) != 0)
@@ -214,23 +214,23 @@ need_copy (char const *src_name, char const *dest_name,
   /* compare SELinux context if preserving */
   if (selinux_enabled && x->preserve_security_context)
     {
-      char *file_scontext = nullptr;
-      char *to_scontext = nullptr;
+      char *file_scontext_raw = nullptr;
+      char *to_scontext_raw = nullptr;
       bool scontext_match;
 
-      if (getfilecon (src_name, &file_scontext) == -1)
+      if (getfilecon_raw (src_name, &file_scontext_raw) == -1)
         return true;
 
-      if (getfilecon (dest_name, &to_scontext) == -1)
+      if (getfilecon_raw (dest_name, &to_scontext_raw) == -1)
         {
-          freecon (file_scontext);
+          freecon (file_scontext_raw);
           return true;
         }
 
-      scontext_match = STREQ (file_scontext, to_scontext);
+      scontext_match = STREQ (file_scontext_raw, to_scontext_raw);
 
-      freecon (file_scontext);
-      freecon (to_scontext);
+      freecon (file_scontext_raw);
+      freecon (to_scontext_raw);
       if (!scontext_match)
         return true;
     }
@@ -290,7 +290,7 @@ cp_option_init (struct cp_options *x)
   x->stdin_tty = false;
 
   x->open_dangling_dest_symlink = false;
-  x->update = false;
+  x->update = UPDATE_ALL;
   x->require_preserve_context = false;  /* Not used by install currently.  */
   x->preserve_security_context = false; /* Whether to copy context from src.  */
   x->set_security_context = nullptr; /* Whether to set sys default context.  */
@@ -323,7 +323,7 @@ static void
 setdefaultfilecon (char const *file)
 {
   struct stat st;
-  char *scontext = nullptr;
+  char *scontext_raw = nullptr;
 
   if (selinux_enabled != 1)
     {
@@ -336,7 +336,7 @@ setdefaultfilecon (char const *file)
   struct selabel_handle *hnd = get_labeling_handle ();
   if (!hnd)
     return;
-  if (selabel_lookup (hnd, &scontext, file, st.st_mode) != 0)
+  if (selabel_lookup_raw (hnd, &scontext_raw, file, st.st_mode) != 0)
     {
       if (errno != ENOENT && ! ignorable_ctx_err (errno))
         error (0, errno, _("warning: %s: context lookup failed"),
@@ -344,12 +344,12 @@ setdefaultfilecon (char const *file)
       return;
     }
 
-  if (lsetfilecon (file, scontext) < 0 && errno != ENOTSUP)
+  if (lsetfilecon_raw (file, scontext_raw) < 0 && errno != ENOTSUP)
     error (0, errno,
            _("warning: %s: failed to change context to %s"),
-           quotef_n (0, file), quote_n (1, scontext));
+           quotef_n (0, file), quote_n (1, scontext_raw));
 
-  freecon (scontext);
+  freecon (scontext_raw);
 }
 
 /* Report that directory DIR was made, if OPTIONS requests this.  */

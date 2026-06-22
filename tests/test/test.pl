@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# Copyright (C) 2008-2023 Free Software Foundation, Inc.
+# Copyright (C) 2008-2025 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -185,6 +185,14 @@ my @Tests =
   ['paren-3', "'(' ')' ')'"],
   ['paren-4', "'(' ! ')'"],
   ['paren-5', "'(' -a ')'"],
+
+  ['less-collate-1', "'a' '<' 'b'"],
+  ['less-collate-2', "'a' '<' 'a'", {EXIT=>1}],
+  ['less-collate-3', "'b' '<' 'a'", {EXIT=>1}],
+
+  ['greater-collate-1', "'b' '>' 'a'"],
+  ['greater-collate-2', "'a' '>' 'a'", {EXIT=>1}],
+  ['greater-collate-3', "'a' '>' 'b'", {EXIT=>1}],
 );
 
 @Tests = add_inverse_op_tests \@Tests;

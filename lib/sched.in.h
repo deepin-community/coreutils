@@ -1,5 +1,5 @@
 /* A GNU-like <sched.h>.
-   Copyright (C) 2008-2023 Free Software Foundation, Inc.
+   Copyright (C) 2008-2025 Free Software Foundation, Inc.
 
    This file is free software: you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as
@@ -88,11 +88,11 @@ struct sched_param
 #   undef sched_yield
 #   define sched_yield rpl_sched_yield
 #  endif
-_GL_FUNCDECL_RPL (sched_yield, int, (void));
+_GL_FUNCDECL_RPL (sched_yield, int, (void), );
 _GL_CXXALIAS_RPL (sched_yield, int, (void));
 # else
 #  if !@HAVE_SCHED_YIELD@
-_GL_FUNCDECL_SYS (sched_yield, int, (void));
+_GL_FUNCDECL_SYS (sched_yield, int, (void), );
 #  endif
 _GL_CXXALIAS_SYS (sched_yield, int, (void));
 # endif

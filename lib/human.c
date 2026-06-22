@@ -1,6 +1,6 @@
 /* human.c -- print human readable file size
 
-   Copyright (C) 1996-2007, 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 1996-2007, 2009-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -397,7 +397,7 @@ human_readable (uintmax_t n, char *buf, int opts,
 # define DEFAULT_BLOCK_SIZE 1024
 #endif
 
-static char const *const block_size_args[] = { "human-readable", "si", 0 };
+static char const *const block_size_args[] = { "human-readable", "si", NULL };
 static int const block_size_opts[] =
   {
     human_autoscale + human_SI + human_base_1024,

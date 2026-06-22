@@ -1,5 +1,5 @@
 /* core functions for copying files and directories
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -63,21 +63,23 @@ enum Update_type
   /* Always update..  */
   UPDATE_ALL,
 
-  /* Update if dest older.  */
+  /* Update if (nondirectory) dest has older mtime.  */
   UPDATE_OLDER,
 
   /* Leave existing files.  */
   UPDATE_NONE,
+
+  /* Leave existing files, but exit failure if existing files.  */
+  UPDATE_NONE_FAIL,
 };
 
 /* This type is used to help mv (via copy.c) distinguish these cases.  */
 enum Interactive
 {
-  I_ALWAYS_YES = 1,
-  I_ALWAYS_NO,       /* Skip and fail.   */
-  I_ALWAYS_SKIP,     /* Skip and ignore. */
-  I_ASK_USER,
-  I_UNSPECIFIED
+  I_UNSPECIFIED,
+  I_ALWAYS_YES,      /* -f.  */
+  I_ALWAYS_SKIP,     /* -n (Skip and ignore).  */
+  I_ASK_USER,        /* -i.  */
 };
 
 /* How to handle symbolic links.  */
@@ -129,8 +131,8 @@ struct cp_options
      if SET_MODE is nonzero.  */
   mode_t mode;
 
-  /* If true, copy all files except (directories and, if not dereferencing
-     them, symbolic links,) as if they were regular files.  */
+  /* If true, copy all files except directories (and, if not dereferencing
+     them, symbolic links) as if they were regular files.  */
   bool copy_as_regular;
 
   /* If true, remove each existing destination nondirectory before
@@ -151,6 +153,10 @@ struct cp_options
   /* If MOVE_MODE, first try to rename.
      If that fails and NO_COPY, fail instead of copying.  */
   bool move_mode, no_copy;
+
+  /* Exchange instead of renaming.  Valid only if MOVE_MODE and if
+     BACKUP_TYPE == no_backups.  */
+  bool exchange;
 
   /* If true, install(1) is the caller.  */
   bool install_mode;
@@ -249,12 +255,14 @@ struct cp_options
      Create destination directories as usual. */
   bool symbolic_link;
 
-  /* If true, do not copy a nondirectory that has an existing destination
-     with the same or newer modification time. */
-  bool update;
+  /* Control if destination files are replaced.  */
+  enum Update_type update;
 
   /* If true, display the names of the files before copying them. */
   bool verbose;
+
+  /* If true, follow existing symlinks to directories when copying. */
+  bool keep_directory_symlink;
 
   /* If true, display details of how files were copied.  */
   bool debug;
@@ -293,15 +301,6 @@ struct cp_options
   /* FIXME */
   Hash_table *src_info;
 };
-
-/* Arrange to make rename calls go through the wrapper function
-   on systems with a rename function that fails for a source file name
-   specified with a trailing slash.  */
-# if RENAME_TRAILING_SLASH_BUG
-int rpl_rename (char const *, char const *);
-#  undef rename
-#  define rename rpl_rename
-# endif
 
 bool copy (char const *src_name, char const *dst_name,
            int dst_dirfd, char const *dst_relname,

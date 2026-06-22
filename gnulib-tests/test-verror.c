@@ -1,5 +1,5 @@
 /* Test of verror.h functions.
-   Copyright (C) 2023 Free Software Foundation, Inc.
+   Copyright (C) 2023-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,12 +18,12 @@
 
 #include <config.h>
 
-#include "verror.h"
+#include <error.h>
 
 #include <errno.h>
 #include <stdarg.h>
 
-#include "error.h"
+#include <error.h>
 #include "macros.h"
 
 /* Custom function to not show the program name in error messages.  */
@@ -127,5 +127,5 @@ main (int argc, char *argv[])
   /* Test verror() function with nonzero STATUS.  */
   test_fatal ("fatal error");
 
-  return 0;
+  return test_exit_status;
 }

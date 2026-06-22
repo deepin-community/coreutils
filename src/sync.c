@@ -1,5 +1,5 @@
 /* sync - update the super block
-   Copyright (C) 1994-2023 Free Software Foundation, Inc.
+   Copyright (C) 1994-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -139,13 +139,12 @@ sync_arg (enum sync_mode mode, char const *file)
           sync_status = fsync (fd);
           break;
 
-#if HAVE_SYNCFS
         case MODE_FILE_SYSTEM:
+#if HAVE_SYNCFS
           sync_status = syncfs (fd);
           break;
 #endif
-
-        default:
+        case MODE_SYNC: default:
           unreachable ();
         }
 

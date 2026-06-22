@@ -1,4 +1,4031 @@
+2025-04-09  Pádraig Brady  <P@draigBrady.com>
+
+	version 9.7
+	* NEWS: Record release date.
+
+2025-04-08  Pádraig Brady  <P@draigBrady.com>
+
+	tests: adjust csplit VM limit for CheriBSD
+	* tests/misc/csplit-heap.sh: More memory is required to avoid
+	a false failure on CheriBSD with its heap accounting overhead.
+	This is confirmed to still trigger with the original memory leak
+	being tested.
+
+	ls: support capabilities with device 0,0
+	* src/ls.c (has_capability_cache): Don't assume
+	a device major,minor of 0,0 never occurs.
+
+2025-04-08  Bruno Haible  <bruno@clisp.org>
+
+	ls: fix crash of "ls -Z ." on OpenBSD's /dev/wd0a disk
+	* src/ls.c (file_has_aclinfo_cache): Add new static variable
+	'unsupported_cached'. Don't assume that device 0 never occurs.
+
+2025-04-07  Jim Meyering  <meyering@meta.com>
+
+	build: use _GL_ATTRIBUTE_NONSTRING attribute to avoid new warnings
+	Avoid warnings like this from GCC 15:
+	src/basenc.c:1139:20: error: initializer-string for array of 'char'
+	truncates NUL terminator but destination lacks 'nonstring' attribute
+	(9 chars into 8 available) [-Werror=unterminated-string-initialization]
+	* src/basenc.c (z85_encoding, do_decode): Mark two more variables as
+	non-terminated.
+
+2025-04-07  Pádraig Brady  <P@draigBrady.com>
+
+	maint: avoid syntax-check failures from recent commit
+	* gl/lib/dtimespec-bound.h: Indent, Spellcheck.
+	* gl/local.mk: Add new gl files.
+
+2025-04-07  Paul Eggert  <eggert@cs.ucla.edu>
+
+	doc: mention workaround for combining hex floats with suffixes
+	* doc/coreutils.texi (hexDuration): Mention the p style exponent trick.
+
+	build: update gnulib submodule to latest
+
+	timeout: don’t sleep less than requested
+	Also, change sleep and tail to not sleep less than requested.
+	* bootstrap.conf (gnulib_modules): Add dtimespec-bound.
+	* gl/lib/dtimespec-bound.c, gl/lib/dtimespec-bound.h:
+	* gl/modules/dtimespec-bound: New files.
+	* src/sleep.c, src/tail.c, src/timeout.c: Include dtimespec-bound.h.
+	* src/sleep.c, src/tail.c: Don’t include xstrtod.h.
+	* src/sleep.c (apply_suffix, main):
+	* src/tail.c (parse_options):
+	* src/timeout.c (apply_time_suffix):
+	Don’t sleep less than the true number of seconds.
+	* src/timeout.c: Don’t include ctype.h.
+	(is_negative): Remove; no longer needed.
+	(parse_duration): Use a slightly looser bound on the timeout, one
+	that doesn’t need -lm on GNU/Linux.  Clear errno before calling
+	cl_strtod.
+
+2025-04-06  Jim Meyering  <jim@meyering.net>
+
+	maint: silence a -Wunterminated-string-initialization warning
+	* src/basenc.c (base16_encode): Mark BASE16 as not NUL-terminated.
+
+2025-04-06  Pádraig Brady  <P@draigBrady.com>
+
+	build: update gnulib submodule to latest
+
+2025-04-06  Pádraig Brady  <P@draigBrady.com>
+
+	timeout: remove dependence on libm
+	This was seen to add about 100,000 ns to the startup time,
+	on a 2.6 GHz i7-5600U with glibc 2.40.
+
+	* .gitignore: Remove /lib/fenv.h.
+	* bootstrap.conf: Remove fenv-rounding and signbit deps.
+	* src/local.mk: Remove fenv lib dependency.
+	* src/timeout.c (is_negative): A new helper function to
+	be equivalent of signbit in the underflow case.
+	(parse_duration): Remove the rounding up logic,
+	as a nanosecond here or there has no significance.
+
+2025-04-06  Pádraig Brady  <P@draigBrady.com>
+
+	doc: mention the edge case of hex durations with 'd' suffix
+	* doc/coreutils.texi (sleep invocation): Mention that suffixes are
+	best avoided with hex arguments.
+	(timeout invocation): Likewise.
+	* tests/misc/sleep.sh: Ensure 'd' is not interpreted as "day".
+
+2025-04-05  Pádraig Brady  <P@draigBrady.com>
+
+	maint: adjustments to recent timeout change
+	* .gitignore: Add /lib/fenv.h to ignore list.
+	* tests/timeout/timeout-parameters.sh: Use a sleep length of 10s
+	to be consistent with the pattern where we use this larger time
+	when it does not slow down a test, but also provides protection
+	against a hung test, and better avoidance of false failures due
+	to races on very loaded systems.  Also fix the setting of FAIL.
+	* tests/timeout/timeout-large-parameters.sh: Remove duplicated test.
+
+2025-04-05  Paul Eggert  <eggert@cs.ucla.edu>
+
+	timeout: round timeouts up
+	This handles timeouts like 16777216.000000001 correctly;
+	formerly the subsecond part of that timeout was ignored.
+	* bootstrap.conf (gnulib_modules): Add fenv-rounding, signbit.
+	* src/local.mk (src_timeout_LDADD): Append $(FENV_ROUNDING_LIBM).
+	* src/timeout.c: Include fenv.h, math.h.
+	Don’t include xstrtod.h, as xstrtod’s checking now gets in the way.
+	(parse_duration): Round up when calling cl_strtod.
+	Check for -1e-1000.  Don’t double-round 1e-9.
+	* tests/timeout/timeout-parameters.sh: Test for -0.1,
+	-1e-1000, 1e-1000.
+
+2025-04-04  Collin Funk  <collin.funk1@gmail.com>
+
+	maint: ensure that new "make syntax-check"-run sc_codespell passes
+	* cfg.mk (codespell_ignore_words_list): Ignore false-positives.
+	(exclude_file_name_regexp--sc_codespell): Skip some file names.
+	* doc/coreutils.texi (mktemp invocation): Use "alphanumeric" which is
+	consistent with the rest of the documentation.
+	* src/expand-common.c: Fix typo.
+	* src/ls.c: Likewise.
+	* tests/split/l-chunk-root.sh: Likewise.
+
+2025-04-04  Pádraig Brady  <P@draigBrady.com>
+
+	timeout: ensure infinitesimal timeouts timeout quickly
+	* src/timeout.c (parse_duration): Clamp infinitesimal values to 1ns.
+	* tests/timeout/timeout-large-parameters.sh: Add a test case.
+	* NEWS: Mention the bug fix.
+	Fixes https://bugs.gnu.org/77535
+
+	tests: fix false failure with multi-byte thousands separators
+	* tests/sort/sort-h-thousands-sep.sh: sv_SE defaults to UTF-8
+	on macOS 18, so avoid the test for multi-byte separators.
+	Fixes https://bugs.gnu.org/77509
+
+2025-03-31  Pádraig Brady  <P@draigBrady.com>
+
+	ls: suppress ENOENT errors when reading ACL info
+	* src/ls.c (gobble_file): Indicating unknown ACL info with '?'
+	suffices for the edge case of a file being removed while reading,
+	or older cygwin when reading through dangling symlinks.
+	Reported by Corinna Vinschen.
+
+2025-03-30  Pádraig Brady  <P@draigBrady.com>
+
+	ls: print correct xattr error on all platforms
+	* src/ls.c (gobble_file): Output errno, as u.err
+	is not populated by file_has_aclinfo() on all platforms.
+	* NEWS: Mention the bug fix.
+
+2025-03-23  Paul Eggert  <eggert@cs.ucla.edu>
+
+	mv: port test to OpenBSD 7.5
+	Problem reported by Bruno Haible <https://bugs.gnu.org/75685>.
+	* tests/mv/sticky-to-xpart.sh: Also allow OpenBSD behavior.
+
+2025-03-22  Pádraig Brady  <P@draigBrady.com>
+
+	doc: id: be direct about valid options with -nr
+	* src/id.c (usage): State what options are valid with -nr,
+	rather than just stating the default format is invalid.
+	Fixes https://bugs.gnu.org/77163
+
+	doc: id: make option combinations more searchable
+	* src/id.c (usage): Add commas to make options more searchable.
+	Don't add spaces since that would overflow 80 cols.
+	Fixes https://bugs.gnu.org/77162
+
+2025-03-21  Pádraig Brady  <P@draigBrady.com>
+
+	ls: fix crash on systems with SELinux but without xattr support
+	This was seen on termux on Android with ./configure --disable-xattr
+	where listxattr() and getxattr() returned ENOTSUP.
+	Then the valid security context obtained by file_has_aclinfo()
+	was discounted, and problematically then freed multiple times.
+	Reported at https://github.com/termux/termux-packages/issues/23752
+
+	* src/ls.c (file_has_aclinfo_cache): Only discount the returned
+	acl info when all components are defaulted due to being unsupported.
+
+2025-03-15  Pádraig Brady  <P@draigBrady.com>
+
+	dircolors: add vt220 as a color capable terminal
+	This isn't strictly historically accurate
+	but most practical these days, especially since
+	systemd uses this as its default TERM type.
+	See https://github.com/coreutils/coreutils/issues/96
+
+	Tested with:
+	  $ LS_COLORS= COLORTERM= TERM=vt220 src/ls --color
+	  $ COLORTERM= TERM=vt220 src/dircolors
+
+	* src/dircolors.hin: Add vt220.
+
+2025-03-10  Pádraig Brady  <P@draigBrady.com>
+
+	tests: dd: ensure posix_fadvise errors are handled
+	* tests/dd/nocache_fail.sh: Add a test case for the recent fix.
+
+2025-03-10  Frédéric Yhuel  <frederic.yhuel@dalibo.com>
+
+	dd: fix error detection with "nocache" flag
+	* NEWS: Mention the bug fix.
+	* src/dd.c (invalidate_cache): Adjust to the unusual
+	error propagation sematics of posix_fadvise().
+
+2025-03-10  Paul Eggert  <eggert@cs.ucla.edu>
+
+	build: update gnulib submodule to latest
+
+2025-03-09  Pádraig Brady  <P@draigBrady.com>
+
+	doc: mention logname improvement in NEWS
+	* NEWS: Mention the improvement in gnulib commit 90840606.
+	Addresses https://bugs.gnu.org/76876
+
+2025-02-26  Grisha Levit  <grishalevit@gmail.com>
+
+	build: fix LIBCRYPTO_SONAME value with config cache
+	* configure.ac (LIBCRYPTO_SONAME): Store library name in cache so we
+	do not end up with an empty value for it when a cache file is used.
+	The configure variable name is changed from utils_cv_dlopen_libcrypto
+	to utils_cv_libcrypto_soname.
+
+2025-02-24  Lukáš Zaoral  <lzaoral@redhat.com>
+
+	who: fix -m with guessed tty names
+	* who.c (scan_entries): Account for guessed tty names (e.g.
+	'sshd pts/1') from the readutmp module when using the systemd backend.
+	* bootstrap.conf (gnulib_modules): Add str_endswith.
+	* News: Mention the bug fix.
+	Addresses https://bugzilla.redhat.com/2343998
+
+2025-02-20  Pádraig Brady  <P@draigBrady.com>
+
+	build: update gnulib submodule to latest
+	* gnulib: Update to 757345e8.
+	* src/who.c: Adjust to new defines.
+
+	maint: fix sc_tight_scope failure
+	This reverts commit 83fb600a21c6bad362b5739e7a9a9780639fa550.
+
+	maint: fix sc_preprocessor_indentation failure
+	* src/cksum.h: Indent appropriately.
+
+2025-02-19  Paul Eggert  <eggert@cs.ucla.edu>
+
+	sort: improve -u brief doc
+	* src/sort.c (usage): Reword -u help (Bug#76290).
+
+	du: update debug option setup
+	Current Gnulib arranges for fts debugging if GNULIB_FTS_DEBUG
+	is defined, so key off that rather than off DU_DEBUG.
+	* src/du.c (fts_debug): Remove decl, as Gnulib does this now.
+	(FTS_CROSS_CHECK): Remove; all uses removed.
+	(FTS_DEBUG) [!GNULIB_FTS_DEBUG]: Remove.
+	(long_options) [GNULIB_FTS_DEBUG]: Add a ---debug option.
+	(du_files): Call fts_cross_check only if fts_debug and GNULIB_FTS_DEBUG.
+	(main): Set fts_debug if GNULIB_FTS_DEBUG, not DU_DEBUG.
+
+	maint: omit function defn extern
+	* src/chown-core.c, src/copy.c, src/cp-hash.c, src/csplit.c:
+	* src/expand-common.c, src/find-mount-point.c, src/force-link.c:
+	* src/group-list.c, src/iopoll.c, src/operand2sig.c:
+	* src/show-date.c, src/wc_avx2.c:
+	Omit unnecessary ‘extern ’ at the start of function defns.
+	This is less wordy, makes it a bit easier to grep for issues such
+	as the missing consistency checking in cksum.
+
+	cksum: check API better
+	* src/cksum_avx2.c, src/cksum_avx512.c, src/cksum_pclmul.c:
+	* src/cksum_vmull.c:
+	Include cksum.h instead of copying its decls/includes by hand.
+	This is a better way to ensure consistency among defns and uses.
+
+	cksum: minor crctab generation cleanups
+	* src/cksum.c [CRCTAB]: Include only config.h and stdio.h,
+	to simplify the crctab-generating code.
+	[!CRCTAB]: Do not include stdint.h or stdio.h, as cksum.h does it now.
+	(BIT, r, crc_remainder, main) [CRCTAB]: Use unsigned int, not
+	uint_fast32_t or uint32_t, as this is good enough for GNU where
+	unsigned int is guaranteed to be at least 32 bits, and this way we
+	needn’t worry about mismatches between %08x formats and uint_fast32_t.
+	(main) [CRCTAB]: Prefer more-local decls.  Do not output
+	unnecessary directives to include stdint.h or stdio.h.
+	No need for ‘return EXIT_SUCCESS;’ nowadays.
+	* src/crctab.c: Regenerate.
+
+	cksum: make cksum.h standalone
+	* src/cksum.h: Include stdint.h, stdio.h so that this file
+	can be included in any order, after config.h.
+	Add a copyright notice.
+
+	build: update gnulib submodule to latest
+
+2025-02-17  Paul Eggert  <eggert@cs.ucla.edu>
+
+	cksum: port to 32-bit uint_fast32_t
+	* src/cksum_vmull.c (cksum_vmull): Don’t assume
+	uint_fast32_t can hold 64 bits.
+	Problem reported by Alyssa Ross (Bug#76360).
+
+	cksum: fix test for missing
+	* tests/cksum/cksum.sh: Don’t output confusing diagnostic.
+	Problem reported by Alyssa Ross (Bug#76360).
+
+2025-02-16  Mike Swanson  <mikeonthecomputer@gmail.com>
+
+	dircolors: recognize “jxl” (JPEG XL) files
+
+2025-02-14  Paul Eggert  <eggert@cs.ucla.edu>
+
+	cat: fix plain ‘cat’ bug
+	* src/cat.c (main): Do not fail with plain ‘cat’ where input and
+	output are both /dev/tty, if the output happens to have O_APPEND set.
+	Problem reported by lilydjwg <https://bugs.gnu.org/76255>.
+	Also, don’t report an error if the seek position is at or after EOF,
+	even if O_APPEND is set.
+
+	cat: omit unnecessary lseek
+	* src/cat.c (main): Don’t bother to try lseek on a fifo or socket,
+	as it will fail.
+
+	cat: port to platforms with shm, tmo
+	* src/cat.c (main): Work even on platforms that have shared memory
+	objects and typed memory objects, which means st_dev and st_ino do
+	not work.
+
+2025-02-05  Pádraig Brady  <P@draigBrady.com>
+
+	doc: remove extraneous new lines in some man pages
+	* local.mk: Add the --loose-indent option, which results in help2man
+	avoiding extraneous new lines in expr.1, id.1, numfmt.1, shred.1,
+	tail.1, and timeout.1.
+	Fixes https://bugs.gnu.org/74107
+
+	doc: sync help2man to latest version
+	* man/help2man: sync changes to commit 8fe02612
+	The main change here is to Use \f(CR for monospace text
+	when using groff in troff mode.
+	Previously \f(CW was used, but that's not portable.
+
+	tests: du: avoid intermittent false failure
+	* tests/du/long-sloop.sh: Avoid failure due to
+	intermittent reception of FTS_DNR, seen on BTRFS at least.
+
+2025-02-04  Paul Eggert  <eggert@cs.ucla.edu>
+
+	build: update gnulib submodule to latest
+
+2025-02-03  Paul Eggert  <eggert@cs.ucla.edu>
+
+	maint: pacify ‘gcc -Wswitch-enum’
+	I thought of a way to pacify -Wswitch-enum without much trouble.
+	Either add all the enums, or if that’s too verbose use ‘switch (+E)’
+	to indicate to the reader that there need not be a case for
+	every enum value.  Since this approach improves static checking,
+	make the change everywhere and check it with -Wswitch-enum.
+	* configure.ac: Compile with -Wswitch-enum if it works and
+	--enable-gcc-warnings.  No need to remove -Wswitch-default
+	since Gnulib no longer adds it.
+	* src/chmod.c (describe_change):
+	* src/chown-core.c (describe_change):
+	* src/copy.c (copy_debug_string, copy_debug_sparse_string):
+	* src/df.c (decode_output_arg, get_dev):
+	* src/du.c (main):
+	* src/factor.c (print_factors):
+	* src/head.c (diagnose_copy_fd_failure):
+	* src/ls.c (time_type_to_statx, calc_req_mask)
+	(decode_line_length, get_funky_string, parse_ls_color)
+	(gobble_file, print_long_format):
+	* src/split.c (main):
+	* src/sync.c (sync_arg):
+	* src/tr.c (is_char_class_member):
+	* src/wc.c (main):
+	Add switch cases to pacify -Wswitch-enum.
+	* src/copy.c (copy_debug_string, copy_debug_sparse_string):
+	Add unreachable () for unreachable cases.
+	* src/digest.c (main):
+	* src/od.c (decode_one_format):
+	* src/tr.c (get_next, get_spec_stats):
+	switch (E) → switch (+E).
+	* src/digest.c (main):
+	* src/tr.c (get_next):
+	Omit unnecessary ‘default: break;’ that merely pacified GCC,
+	as the new pacification style is better.
+	* src/ls.c (decode_line_length):
+	Add default unreachable case to prevent warning that function
+	might not return a value.
+	(gobble_file): Distinguish DEREF_NEVER from unreachable cases.
+
+	build: update gnulib submodule to latest
+
+2025-01-29  Pádraig Brady  <P@draigBrady.com>
+
+	doc: ls: clarify --format options
+	* src/ls.c (usage): Use parentheses to be less ambiguous as
+	to what are WORDs and equivalent short options.  This is also
+	consistent with the description of --sort and --indicator-style.
+	Fixes https://bugs.gnu.org/75916
+
+2025-01-28  Pádraig Brady  <P@draigBrady.com>
+
+	doc: support --with-packager-bug-reports
+	* src/system.h (emit_ancillary_info): Output
+	PACKAGE_PACKAGER_BUG_REPORTS if the build is configured
+	--with-packager-bug-reports.
+	Reported by Bruno Haible.
+
+2025-01-22  Pádraig Brady  <P@draigBrady.com>
+
+	sort: drop "note" from a --debug message
+	* src/sort.c (key_warnings): Remove "note " from the start
+	of a usually informational message, as this simplifies translation.
+	* tests/sort/sort-debug-warn.sh": Adjust accordingly.
+	Fixes https://bugs.gnu.org/75763
+
+2025-01-20  Pádraig Brady  <P@draigBrady.com>
+
+	tests: avoid ENAMETOOLONG ERROR on some systems
+	* tests/du/long-from-unreadable.sh: Relax to a skip_ for now,
+	as this was seen to error on ext4 on Debian 11 in a docker container.
+
+2025-01-20  Collin Funk  <collin.funk1@gmail.com>
+
+	maint: tests: remove duplicate uses of 'my' in Perl
+	* tests/env/env-S.pl (cf): Remove uses of 'my' after the variable has
+	been declared.
+	* tests/factor/factor.pl (t): Likewise.
+	* tests/misc/fold.pl (prog): Remove duplicate assignment.
+
+2025-01-20  Pádraig Brady  <P@draigBrady.com>
+
+	tests: remove use of unprotected 'set'
+	* cfg.mk (sc_prohibit_bare_set): A new syntax check to
+	ensure we protect use of set with '--', so that args
+	beginning with '-' are not interpreted as options,
+	and if no args are present, all existing args are cleared.
+	* tests/cp/symlink-slash.sh: Add -- to unprotected use of set.
+	* tests/ls/ls-time.sh: Likewise.
+	* tests/ls/symlink-slash.sh: Likewise.
+	* tests/mkdir/perm.sh: Likewise.
+	* tests/mkdir/selinux.sh: Likewise.
+	* tests/mkdir/smack-no-root.sh: Likewise.
+	* tests/mkdir/smack-root.sh: Likewise.
+	* tests/mv/part-hardlink.sh: Likewise.
+	* tests/nice/nice.sh: Likewise.
+	* tests/stty/stty-row-col.sh: Likewise.
+
+2025-01-19  Daniel Hofstetter  <dhofstet@gmail.com>
+
+	tests: fix typo in tests/ls/ls-time.sh
+	* tests/ls/ls-time.sh: s/--sort-name -t/-t --sort=name/.
+
+2025-01-19  G. Branden Robinson  <g.branden.robinson@gmail.com>
+
+	doc: fix superscript in Texinfo manual's math
+	The numeral "3" in the exponent was set at full size on the baseline.
+
+2025-01-18  Pádraig Brady  <P@draigBrady.com>
+
+	ls: fix crash with --context
+	* src/ls.c (main): Flag that we need to stat()
+	if we're going to get security context (call file_has_aclinfo_cache).
+	(file_has_aclinfo_cache): Be defensive and only lookup the device
+	for the file if the stat has been performed.
+	(has_capability_cache): Likewise.
+	* tests/ls/selinux-segfault.sh: Add a test case.
+	* NEWS: Mention the bug fix.
+	Reported by Bruno Haible.
+
+2025-01-17  Pádraig Brady  <P@draigBrady.com>
+
+	maint: post-release administrivia
+	* NEWS: Add header line for next release.
+	* .prev-version: Record previous version.
+	* cfg.mk (old_NEWS_hash): Auto-update.
+
+	version 9.6
+	* NEWS: Record release date.
+
+	build: update gnulib submodule to latest
+	Mainly to avoid make dist-check failure with --disable-nls
+
+2025-01-16  Bruno Haible  <bruno@clisp.org>
+
+	build: fix compilation error on CentOS 8 Stream
+	* configure.ac (USE_AVX512_CRC32): Set to false if the function
+	_mm512_set_epi8 does not exist.
+
+2025-01-16  Pádraig Brady  <P@draigBrady.com>
+
+	tests: tail-c.sh: avoid failure on Linux kernels <= 2
+	tests/tail/tail-c.sh: Exclude older kernels from timeout failure.
+
+2025-01-16  Bruno Haible  <bruno@clisp.org>
+
+	ls: Fix compilation error on CentOS 6
+	* src/ls.c (XATTR_NAME_CAPS): Define fallback.
+
+2025-01-16  Paul Eggert  <eggert@cs.ucla.edu>
+
+	sort: fix --debug buffer overrun
+	* src/sort.c (debug_key): Fix undefined behavior when a key ends
+	before it starts.  Problem reported by Bruno Haible
+	<https://bugs.gnu.org/75606>.
+
+2025-01-16  Pádraig Brady  <P@draigBrady.com>
+
+	tests: avoid false failure with replaced readdir
+	* tests/rm/rm-readdir-fail.sh: Simulate EIO rather than ENOENT,
+	as gnulib absorbs the latter since commit 5a2d28df.
+
+	ls: suppress ENOTSUP errors on virtiofs
+	* gnulib: Update to latest to pick up commit caf76886.
+	* NEWS: Mention the bug fix.
+
+2025-01-15  Pádraig Brady  <P@draigBrady.com>
+
+	tests: misc/write-errors.sh: increase memory limit
+	* tests/head/head-c.sh: Use a larger VM limit to avoid
+	mem allocation failures, which were seen on CheriBSD.
+
+	tests: head: avoid false failure on some systems
+	* tests/head/head-c.sh: Pass a more similar operation
+	to get_min_ulimit_v_, so we get a more appropriate limit.
+	This was seen to be significant with CheriBSD.
+
+	yes: avoid failure on CHERI protected systems
+	* src/yes.c (main): Don't reuse the argv array as CHERI's
+	capability bounds do not allow for that, failing like:
+	  $ yes $(seq 156) | head -n1
+	  In-address space security exception (core dumped)
+
+2025-01-15  Pádraig Brady  <P@draigBrady.com>
+
+	tac: avoid out of bounds access
+	This was flagged on CheriBSD on ARM Morello with the error:
+	"In-address space security exception (core dumped)"
+	triggered with: tac -s '' /dev/null
+
+	* src/tac.c (main): Ensure we don't read beyond the
+	end of the supplied optarg.
+
+2025-01-15  Pádraig Brady  <P@draigBrady.com>
+
+	tests: avoid ERRORs with no mntent.h
+	* tests/df/skip-duplicates.sh: Just skip this test if we fail
+	to build the shared lib.  This fails on Solaris 11 at least
+	due to no HAVE_MNTENT_H.  Note HAVE_SYS_MNTENT_H does not
+	suffice for this wrapper code.
+	* tests/df/no-mtab-status.sh: Likewise.
+
+	tests: avoid false failure with many mountpoints
+	* tests/ls/readdir-mountpoint-inode.sh: Only take the first 64.
+
+	tests: printf: avoid false failure
+	* tests/printf/printf-surprise.sh: Increase the VM limit
+	to avoid false failures in rare cases.
+
+	tests: avoid slow ulimit -v behavior
+	* init.cfg (ulimit_supported_): skip_ if the ulimit -v
+	takes too long, which was seen with bash 5.2 on Solaris 11,
+	where fork() returned EAGAIN under memory constraints,
+	and bash retried for about 16 seconds.
+	(get_min_ulimit_v_): Break early if skipped.
+	* tests/misc/write-errors.sh: Be more conservative and
+	skip on failure to determine min ulimit.
+
+	tests: use more portable timeout presence check
+	* init.cfg: timeout(1) on FreeBSD doesn't support --version
+	(or --help with success status), so use syntax compatible
+	with both FreeBSD and GNU.
+
+	tests: tail: avoid failure on Solaris 11
+	* tests/tail/tail-c.sh: On Solaris 11, tail -c 4096 /dev/urandom,
+	will induce an lseek(,-4096,SEEK_END) which returns -4096 without
+	setting errno, and a subsequent read() then gives EINVAL.
+	Since tailing the end of a psuedo device is an edge case,
+	we just verify that we don't spin reading the device forever.
+
+	maint: avoid syntax-check failure
+	* src/cksum.c: Use spaces to indent, not tabs.
+
+2025-01-15  Paul Eggert  <eggert@cs.ucla.edu>
+
+	cksum: port to Oracle Developer Studio 12.6
+	* src/cksum.c (cksum_fp_t): New typedef.
+	(pclmul_supported, avx2_supported, avx512_supported)
+	(vmull_supported): Return this new type instead of bool.
+	All callers changed.  That way, callers do not need to
+	refer to functions like cksum_avx512 that might not
+	exist on this platform.  Although GCC optimizes such
+	references away, the C standard does not require this
+	optimization.
+
+	build: update gnulib submodule to latest
+
+2025-01-14  Collin Funk  <collin.funk1@gmail.com>
+
+	tests: env-S.pl: unset GNU/Hurd env vars
+	* tests/misc/env-S.pl: Unset LD_ORIGIN_PATH.
+
+2025-01-13  Paul Eggert  <eggert@cs.ucla.edu>
+
+	ls: readdir errno fixes
+	* src/ls.c (print_dir): Fix bug: file_failure can set errno to
+	something other than EOVERFLOW but the code assumed it didn’t.
+	Also, omit ENOENT bug workaround with glibc 2.3 and later,
+	for consistency with Gnulib.
+
+2025-01-13  Pádraig Brady  <P@draigBrady.com>
+
+	tail: fix regression in open() flags used
+	* src/tail.c (tail_file): Fix precedence issue introduced
+	in commit v9.5-231-g177fcec66 so that we pass correct flags to open().
+	Effectively this meant we would have dropped the O_BINARY flag
+	on windows, since O_RDONLY is generally 0.
+	Issue spotted by coverity.
+
+	build: update to latest gnulib
+	Ensure WCOREDUMP is always defined,
+	and ensure --enable-silent-rules is honored with crc code generation.
+
+2025-01-12  Pádraig Brady  <P@draigBrady.com>
+
+	all: fix program name with --enable-single-binary=shebangs
+	* gnulib: Pick up gnulib commit f11caad4fd which ensures
+	we diagnose the actual utility name, and not just "coreutils"
+	when in single binary mode.  This adjustment is required
+	since gnulib commit 959152ba37 which enforced use of gnulib's
+	error() once verror is used, and gnulib's error() always
+	outputs the base name of the command, which the new gnulib
+	commit now keeps up to date.
+
+	tests: make misc/write-errors.sh immune to default signal disposition
+	* tests/misc/write-errors.sh: Reset SIGPIPE to the default (terminate)
+	disposition, so that the test doesn't erroneously fail due to an
+	ignored SIGPIPE in the test environment.
+
+2025-01-11  Pádraig Brady  <P@draigBrady.com>
+
+	ls: fix inaccurate indication of ACLs on NFS
+	* gnulib: Update to latest to pick up gnulib commit 05c63bc908
+	which ensures accurate determination of the presence of NFSv4 ACLs.
+	* NEWS: Adjust accordingly.
+	Related to https://bugs.gnu.org/74692
+
+2025-01-10  Pádraig Brady  <P@draigBrady.com>
+
+	csplit: avoid extraenous output files given empty input
+	* src/csplit.c (get_first_line_in_buffer): Don't exit here
+	upon empty input, rather indicate no input in the return
+	to let callers handle in a more consistent fashion.
+	* NEWS: Mention the bug fix.
+	* tests/csplit/csplit.sh: Add a test case.
+	Reported by Daniel Hofstetter.
+
+2025-01-10  Pádraig Brady  <P@draigBrady.com>
+
+	ls: suppress "Permission denied" errors on NFS
+	NFS (on Linux 6.12 at least) was seen to return EACCES
+	from listxattr() for files without read access.
+	We started using listxattr() in coreutils 9.4.
+
+	* src/ls.c (gobble_file): Map EACCES from file_has_aclinfo()
+	to '?', rather than displaying the error.
+	* doc/coreutils.texi (ls invocation): Document the '?' flag.
+	* NEWS: Mention the bug fix.
+	Addresses https://bugs.gnu.org/74692
+
+2025-01-10  Paul Eggert  <eggert@cs.ucla.edu>
+
+	build: update gnulib submodule to latest
+
+2025-01-08  Paul Eggert  <eggert@cs.ucla.edu>
+
+	ls: update comment
+	* src/ls.c (file_has_aclinfo_cache): Fix comment.
+
+2025-01-08  Pádraig Brady  <P@draigBrady.com>
+
+	tail: honor --pid with fifos
+	* src/tail.c (tail_file): Open files with O_NONBLOCK
+	if we might need async processing.
+	(pipe_bytes): Ignore EAGAIN read() errors.
+	(pipe_lines): Likewise.
+	* tests/tail/pid-pipe.sh: Add a new test.
+	* tests/local.mk: Reference the new test.
+	* NEWS: Mention the bug fix.
+	Reported by Berhard Voelker.
+
+2025-01-07  Pádraig Brady  <P@draigBrady.com>
+
+	cp,mv: decouple --update from -f,-i,-n options
+	* src/copy.h: Change update member from bool to enum.
+	* src/copy.c: s/interactive == I_ALWAYS_NO/update == UPDATE_NONE_FAIL/;
+	              s/interactive == I_ALWAYS_SKIP/update == UPDATE_NONE/;
+	              s/update/update == UPDATE_OLDER/;
+	* src/install.c: Init with UPDATE_ALL, rather than false.
+	* src/cp.c: Likewise.  Simply parse -f,-i,-n to x.interactive,
+	and parse --update to x.update.
+	* src/mv.c: Likewise.
+	* tests/cp/cp-i.sh: Add a test case where -n --update -i
+	honors the --update option, which would previously have been
+	ignored due to the preceding -n.
+
+2025-01-06  Pádraig Brady  <P@draigBrady.com>
+
+	cp,mv: ensure -i,f are not overridden by -u
+	Since coreutils 9.3 we had --update={all,older} override -i.
+	In coreutils 9.5 this was expanded to -u
+	(to make it consistent with --update=older).
+
+	This patch reinstates things so that -i combines with -u instead.
+	I.e. have -i be protective, rather than selective (like -u).
+
+	The -f option of mv is similarly adjusted in this patch,
+	so now --update does not override any of -f,-i,-n.
+
+	* NEWS: Mention the bug fix.
+	* src/cp.c (main): Don't have -u disable prompting.
+	* src/mv.c (main): Likewise.
+	* tests/cp/cp-i.sh: Add a test case for -i.
+	* tests/mv/update.sh: Likewise.
+	* tests/mv/i-3.sh. Add a test case for -f.
+	Fixes https://bugs.gnu.org/70887
+
+2025-01-06  Pádraig Brady  <P@draigBrady.com>
+
+	doc: clarify mv -f operation in texinfo
+	* doc/coreutils.texi (mv invocation): Be less ambiguous,
+	in that -f is significant for any replacement operation
+	on the destination, not just unlinking.
+
+2025-01-01  Pádraig Brady  <P@draigBrady.com>
+
+	maint: update all copyright year number ranges
+	Update to latest gnulib with new copyright year.
+	Run "make update-copyright" and then...
+
+	* gnulib: Update included in this commit as copyright years
+	are the only change from the previous gnulib commit.
+	* tests/init.sh: Sync with gnulib to pick up copyright year.
+	* bootstrap: Likewise.
+	* tests/sample-test: Adjust to use the single most recent year.
+
+2025-01-01  Pádraig Brady  <P@draigBrady.com>
+
+	pwd: fix erroneous leading slash on some systems
+	* gnulib: Pull in the fix to getcwd() from gnulib.
+	* NEWS: Mention the fix.
+
+2024-12-30  Pádraig Brady  <P@draigBrady.com>
+
+	numfmt: don't require a suffix with --from=iec-i
+	* src/numfmt.c (simple_strtod_human): Only look for 'i'
+	after detecting a suffix.
+	* tests/misc/numfmt.pl: Add a test case.
+	* NEWS: Mention the bug fix.
+	Reported at https://bugs.debian.org/1091758
+
+	maint: fix syntax-check error
+	* src/seq.c: Adjust line length.
+
+2024-12-30  Paul Eggert  <eggert@cs.ucla.edu>
+
+	maint: adjust to Gnulib module renaming
+	* bootstrap.conf, gl/modules/buffer-lcm, gl/modules/randperm:
+	* gl/modules/randread, gl/modules/strnumcmp, gl/modules/targetdir:
+	* gl/modules/xdectoint, gl/modules/xfts:
+	Adjust to recent renaming of Gnulib modules, e.g., stdbool → bool,
+	inttypes → inttypes-h.
+
+	build: update gnulib submodule to latest
+
+	date: improve doc for ambiguous formats
+	Problem reported by Tim Connors <https://bugs.gnu.org/75208>.
+	* doc/coreutils.texi (Date conversion specifiers):
+	* src/date.c (usage):
+	Warn about ambiguous formats like %D.
+
+	maint: ISDIGIT → c_isdigit
+	* gl/lib/strnumcmp-in.h (ISDIGIT):
+	* src/system.h (ISDIGIT): Remove.  All uses replaced by c_isdigit,
+	with appropriate inclusions of c-ctype.h.  This is more regular,
+	and is more portable to existing (but unlikely) platforms where
+	INT_MAX == UINT_MAX.
+
+2024-12-30  Sylvestre Ledru  <sylvestre@debian.org>
+
+	tests: improve the chmod/symlinks.sh test
+	The variable of the loop isn't passed to the command making
+	it less interesting
+
+	* tests/chmod/symlinks.sh: Fix the test case.
+
+2024-12-23  Pádraig Brady  <P@draigBrady.com>
+
+	kill: with -l,-t list signal 0
+	The 0 (EXIT) signal is valid as input
+	(and useful to determine existence of a pid),
+	so list it along with other signals.
+
+	* doc/coreutils.texi (signal specifications): Document 0, "EXIT".
+	* src/kill.c (list_signals): Start loops at 0, not 1.
+	* tests/misc/kill.sh: Add a test case.
+	* NEWS: Mention the change in behavior.
+
+2024-12-21  Pádraig Brady  <P@draigBrady.com>
+
+	maint: correct © dates for hardware optimized crc routines
+	* src/cksum_pclmul.c: 2021-2024.
+	* src/cksum_avx2.c: 2024.
+	* src/cksum_avx512.c: 2024.
+	* src/cksum_vmull.c: 2024.
+
+	tail: always fail when followed files become inaccessible
+	* src/tail.c (tail_forever): Without --retry, exit with failure
+	status like we do for the inotify case (since v8.11-15-g61de57cd2).
+	This is also consistent with the failure exit if no file was
+	accessible at tail startup.
+	* tests/tail/follow-stdin.sh: Tweak due to earlier exit.
+	* tests/tail/follow-name.sh: Test with and without inotify.
+	* NEWS: Mention the bug fix.
+
+2024-12-20  Pádraig Brady  <P@draigBrady.com>
+
+	cksum: update to pclmul optimized crc32b from gnulib
+	* bootstrap.conf: Depend on crc-x86_64 rather than crc.
+	* gnulib: Update to latest.
+	* src/cksum.c (crc32b_sum_stream): Add --debug info.
+	* NEWS: Mention the performance improvement.
+
+2024-12-16  Daniel Hofstetter  <dhofstet@gmail.com>
+
+	maint: tests: update deprecated perl backreference syntax
+	* tests/basenc/basenc.pl: perl warns that $1 is better than \1,
+	so update to the preferred form.
+
+2024-12-12  Paul Eggert  <eggert@cs.ucla.edu>
+
+	maint: sync help2man to latest version
+	* man/help2man: sync changes from version 1.48.5 through 1.49.3.
+	This doesn't materially change the generated man pages.
+
+2024-12-05  Sam Russell  <sam.h.russell@gmail.com>
+
+	cksum: use ARMv8 SIMD extensions
+	* configure.ac: Add check for ARMv8 VMULL support.
+	* src/cksum.c: Add ARMv8 VMULL detection function.
+	* src/cksum.h: Add ARMv8 VMULL implementation declaration.
+	* src/cksum_vmull.c: ARMv8 VMULL implementation.
+	* src/local.mk: Add build flags for ARMv8 VMULL.
+	* NEWS: Mention the ARMv8 SIMD improvement.
+
+2024-12-05  Pádraig Brady  <P@draigBrady.com>
+
+	tail: ensure --follow=name unfollows renamed files
+	Require --retry to continue to track files upon rename.
+	We already unfollowed a file if it was renamed
+	to another file system (unlinked), so this makes the behavior
+	consistent if renaming to a file in the same file system.
+	I.e. --follow=name without --retry, means unfollow if the
+	name is unlinked or moved, so this change ensures that
+	behavior for all rename cases.
+	Related commits: v8.0-121-g3b997a9bc, v8.23-161-gd313a0b24
+
+	* src/tail.c (tail_forever_notify): Remove watch for a renamed file
+	if --retry is not specified.
+	* tests/tail/F-vs-rename.sh: Related test cleanup.
+	* tests/tail/follow-name.sh: Add a test case.
+	* NEWS: Mention the bug fix.
+	Fixes https://bugs.gnu.org/74653
+
+2024-11-26  Sam Russell  <sam.h.russell@gmail.com>
+
+	cksum: use AVX2 and AVX512 for speedup
+	* configure.ac: Add checks for avx2 and avx512 support.
+	* src/cksum_avx2.c: AVX2 implementation.
+	* src/cksum_avx512.c: AVX512 implementation.
+	* src/local.mk: Add build flags for avx2 and avx512.
+	* src/cksum.c: Add avx2 and avx512 detection functions.
+	* src/cksum.h: Add avx2 and avx512 implementation declarations.
+	* NEWS: Mention the AVX2 and AVX512 improvement.
+
+2024-11-26  Pádraig Brady  <P@draigBrady.com>
+
+	tail,tee: fix broken pipe detection on darwin 9
+	* src/iopoll.c (): Restrict use of poll() on macOS
+	to >= 11 (darwin 20), as it was seen to fail on macOS 10.5.
+	Fixes https://bugs.gnu.org/74503
+
+2024-11-24  Pádraig Brady  <P@draigBrady.com>
+
+	tests: avoid false failure with unicode decomposed file systems
+	* tests/ls/dired.sh: macOS normalizes unicode characters to decomposed
+	(NFD) form when storing names in the file system, which breaks the
+	round-trip comparison employed by the test.  So instead use a character
+	which does not decompose; verified with:
+	  echo æ | uconv -f utf8 -t utf8 -x nfd | od -Ax -tx1z
+
+2024-11-20  Paul Eggert  <eggert@cs.ucla.edu>
+
+	dd: port big-offset test to macOS 12.6
+	* tests/dd/skip-seek-past-file.sh: Do not assume that
+	seek to exactly OFF_T_MAX should fail; it works on macOS 12.6
+	and POSIX allows this.  Come to think of it, it should work
+	on Solaris too, if someone ever comes across a Solaris host
+	with a file system that allows such files.
+
+2024-11-20  Collin Funk  <collin.funk1@gmail.com>
+
+	maint: update .gitignore
+	* .gitignore (/lib/crc-sliceby8.h): Add file generated by Gnulib.
+
+	maint: prefer mbszero over memset
+	* src/df.c (replace_invalid_chars): Use mbszero.
+
+2024-11-20  Paul Eggert  <eggert@cs.ucla.edu>
+
+	ls: port to Oracle Developer Studio 12.6
+	Oracle Developer Studio 12.6 for sparc mishandles
+	‘sizeof ((char []) {'x', 'y'})’: it says
+	“warning: null dimension: sizeof()” and then generates
+	the wrong length in data.  Work around the compiler bug
+	by counting sizes by hand, which may be a bit clearer anyway,
+	if a bit more error-prone.
+	* src/ls.c (BIN_STR): Remove.
+	(color_indicator): Spell out instead of using BIN_STR.
+
+	factor: fix ‘return’ typo
+	* src/factor.c (lbuf_putint): Don’t use ‘return E;’ in
+	a void function’s body, fixing a recently-introduced typo.
+
+2024-11-19  Paul Eggert  <eggert@cs.ucla.edu>
+
+	doc: mention "printf %d ''" change
+
+2024-11-19  Pádraig Brady  <P@draigBrady.com>
+
+	tests: fix inconsistent use of getlimits_
+	* tests/dd/skip-seek-past-file.sh: s/eval $(getlimits)/getlimits_/
+
+	tests: printf: avoid iconv issues on macOS
+	* tests/printf/printf-cov.pl: Since gnulib commit v1.0-1103-ge5b82978e2
+	we avoid iconv() on ASCII range 0x32 - 0x7F inclusive, so adjust
+	this test to fall within that range.
+	Addresses https://bugs.gnu.org/74428
+
+2024-11-19  Paul Eggert  <eggert@cs.ucla.edu>
+
+	chown: port test to macOS 12.6 nogroup user
+	* tests/chown/preserve-root.sh (id_g): Set to empty if id -gn
+	reports that it is nogroup, and skip that part of the test.
+
+	maint: omit unnecessary to_uchar
+	* src/df.c (replace_control_chars):
+	* src/dircolors.c (parse_line):
+	* src/printf.c (print_esc):
+	* src/ptx.c (unescape_string):
+	* src/stat.c (print_it):
+	* src/tr.c (star_digits_closebracket):
+	Omit to_uchar calls that aren’t needed, because the parent
+	expression works with ‘char’ as well as with ‘unsigned char’.
+
+	tests: Remove stray ‘i’
+
+	printf: diagnose empty args correctly
+	Also, port better to macOS.
+	* src/printf.c (verify_numeric): Don’t assume that when s == end
+	then errno is zero; it is EINVAL on macOS, and POSIX allows this.
+	(print_direc): Treat missing arg as zero for numeric conversions,
+	and as an empty string for the others.
+	(print_formatted): Use null pointer, not an empty string,
+	to represent missing arg.
+	* tests/printf/printf.sh: Test empty and space widths and precisions.
+
+	printf: do n$ overflow checking by hand
+	* src/printf.c (get_curr_arg): Mark as pure to pacify GCC 14.
+	Do overflow checking by hand rather than relying on strspn
+	and strtoimax.
+
+	printf: refactor macros to function
+	* src/printf.c (struct arg_cursor): New struct.
+	(get_curr_arg): New function.
+	(print_formatted): Use it instead of ...
+	(GET_CURR_ARG, SET_CURR_ARG): ... these removed macros.
+	This makes the code a bit easier to follow, and any efficiency
+	cost should be minimal.
+
+2024-11-18  Pádraig Brady  <P@draigBrady.com>
+
+	maint: avoid a syntax-check failure
+	This was also updated in gnulib.
+
+	* bootstrap: s/can not/cannot/
+
+2024-11-18  Pádraig Brady  <P@draigBrady.com>
+
+	doc: describe "New programs" consistently in NEWS
+	* NEWS: s/New commands/New programs/
+
+2024-11-18  Paul Eggert  <eggert@cs.ucla.edu>
+
+	build: update gnulib submodule to latest
+	Also, copy bootstrap from gnulib/build-aux/bootstrap.
+
+	factor: pacify -Wunused-macros
+	* src/factor.c: Also use __GMP_GNUC_PREREQ
+
+2024-11-15  Paul Eggert  <eggert@cs.ucla.edu>
+
+	ls: refactor gobble_file get_scontext
+	* src/ls.c (gobble_file): Simplify by pulling get_scontext
+	out of ‘if’.
+
+2024-11-12  Pádraig Brady  <P@draigBrady.com>
+
+	tests: ls: also test security context output for symlinks
+	* tests/ls/selinux.sh: Test symlinks as well as files.
+
+	tests: avoid false failure with --disable-selinux
+	* tests/ls/selinux-segfault.sh: Move recent addition to ...
+	* tests/ls/selinux.sh: ... this new test that uses require_selinux_
+	to skip appropriately when we've built without selinux support.
+	Also add a non root test that checks we output '.' along with the
+	mode for files, to indicate a security context is present.
+	* tests/local.mk (Reference the new test).
+
+2024-11-11  Pádraig Brady  <P@draigBrady.com>
+
+	ls: fix security context indication in --long mode
+	* src/ls.c (gobble_file): Always get the security context with -l
+	so that we can indicate a context with '.' if present.
+
+2024-11-11  Paul Eggert  <eggert@cs.ucla.edu>
+
+	build: update gnulib submodule to latest
+	This also fixes a problem with ls -Z when configured with
+	--disable-acl, reported by Pádraig Brady
+	<https://bugs.gnu.org/73418#52>.
+	* src/ls.c (gobble_file): Pass ACL_GET_SCONTEXT to
+	file_has_aclinfo, if -Z is used.
+
+2024-11-11  Pádraig Brady  <P@draigBrady.com>
+
+	build: update gnulib to latest
+	* NEWS: Mention the fix to nproc honoring the affinity mask
+	on systems with more than 1024 processors.
+
+2024-11-10  Paul Eggert  <eggert@cs.ucla.edu>
+
+	ls: add test case for ls -Z bug
+	Problem reported by Pádraig Brady <https://bugs.gnu.org/73418#35>.
+	This bug was fixed by the recent gnulib update.
+	* tests/ls/selinux-segfault.sh:
+	Also test for ls -Z on broken symlinks.
+
+	build: update gnulib submodule to latest
+
+2024-11-09  Pádraig Brady  <P@draigBrady.com>
+
+	tests: avoid false failure on older valgrind
+	* src/shuf.c (main): In dev mode call randint_all_free()
+	to avoid false failure with valgrind 3.16.1 at least.
+	Note this partially reinstates commit v9.0-109-g0106b5a4b.
+	This was noticed on a debian 11 system running CI tests.
+
+2024-11-09  Paul Eggert  <eggert@cs.ucla.edu>
+
+	seq: seq_fast always exits now
+	* src/seq.c (seq_fast): Always exit.  Don’t bother freeing
+	just before exit.
+
+	seq: simplify cmp calls
+	* src/seq.c (seq_fast): Call cmp in just one place, not two.
+	Redo loop structure to make it work.
+
+	seq: use full_write instead of fwrite
+	* src/seq.c: Include full-write.h.
+	(seq_fast): Since we’re doing all the buffering work anyway,
+	we might as well use syscalls instead of stdio to write.
+	Use full_write instead of fwrite.
+
+	seq: simplify output buffer management
+	* src/seq.c (seq_fast): Simplify by using an output buffer of
+	known size (BUFSIZ) on the stack, rather than a heap buffer that
+	might grow.  For the number buffer, don’t bother appending NUL
+	since nobody uses the NUL, and xpalloc from nullptr not p0 since
+	we need to move the buffer data by hand anyway.
+
+	seq: omit unnecessary malloc for upper bound
+	* src/seq.c (seq_fast): Speed up test for "inf".
+	Do not allocate and free a copy of B, as it is fine as-is.
+
+	seq: simplify cmp
+	* src/seq.c (cmp): Simplify, and change some size_t to idx_t.
+	(INITIAL_ALLOC_DIGITS): Now a constant, not a macro.
+
+	seq: explicate incr
+	* src/seq.c (incr): Change API to make the code easier to follow,
+	and also to avoid undefined behavior on hypothetical platforms
+	where '9' == INT_MAX (!).  Caller changed.
+
+	env: prefer xpalloc to xrealloc
+	* src/env.c (extract_varname): Prefer free+xpalloc to
+	xrealloc, since the old buffer contents don’t matter.
+
+	shuf: prefer xpalloc to xnrealloc
+	* src/shuf.c (RESERVOIR_LINES_INCREMENT): Remove.
+	All uses removed.
+	(read_input_reservoir_sampling, main):
+	Prefer idx_t to size_t for sizes related to xpalloc.
+	(read_input_reservoir_sampling): Prefer xpalloc to xnrealloc.
+
+	pwd: prefer xpalloc to xnrealloc
+	* src/pwd.c (struct file_name, file_name_prepend):
+	Prefer idx_t to size_t for sizes related to xpalloc,
+	(file_name_init): Don’t overflow if PATH_MAX == INT_MAX.
+	(file_name_prepend): Prefer xpalloc to by-hand resizing.
+	Simplify by using memcpy return value.
+
+	du: prefer xpalloc to xnrealloc
+	* src/du.c (prev_level, process_file):
+	Prefer idx_t to size_t for sizes related to xpalloc,
+	and to nesting levels (since that’s what fts_level does anyway).
+	(process_file): Prefer xpalloc to xnrealloc.
+
+	df: prefer xpalloc to xnrealloc
+	* src/df.c (ncolumns, nrows, print_table, get_header, get_dev):
+	Prefer idx_t to size_t for sizes related to xpalloc.
+	(ncolumns_alloc, nrows_alloc): New static vars.
+	(alloc_table_row, alloc_field): Prefer xpalloc to xnrealloc.
+
+	basenc: prefer xpalloc to xnrealloc
+	* src/basenc.c (prepare_inbuf): Prefer xpalloc to xnrealloc.
+
+	ls: prefer xpalloc to xnrealloc
+	* src/ls.c (cwd_n_alloc, cwd_n_used, clear_files)
+	(extract_dirs_from_files, initialize_ordering_vector)
+	(update_current_files_info, sort_files, print_current_files)
+	(print_many_per_line, print_horizontal, print_with_separator)
+	(init_column_info, calculate_columns):
+	Prefer idx_t to size_t for sizes related to xpalloc.
+	(main): Let the compiler fold constants.
+	(gobble_file, init_column_info): Use xpalloc, not xnrealloc.
+	(print_many_per_line): Fix very-unlikely integer overflow.
+
+	df: simplify via xasprintf
+	* src/df.c: Include xvasprintf.h.
+	(get_header, get_dev): Simplify by using xasprintf and xstrdup
+	rather than doing the error checking ourselves.
+
+	csplit: port to IDX_MAX < INT_MAX
+	* src/csplit.c (max_out): Defend against unlikely IDX_MAX < INT_MAX.
+
+	pr: prefer xpalloc to x2realloc
+	* src/pr.c (buff_allocated, main):
+	Prefer idx_t to size_t for sizes.
+	(main, store_char): Use xpalloc, not x2realloc.
+	(init_store_cols): Check for multiplication overflow ourselves
+	and use ximalloc, not xnmalloc.  This is a bit simpler.
+	* src/system.h (X2REALLOC): Remove; no longer used.
+
+	od: prefer xpalloc to x2realloc
+	* src/od.c (string_min, dump_strings): Prefer idx_t to size_t for
+	sizes.  Use xpalloc, not x2realloc.
+
+	fold: prefer xpalloc to x2realloc
+	* src/fold.c (fold_file): Prefer idx_t to size_t for sizes.
+	Use xpalloc, not x2realloc.
+
+	sort: prefer xpalloc to x2nrealloc
+	* src/sort.c (struct buffer, temp_dir_count, temp_dir_alloc)
+	(create_temp_file, add_temp_dir, fillbuf):
+	Prefer idx_t to ptrdiff_t/size_t for nonnegative directory counts.
+	(add_temp_dir, fillbuf): Use xpalloc, not x2nrealloc.
+	* src/system.h (X2NREALLOC): Remove; no longer used.
+
+	cut,numfmt: prefer xpalloc to x2nrealloc
+	* src/set-fields.c (n_frp, n_frp_allocated, complement_rp, set_fields):
+	Prefer idx_t to ptrdiff_t/size_t for nonnegative sizes.
+	(add_range_pair): Use xpalloc, not x2nrealloc.
+
+	ptx: prefer xpalloc to x2nrealloc
+	* src/ptx.c (line_width, gap_size, WORD, WORD_TABLE)
+	(maximum_word_length, reference_max_width, occurs_alloc)
+	(number_of_occurs, half_line_width, truncation_string_length)
+	(compare_words, search_table, digest_word_file)
+	(find_occurs_in_text, fix_output_parameters)
+	(generate_all_output, main, find_occurs_in_text)
+	(fix_output_parameters, generate_all_output):
+	Prefer idx_t to ptrdiff_t/size_t for nonnegative sizes.
+	(first, second): Remove macros, replacing them with locals.
+	(search_table): Use hi (for highest + 1) to simplify.
+	Avoid unlikely overflow by not computing lo + hi.
+	(digest_word_file, find_occurs_in_text): Use xpalloc, not x2nrealloc.
+
+	od: prefer xpalloc to x2nrealloc
+	* src/od.c (n_specs, n_specs_allocated, write_block, get_lcm, main):
+	Use idx_t instead of size_t for some sizes, so that we can
+	use xpalloc.
+	(decode_format_string): Prefer xpalloc to X2NREALLOC.
+
+	expand: check for colno overflow
+	* src/expand-common.c (get_next_tab_column): Check for tab
+	stop overflow here.  All callers changed to not check.
+	* src/expand.c (expand): Use colno for column number.
+
+	ls: fix aclinfo cache bug
+	Found when testing on a new platform with a new file system.
+	* src/ls.c (file_has_aclinfo_cache): For failures, also cache
+	return value, scontext, and scontext_err, and when using cached
+	values make sure buf and size have reasonable values for
+	aclinfo_free etc.
+
+	ls: use Gnulib’s unsupported errno list
+	* bootstrap.conf (gnulib_modules): Add acl-permissions, which
+	supplies acl_errno_valid, and which we are already using
+	indirectly via file-has-acl.
+	* src/ls.c (errno_unsupported): Remove.  All calls replaced
+	by !acl_errno_valid.
+
+	expand: use signed colno
+	* src/expand-common.h (colno): Now intmax_t, not uintmax_t.
+
+	expand: refactor to introduce ‘colno’
+	* src/expand-common.h (colno): New typedef.
+	All uses of uintmax_t for column numbers replaced by colno.
+	* src/expand-common.c (add_tab_stop): Use xpalloc
+	instead of X2NREALLOC, and use ckd_add to check for overflow.
+
+	expand: prefer xpalloc to x2nrealloc
+	* src/expand-common.c (max_column_width, n_tabs_allocated)
+	(first_free_tab, add_tab_stop, parse_tab_stops, validate_tab_stops)
+	(get_next_tab_column):
+	Use idx_t for sizes.  All uses changed.
+	(add_tab_stop): Use xpalloc instead of X2NREALLOC.
+	Use ckd_add to check for overflow, instead of doing it by hand.
+
+	env: prefer xpalloc to x2nrealloc
+	* src/env.c (usvars_alloc): Use idx_t for size.
+	(append_unset_var): Use xpalloc instead of x2nrealloc.
+
+	chroot: expand heap a bit less aggressively
+	* src/chroot.c (parse_additional_groups, main):
+	Prefer idx_t to size_t for sizes.
+	(parse_additional_groups): Use xpalloc instead of x2nrealloc.
+
+	maint: expand heap a bit less aggressively
+	* gl/lib/heap.c (struct heap, heap_alloc, heap_insert)
+	(heapify_down, heapify_up): Prefer idx_t to size_t for sizes.
+	(heap_insert): Use xpalloc instead of x2nrealloc.
+	(heapify_down): Return void since no caller cares about value.
+	* gl/modules/heap: Depend on idx.
+
+2024-11-03  Bruno Haible  <bruno@clisp.org>
+
+	build: Regenerate distributed built files in $(top_srcdir)
+	* src/local.mk (src/dircolors.h, src/fs-is-local.h, src/fs.h): Generate
+	in $(top_srcdir).
+
+2024-11-02  Pádraig Brady  <P@draigBrady.com>
+
+	cksum: add support for --algorithm=crc32b
+	  $ echo -n '123456789' | cksum --raw -a crc32b | basenc --base16
+	  CBF43926
+
+	* bootstrap.conf: Explicitly depend on the crc module.
+	* doc/coreutils.texi (cksum): Add "crc32b" as an argument to -a.
+	* src/cksum.c (crc32b_sum_stream): A new function similar to
+	crc_sum_stream, but which does not include the length in
+	the CRC calculation.
+	* src/cksum.h: Add crc32b_sum_stream prototype.
+	* src/digest.c: Add "crc32b" as an argument to -a.
+	* tests/cksum/cksum.sh: Refactor to test both crc and crc32b.
+	* tests/cksum/cksum-a.sh: Add "crc32b" case.
+	* tests/cksum/cksum-base64.pl: Likewise.
+	* tests/misc/read-errors.sh: Likewise.
+	* NEWS: Mention the new feature.
+
+2024-11-02  Collin Funk  <collin.funk1@gmail.com>
+
+	test: add string operators added by POSIX 2024
+	* src/test.c (binop): Recognize the ">" and "<" operators.
+	(three_arguments): Likewise.
+	(binary_operator): Implement the "<" and ">" operators.
+	(usage): Add operators to --help output.
+	* tests/test/test.pl (@Tests): Add functionality tests.
+	* doc/coreutils.texi (test invocation, String tests): Document new
+	operators.
+	* NEWS: Mention the new feature.
+
+2024-11-01  Pádraig Brady  <P@draigBrady.com>
+
+	doc: mention new timeout short options in NEWS
+	* NEWS: Mention the timeout -f and -p options.
+
+2024-11-01  Collin Funk  <collin.funk1@gmail.com>
+
+	stty: adjust --help to match POSIX 2024
+	* src/stty.c (usage): Mark cols, rows, and size as standardized by
+	POSIX.
+	* doc/coreutils.texi (Special): Likewise.
+
+2024-11-01  Pádraig Brady  <P@draigBrady.com>
+
+	doc: fix timeout --help for -p
+	* src/timeout.c (usage): Fix typo of period with comma.
+	* tests/timeout/timeout.sh: Only test a single option variant,
+	as tests/misc/usage_vs_getopt.sh suffices for basic option validation.
+
+2024-10-30  Pádraig Brady  <P@draigBrady.com>
+
+	timeout: add -f and -p short options as per POSIX 2024
+	* src/timeout.c: Support -f and -p short options, corresponding to
+	--foreground and --preserve-status respectively.  This adds
+	compatability with POSIX 2024 and OpenBSD.
+	(usage): Separate translations, and reorder the option descriptions.
+	* doc/coreutils.texi (timeout invocation): Adjust accordingly,
+	and also reorder the option descriptions alphabetically.
+	* tests/timeout/timeout.sh: Also test short option variants.
+
+2024-10-20  Sylvestre Ledru  <sylvestre@debian.org>
+
+	tests: cksum: verify --check with comments
+	* tests/cksum/cksum-c.sh: Add a test case with a comment.
+
+	tests: improve ls --dired with symlink testing
+	* tests/ls/dired.sh: Verify ls --dired with symlink.
+
+2024-10-14  Pádraig Brady  <P@draigBrady.com>
+
+	maint: add syntax-check to ensure all gl/ files are distributed
+	* cfg.mk (sc_gldist_missing): Add a new target to ensure we don't
+	forget to distribute any new gl/ files.
+	* gl/local.mk: Remove generation comment since it's
+	now encapsulated in the syntax-check, which outputs a consumable
+	diff to make any future adjustments.
+	Also adjust ordering to that of the C locale used in the syntax check.
+
+2024-10-14  Bruno Haible  <bruno@clisp.org>
+
+	build: distribute the gl/ directory in the tarballs
+	Suggested by Michael Pratt in
+	<https://mail.gnu.org/archive/html/coreutils/2024-10/msg00010.html>.
+
+	* gl/local.mk: New file, based on gettext/gnulib-local/Makefile.am.
+	* Makefile.am: Include it.
+
+2024-10-12  Masatake YAMATO  <yamato@redhat.com>
+
+	cp,mv: align the descriptions of long options
+	* src/cp.c (usage): Adjust white spaces for --update.
+	* src/mv.c (usage): Ditto.
+	Fixes https://bugs.gnu.org/73772
+
+2024-10-07  Collin Funk  <collin.funk1@gmail.com>
+
+	chroot,whoami: use uintmax_t for printing uids
+	* src/chroot.c (main): Cast the uid to uintmax_t instead of int.
+	* src/whoami.c (main): Cast the uid to uintmax_t instead of unsigned
+	long int.
+
+2024-10-06  Bernhard Voelker  <mail@bernhard-voelker.de>
+
+	maint: adjust check-ls-dircolors to recent change in ls.c
+	'make distcheck' would fail since commit 75b34c77e43a, because the
+	comparison by check-ls-dircolors fails.
+
+	* Makefile.am (check-ls-dircolors): Adjust sed(1) expression to the
+	changed data initialization.
+
+2024-10-03  Pádraig Brady  <P@draigBrady.com>
+
+	ls: fix spurious output with -Z
+	* src/ls.c (gobble_file): Only output an error if there actually
+	was an error.
+
+	tests: ls: don't always skip a capability test
+	* tests/ls/no-cap.sh: Move to being a root only test, since
+	commit v9.5-132-g2a6bed933 we now need to call setcap
+	to make the test effective.  Otherwise we would have always
+	just skipped the test.
+
+2024-10-03  Paul Eggert  <eggert@cs.ucla.edu>
+
+	ls: tune usage of getxattr/stat syscalls
+	Update gnulib submodule to latest.  This changes the file_has_aclinfo
+	API, so at the same time do the following changes to ls.c, which
+	adjusts to these changes among other things.
+	* src/ls.c (filetype_d_type, d_type_filetype): New static constants.
+	(format_needs_capability): New static var.
+	(main): Set and use it.  Don’t set format_needs_stat merely
+	because print_scontext, as we needn’t call stat to get the
+	scontext.  Instead, set format_needs_type if print_scontext but
+	not format_needs_stat.
+	(print_dir): Use new static tables to determine filetype
+	more efficiently.
+	(file_has_aclinfo_cache): Adjust to Gnulib file_has_aclinfo API change.
+	(gobble_file): Check stat if format_needs_type but the type is
+	unknown.  Be conservative, and when deciding whether to check stat
+	but the type is unknown, assume it might be directory.  Similarly
+	for normal files when classifying; if the type is unknown assume
+	it might be normal.  Use new static constants and IFTODT to
+	compute filetype more straightforwardly.  Get ACLs and check for
+	capability less often.
+	(get_color_indicator): Omit unnecessary call to is_colored (C_CAP),
+	since f->has_capability can be true only if is_colored (C_CAP).
+
+	ls: omit cast from gobble_file
+	* src/ls.c (gobble_file): Minor refactoring.  Last arg is now null
+	pointer, not "", for no directory.  All callers changed.
+	Avoid need for cast from char const * to char *.
+
+	ls: check FILETYPE_INDICATORS cardinality
+	* src/ls.c (filetype_cardinality): New constant.
+	(filetype_letter): Omit unnecessary trailing NUL.
+	(FILETYPE_INDICATORS): Remove, moving definiens to ...
+	(get_color_indicator): ... here, and check its cardinality too.
+
+	ls: tune indicator_name
+	* src/ls.c (indicator_name): Simplify type; it is now merely
+	a 2-dimensional array of char.  All uses changed.
+
+	ls: omit some unnecessary NULs
+	* src/ls.c (BIN_STR): New macro, replacing LEN_STR_PAIR.
+	All uses changed.  This avoids the need to store the
+	trailing \0 in each string.  This change is more for clarity,
+	to make it clear the \0 is not needed.
+
+	ls: tune is_colored
+	* src/ls.c (is_colored): Tune.
+	This shrinks the machine code considerably on x86-64.
+
+	ls: omit unnecessary test
+	* src/ls.c (gobble_file): Omit redundant test of variable that
+	must be false here.
+
+2024-10-02  Pádraig Brady  <P@draigBrady.com>
+
+	ls: reinstate capability checking in more cases
+	The recent commit v9.5-119-g4ce432ad8 restricted capability checking
+	to only files with XATTR_NAME_CAPS set.  If this is done then we need
+	to adjust tests/ls/no-cap.sh so that it doesn't always skip.  More
+	problematically XATTR_NAME_CAPS was only determined in long listing
+	mode, thus breaking capability coloring in short listing mode
+	as evidenced by the failing tests/ls/capability.sh test.
+
+	Note capability checking does have a large overhead, but we've
+	disabled capability checking by default anyway through the default
+	color configuration since v9.0-187-g6b5134770
+
+	So for these reasons revert to checking capabilities as before.
+
+	* src/ls.c (gobble_file): Check for capabilities in all modes
+	if enabled in color config.
+
+2024-10-02  Lukáš Zaoral  <lzaoral@redhat.com>
+
+	doc: ls: fix regression in -k description
+	The description of -k regressed in coreutils 9.0
+
+	* doc/coreutils.texi (ls invocation): Fix incomplete paragraph
+	describing -k introduced by a mistake in commit v8.32-180-g1625916a1.
+
+2024-10-02  Pádraig Brady  <P@draigBrady.com>
+
+	tests: df: avoid false failure due to fuse.portal
+	* tests/df/skip-rootfs.sh: Explicitly exclude "fuse.portal"
+	file systems as these give EPERM errors from statfs().
+
+2024-10-02  Pádraig Brady  <P@draigBrady.com>
+
+	tests: fix skipping of mtab simulation tests
+	Where rpl_fopen() is used rather than fopen(),
+	wrapping fopen() is ineffective.
+	Note rpl_fopen() is used as of glibc-2.39 at least
+	(due to fflush and fclose being replaced).
+
+	* tests/df/no-mtab-status.sh: Wrap open() rather than fopen().
+	* tests/df/skip-duplicates.sh: Likewise.
+
+2024-09-30  Bernhard Voelker  <mail@bernhard-voelker.de>
+
+	maint: avoid sc_preprocessor_indentation failure in factor.c
+	Prompted by the following 'make syntax-check' failure:
+	  cppi: src/factor.c: line 175: not properly indented
+	  cppi: src/factor.c: line 176: not properly indented
+	  maint.mk: incorrect preprocessor indentation
+	  make: *** [cfg.mk:750: sc_preprocessor_indentation] Error 1
+
+	* src/factor.c: Filter through 'cppi -a'.
+
+2024-09-30  Bernhard Voelker  <mail@bernhard-voelker.de>
+
+	tests: add fold(1) test for --bytes option
+	Inspired by:
+	- https://access.redhat.com/solutions/3459791
+	- https://src.fedoraproject.org/rpms/coreutils/c/8080f5a15a20362c
+
+	* tests/misc/fold.pl (bw1, bw2): Add tests for 'fold -b'.
+
+2024-09-30  Paul Eggert  <eggert@cs.ucla.edu>
+
+	ls: use fewer xattr-related syscalls
+	* src/ls.c: Do not include <selinux/selinux.h> or "smack.h".
+	Include <linux/attr.h> if HAVE_LINUX_ATTR_H, for XATTR_NAME_CAPS.
+	(free_ent): Use aclinfo_scontext_free to free f->scontext.
+	(getfilecon_cache): Remove; no longer needed.
+	(file_has_aclinfo_cache): Rename from file_has_acl_cache,
+	and use file_has_aclinfo instead of file_has_acl.  All uses changed.
+	(gobble_file): Use file_has_aclinfo instead of file_has_acl, so
+	that we get more info about the file before deciding whether to
+	issue further syscalls for it.  Let file_has_aclinfo worry about
+	smack and SELinux.  Call has_capability only if the xattr list
+	mentions XATTR_NAME_CAPS.
+
+	build: update gnulib submodule to latest
+
+2024-09-28  Paul Eggert  <eggert@cs.ucla.edu>
+
+	factor: eliminate print_uuint recursion
+	* src/factor.c (lbuf_putint_append): New function, with
+	most of the old lbuf_putint body.  Do the umaxtostr stuff
+	by hand so that we needn’t worry about the trailing NUL.a
+	Do the string copy by hand since the string is so short.
+	(lbuf_putint): Reimplement in terms of lbuf_putint_append.
+	Omit last arg, which is no longer needed.  All callers changed.
+	(print_uuint): Rewrite to avoid recursion, using
+	lbuf_putint_append for the usual case.
+
+	factor: lessen print_uuint recursion
+	* src/factor.c (BIG_POWER_OF_10, LOG_BIG_POWER_OF_10):
+	New constants.
+	(print_uuint): Use them to lessen recursion depth.
+
+	factor: print_uuint accepts uuint
+	* src/factor.c (print_uuint): Rename from print_uintmaxes
+	and accept a uuint rather than two uintmax_t values.
+	Alll uses changed.
+
+	factor: simplify table count
+	* src/factor.c (PRIMES_PTAB_ENTRIES): Simplify.
+
+	factor: macro refactoring
+	* src/factor.c (W_TYPE_SIZE): Simplify by always defining
+	to UINTMAX_WIDTH.
+	(W): Remove.  All uses replaced by W_TYPE_SIZE.
+	We no longer need one of its static_asserts.
+
+	factor: improve gmp-related buffering
+	Previously, the code used stdio buffers for gmp numbers,
+	and did its own buffering for smaller numbers.  This meant
+	for more flushing than was needed.  The code now uses its
+	own buffering for all standard output, which makes for
+	less flushing and fewer writes.
+	* src/factor.c (lbuf_half_flush): New function, taken from the
+	body of lbuf_putnl.
+	(lbuf_putnl): Use it.
+	(lbuf_putmpz): New function, to output an mpz without using stdio.
+	(print_factors): Output via functions instead of via stdio.
+
+	factor: buffer stdout like other progs do
+	* src/factor.c (lbuf_putnl): Don’t worry about whether
+	stdin is a tty when deciding whether to buffer stdout.
+
+	factor: improve fd buffering
+	* src/factor.c (struct lbuf_, lbuf, lbuf_alloc): Remove.
+	All uses removed.
+	(FACTOR_PIPE_BUF): Now a constant instead of a macro.
+	Increase to PIPE_BUF if available.
+	(lbuf_buf, lbuffered): New static vars, replacing lbuf.
+	All uses changed.
+	(lbuf_flush): Avoid unlikely recursion on write failure.
+	(lbuf_putc): Now simply adds a byte to the buffer.
+	(lbuf_putnl): Do the work of the old lbuf_putc ('\n').
+	Use changed.  Use memrchr to find the newline.
+	(lbuf_putint): Widths are now int, not size_t.
+
+	factor: powm2 returns uuint
+	* src/factor.c (powm2): Return uuint rather than half via
+	pointer. All callers changed.
+
+	factor: factor_using_division returns uuint
+	* src/factor.c (factor_using_division): Return uuint rather than
+	half via pointer. All callers changed.
+
+	factor: gcd2_odd returns uuint
+	* src/factor.c (gcd2_odd): Return uuint rather than half via pointer.
+	All callers changed.
+
+	factor: mod2 now returns uuint
+	* src/factor.c (uuset): New function.
+	(mod2): Return uuint rather than having half the returned value
+	stored via a pointer.  This makes the code a bit easier to read
+	and can help the compiler avoid aliasing issues.  All callers changed.
+
+	factor: new type uuint
+	This refactors to add a new type, a uintmax_t pair, which
+	can simplify some code without slowing it down.
+	* src/factor.c (uuint): New type.
+	(lo, hi, hiset, make_uuint): New functions.
+	(struct factors.plarge): Use the new type.  All uses changed.
+
+	factor: tweak prime_p zero counting
+	* src/factor.c (prime_p): Use stdc_trailing_zero here too.
+	This doesn’t make much of a performance difference but
+	we might as well be consistent.
+
+	factor: tweak gcd2_odd performance
+	* src/factor.c (gcd2_odd): Use stdc_trailing_zeros here too.
+
+	factor: tweak gcd_odd performance
+	* src/factor.c (gcd_odd): Use stdc_trailing_zeros instead of
+	counting zeros by hand.
+
+	factor: switch to stdc_leading_zeros etc
+	* bootstrap.conf (gnulib_modules): Add stdc_trailing_zeros.
+	* cfg.mk (_gl_TS_unmarked_extern_vars): Remove factor_clz_tab,
+	as it’s no longer present.
+	* src/factor.c: Include stdbit.h.
+	(__clz_tab, factor_clz_tab): Remove.
+	(ASSERT, UHWtype, __GMP_DECLSPEC): Use simpler way to pacify
+	-Wunused-macros.
+	(count_leading_zeros, count_trailing_zeros):
+	Remove.  All uses replaced by stdc_leading_zeros, stdc_trailing_zeros.
+	(factor_using_division, prime2_p): Add a couple of ‘assume’s
+	so that GCC knows the stdc_* calls are nonzero and can
+	optimize accordingly.
+
+	factor: port to platforms
+	* src/factor.c (mod2): Work even if cntd <= cnta.  The old version
+	of the code assumed that shifts by N had unspecified behavior
+	unless 0 <= N < wordsize.  Although this assumption is portable to
+	all known practical platforms, the C standard says these shifts
+	have undefined behavior and some pedantic platforms check this.
+	* tests/factor/create-test.sh:
+	* tests/local.mk (factor_tests): New test t37.
+
+2024-09-23  Pádraig Brady  <P@draigBrady.com>
+
+	doc: remove extraneous periods from option --help
+	* src/df.c (usage): Remove period from --help description.
+	* src/cksum.c (usage): Likewise.
+	* src/cp.c (usage): Likewise.
+	* src/mkdir.c (usage): Likewise.
+	* src/mv.c (usage): Likewise.
+	* src/tee.c (usage): Likewise.
+
+	doc: sort: be more descriptive than 'manual'
+	* src/sort.c (usage): Don't mention the ambiguous "manual",
+	rather "full documentation", echoing the language at the
+	bottom of each coreutils man page.
+	Fixes https://bugs.gnu.org/72914
+
+	doc: env: simplify extra info in the man page
+	* man/env.x: Avoid confusion in the [OPTIONS] section
+	by renaming to [SCRIPT OPTION HANDLING], and removing info
+	regarding default signal handling, which is best
+	restricted to the full info manual.
+	Addresses https://bugs.gnu.org/72914
+
+	doc: improve printf(1) reference in echo man page
+	* src/echo.c (usage): Use printf(1) rather than 'printf',
+	which is marked up more appropriately, and can be
+	referenced by some man page readers.
+	Fixes https://bugs.gnu.org/72914
+
+	doc: fix option markup in chgrp, chown, chmod man pages
+	* src/system.h (emit_symlink_recurse_options): Remove quotes
+	so that help2man markup is applied to the option.
+	Fixes https://bugs.gnu.org/72914
+
+2024-09-13  Pádraig Brady  <P@draigBrady.com>
+
+	printf: add indexed argument support
+	* src/printf.c (print_formatted): Add support for %i$ indexed args.
+	* tests/printf/printf-indexed.sh: Add a new file of test cases.
+	* tests/local.mk: Reference the new test file.
+	* doc/coreutils.texi (printf invocation): Mention how mixed
+	processing of indexed and sequential references are supported,
+	unlike the printf(2) library function.
+	* NEWS: Mention the new (POSIX:2024) feature.
+	Addresses https://bugs.gnu.org/73068
+
+2024-09-04  Collin Funk  <collin.funk1@gmail.com>
+
+	maint: assume C89 escape sequences
+	* src/ptx.c (unescape_string) [!__STDC__]: Assume compiler supports '\a'
+	and '\v' escape sequences.
+
+2024-08-29  Pádraig Brady  <P@draigBrady.com>
+
+	build: update gnulib submodule to latest
+
+2024-08-28  Pádraig Brady  <P@draigBrady.com>
+
+	all: fix error checking in gl/lib/xdectoint.c
+	This issue was noticed with -flto on GCC 14.2.1
+
+	* gl/lib/xdectoint.c (__xnumtoint): Only inspect the
+	returned value if LONGINT_INVALID is not set,
+	as the returned value is uninitialized in that case.
+	Fixes https://bugs.gnu.org/72842
+
+2024-08-25  Pádraig Brady  <P@draigBrady.com>
+
+	maint: avoid a syntax check failure
+	* tests/df/no-mtab-status.sh: mntent.h is always provided now by gnulib.
+	* tests/df/skip-duplicates.sh: Likewise.
+
+2024-08-25  Collin Funk  <collin.funk1@gmail.com>
+
+	maint: adjust to Gnulib acl changes
+	* src/copy.c (copy_reg, copy_interal): Use xcopy_acl instead of
+	copy_acl.  Use xset_acl instead of set_acl.
+	* src/cp.c (re_protect): Likewise.
+
+	build: update gnulib submodule to latest
+	* bootstrap: Update from Gnulib.
+
+2024-08-19  Pádraig Brady  <P@draigBrady.com>
+
+	install: dereference source symlinks when comparing
+	* NEWS: Mention the change in behavior.
+	* src/install.c (need_copy): s/lstat/stat/ for the source.
+	* tests/install/install-C.sh: Add test cases
+	(and improve existing test case which wan't valid
+	due to the existing non standard modes on test files).
+	Addresses https://bugs.gnu.org/72707
+
+2024-08-15  Paul Eggert  <eggert@cs.ucla.edu>
+
+	maint: adjust to recent removal of verror.c
+	* po/POTFILES.in: Remove lib/verror.c
+
+	build: update gnulib submodule to latest
+	* boostrap.conf (gnulib.modules): Add xvasprintf, which
+	had been omitted by mistake.
+	* src/copy.c, src/dd.c, src/test.c: Don't include verror.h,
+	as Gnulib removed it.
+
+2024-08-11  Pádraig Brady  <P@draigBrady.com>
+
+	ls: add support for explicit file name sorting
+	Support overriding previous sorting options
+	with an explicit --sort=name option.
+
+	* doc/coreutils.texi (ls invocation): Document the new option.
+	* src/ls.c (usage): Likewise.
+	(sort_args): Add the "name" entry, and sort to be consistent
+	with the ordering presented in --help.
+	* tests/ls/ls-time.sh: Add test cases.
+	* NEWS: Mention the new feature.
+	Suggested by: Tzvetelin Katchov
+
+2024-08-11  Pádraig Brady  <P@draigBrady.com>
+
+	maint: fix syntax-check failure
+	* gl/lib/xdectoint.h: Reinstate indentation enforced with cppi.
+	* src/head.c: Remove now redundant inclusion of "quote.h".
+
+	doc: printf %b: clarify octal processing
+	* src/printf.c: Remove redundant comment.
+	State explicitly that the leading 0 is the exception
+	from normal escape processing.  Remove a full stop for consistency.
+	* doc/coreutils.texi (printf invocation): Add a reference
+	to C99 string escapes since these are not mentioned
+	in the referenced glibc printf info. Also explicitly state
+	the leading 0 exception.  Also use NNN rather than OOO
+	to be consistent with the --help documentation.
+	Also remove and extraneous '\' and fix grammar in the info
+	regarding the ninth bit.
+	Addresses https://bugs.gnu.org/72657
+
+2024-08-11  Paul Eggert  <eggert@cs.ucla.edu>
+
+	maint: adjust to Gnulib safe_read etc. changes
+	Although these patches don’t affect user-visible behavior,
+	they do clean up the source code a bit, and the
+	machine code should be a tiny bit more efficient.
+	* src/cat.c (simple_cat, cat):
+	* src/csplit.c (read_input):
+	* src/head.c (copy_fd, elide_tail_bytes_pipe)
+	(elide_tail_lines_pipe, elide_tail_lines_seekable, head_bytes)
+	(head_lines):
+	* src/install.c (have_same_content):
+	* src/tac-pipe.c (buf_init_from_stdin):
+	* src/tac.c (tac_seekable, copy_to_temp):
+	* src/tail.c (dump_remainder, file_lines, pipe_lines)
+	(pipe_bytes, start_bytes, start_lines, tail_forever_inotify):
+	* src/tr.c (plain_read):
+	Adjust to recent Gnulib changes by using new types
+	for safe_read, safe_write, full_read, full_write.
+
+	maint: list Gnulib sys_types directly
+	* bootstrap.conf (gnulib_modules): Add sys_types.
+	Although it’s already brought in indirectly, coreutils
+	code includes <sys/types.h> directly.
+
+	build: update gnulib submodule to latest
+
+	head: fix overflows in elide_tail_bytes_pipe
+	Not clear that the overflows could be exploited,
+	but they made the code confusing.
+	* src/head.c (elide_tail_bytes_pipe): Don’t convert uintmax_t
+	to size_t first thing; wait until it’s known the value will fit,
+	and then use idx_t rather than size_t to prefer signed types.
+	Prefer idx_t in nearby code, too.
+	Rename locals n_elide_0 to n_elide (for consistency elsewhere)
+	and n_elide to in_elide.
+	Remove bogus (SIZE_MAX < n_elide + READ_BUFSIZE) test;
+	in the typical case where n_elide’s type was the same as
+	that of SIZE_MAX, the test never succeeded, and in the
+	less-common case where n_elide was wider than size_t,
+	the addition could silently overflow, causing the test
+	to fail when it should succeed.  The test is not needed anyway now.
+	Add static asserts to document code assumptions.
+	Redo the ! (n_elide <= HEAD_TAIL_PIPE_BYTECOUNT_THRESHOLD) case
+	so that it works with enormous values of n_elide even on
+	32-bit platforms; for example, n_bufs is now uintmax_t not size_t.
+	Simplify by using xpalloc instead of by-hand code.
+	Remove bogus ‘if (rem)’ test, as rem is always nonzero.
+
+	head: new test for big count
+	* tests/head/head-c.sh: Also test head -c with a number
+	much bigger than UINTMAX_MAX.
+
+	tail: support counts > 2**64
+	* src/tail.c (tail_lines): If skipping all input, use lseek if
+	possible.
+	(parse_options): Allow counts to exceed 2**64.
+	(main): Don’t subtract 1 from UINTMAX_MAX, since it stands
+	for infinity in this context.
+	(main): Also don’t read anything when given infinite elisions.
+	* tests/tail/tail.pl: Adjust to match new behavior.  Rename err-5
+	test to big-c and expect the invocation to succeed, since ‘tail
+	-c99999999999999999999’ now succeeds instead of (unnecessarily)
+	failing.
+
+	head: off_t not uintmax_t for file offset
+	* src/head.c (elide_tail_lines_pipe):
+	Use off_t, not uintmax_t, for a local var that is
+	a file offset.
+
+	nproc: support --ignore counts > 2**64
+	* src/nproc.c (main): Allow --ignore arg to exceed 2**64.
+
+	nl: support -l counts > 2**64
+	* src/nl.c (main): Allow -l arg to exceed 2**64.
+
+	head: support counts > 2**64
+	* src/head.c (head): Optimize for -n-HUGE, where HUGE exceeds
+	2**64 - 2.
+	(string_to_integer): Return UINTMAX_MAX for too-large numbers,
+	instead of failing.
+	(main): Omit no-lnger-necessary test for byte count overflow.
+
+	digest: improve -l overflow diagnostic
+	* src/digest.c (main): Use better diagnostic for -l overflow,
+	by using XTOINT_MAX_QUIET to suppress the worse diagnostic.
+
+	maint: distinguish EOVERFLOW vs ERANGE better
+	Also, prepare for allowing some arguments to overflow
+	without that being an error.
+	* gl/lib/xdectoint.c: Do not include stddef.h,
+	since we no longer use ‘unreachable’.
+	(xnumtoimax, xnumtoumax, __xnumtoint):
+	New arg FLAGS.  All callers changed.
+	Stop using __xdectoint_signed.  All definers removed.
+	* gl/lib/xdectoint.h (XTOINT_MIN_QUIET, XTOINT_MAX_QUIET)
+	(XTOINT_MIN_RANGE, XTOINT_MAX_RANGE): New flag constants.
+	* src/fmt.c (main):
+	* src/fold.c (main):
+	* src/nl.c (main):
+	* src/pr.c (getoptnum):
+	* src/split.c (main):
+	Use XTOINT_MIN_RANGE and XTOINT_MAX_RANGE if appropriate.
+	* src/pr.c (getoptnum): Return int rather than returning void
+	and storing through int *.
+	* src/stty.c (apply_settings):
+	Use ckd_add to check for overflow instead of doing it by hand.
+	(integer_arg): Accept and return uintmax_t, not unsigned long.
+
+2024-08-08  Richard Purdie  <richard.purdie@linuxfoundation.org>
+
+	tests: df-P.sh: fix intermittent false failure
+	The test writes to the disk and means the space used changes. If this
+	crosses a number boundary, the heading spacing can change:
+
+	-Filesystem     1024-blocks  Used Available Capacity Mounted on
+	+Filesystem     1024-blocks   Used Available Capacity Mounted on
+
+	* tests/df/df-P.sh: Squash spaces with tr to avoid alignment variations.
+
+2024-08-04  Paul Eggert  <eggert@cs.ucla.edu>
+
+	build: modernize AC_CHECK_TYPE usage
+	* m4/jm-macros.m4 (gl_CHECK_ALL_TYPES):
+	Use current form of AC_CHECK_TYPE instead of the
+	no-longer-documented obsolescent form.
+
+2024-08-04  Pádraig Brady  <P@draigBrady.com>
+
+	maint: avoid warning on older GCC compilers
+	* src/shuf.c: Avoid -Werror=maybe-uninitialized on GCC 10.2.1 at least.
+	This issue does seem to be addressed on GCC 12.
+
+	tests: limit mem usage on potentially expensive test
+	* tests/misc/write-errors.sh: Limit mem usage if possible,
+	as some implementations may use unbounded memory for
+	the tests cases used here.
+
+	tests: ensure utils support writing to a closed pipe
+	* tests/misc/write-errors.sh: A closed pipe is a common scenario,
+	and should not induce an error.  The general case is discussed at:
+	https://www.pixelbeat.org/programming/sigpipe_handling.html
+
+	doc: reference 'dircolors invocation' from ls --color info
+	* doc/coreutils.texi: Reference how to configure colors,
+	from the ls --color description.
+
+	doc: clarify which ls color attributes don't apply to dirs
+	* src/dircolors.hin: Clarify that SETUID, SETGID, CAPABILITY, and EXEC
+	coloring, only apply to regular files.
+
+2024-08-04  Paul Eggert  <eggert@cs.ucla.edu>
+
+	shuf: tiny simplification
+	* src/shuf.c (main): Omit redundant assignment.
+
+	shuf: avoid integer overflow on huge inputs
+	* gl/lib/randperm.c: Include <stdckdint.h>.
+	(randperm_bound): Return SIZE_MAX if the multiplication overflows.
+	Do not overflow when converting bit count to byte count.
+
+	shuf: fix randomness bug
+	Problem reported by Daniel Carpenter <https://bugs.gnu.org/72445>.
+	* gl/lib/randread.c (randread_new): Fill the ISAAC buffer
+	instead of storing at most BYTES_BOUND bytes into it.
+
+2024-07-30  Collin Funk  <collin.funk1@gmail.com>
+
+	maint: remove unnecessary inttostr usage in printf
+	* src/cksum.c (output_crc): Use '%ju' instead of umaxtostr.
+	* src/shred.c (dopass): Likewise.
+	* src/csplit.c (handle_line_error, regexp_error, close_output_file)
+	(parse_patterns): Use '%jd' instead of offtostr.
+	* src/tail.c (xlseek): Likewise.
+	* src/head.c (elseek): Likewise.
+	* src/group-list.c (gidtostr_ptr): Remove function.
+	(gidtostr): Remove macro.
+	(print_group): Use '%ju' instead of umaxtostr.
+	* src/id.c (gidtostr_ptr, uidtostr_ptr): Remove functions.
+	(gidtostr, uidtostr): Remove macros.
+	(print_user, print_full_info): Use '%ju' instead of umaxtostr.
+	* src/sort.c (specify_nmerge): Use '%u' instead of uinttostr.
+
+2024-07-22  Pádraig Brady  <P@draigBrady.com>
+
+	build: support creating reproducible tarball contents
+	We already support reproducible builds since commit v8.24-99-gc1b3d6587,
+	and this adjusts that change to also support reproducible
+	tarball contents with subsequent runs of `make dist`.
+
+	* Makefile.am: Don't create a varying .timestamp file, instead ...
+	* man/local.mk: Rely on the timestamp of the .tarball-version file.
+	Fixes https://bugs.gnu.org/72232
+
+2024-07-16  Paul Eggert  <eggert@cs.ucla.edu>
+
+	tests: port to noatime file systems
+	On these file systems the atime is always zero.
+	Problem found with ZFS on Ubuntu 24.04 LTS.
+	* tests/stat/stat-birthtime.sh (check_timestamps_updated):
+	* tests/stat/stat-nanoseconds.sh:
+	Work even if atimes are always zero.
+	* tests/stat/stat-nanoseconds.sh:
+	Fix typo: print_ver_ called before init.sh sourced.
+
+	maint: update bootstrap from Gnulib
+
+	maint: adjust to Gnulib -Wsystem-headers change
+	* configure.ac: Don’t suppress -Wsystem-headers since Gnulib no
+	longer enables it.
+
+	build: update gnulib submodule to latest
+
+2024-07-10  Bernhard Voelker  <mail@bernhard-voelker.de>
+
+	tests: add fold(1) test for non-existent files
+	* tests/misc/fold.pl: Add 'enoent' test.
+
+2024-07-04  Collin Funk  <collin.funk1@gmail.com>
+
+	maint: import tests/init.sh from Gnulib during bootstrap
+	* bootstrap.conf (bootstrap_post_import_hook): Use gnulib-tool
+	--copy-file to import tests/init.sh.
+	* tests/init.sh: Remove file.
+	* .gitignore (/tests/init.sh): Add entry.
+
+2024-07-03  Pádraig Brady  <P@draigBrady.com>
+
+	doc: remove 'proposed' in regard to $'' descriptions
+	$'' is POSIX standard syntax as of POSIX.1-2024, as per:
+	https://www.austingroupbugs.net/view.php?id=249
+
+	* doc/coreutils.texi (quotingStyles): Remove 'proposed'.
+	* src/printf.c: Likewwise.
+	Reported at https://bugs.debian.org/1074776
+
+2024-07-02  Pádraig Brady  <P@draigBrady.com>
+
+	tests: fix improper use of grep -v
+	* tests/cksum/cksum-c.sh: Remove improper use of `grep -v`.
+
+2024-07-02  Sylvestre Ledru  <sylvestre@debian.org>
+
+	tests: cksum: check when several files are missing or incorrect
+	 * tests/cksum/cksum-c.sh: Add test cases when several files with errors
+
+2024-07-01  Collin Funk  <collin.funk1@gmail.com>
+
+	maint: silence deprecated module warning
+	* bootstrap.conf (gnulib_modules): Use putenv-gnu instead of putenv.
+
+2024-06-29  Collin Funk  <collin.funk1@gmail.com>
+
+	maint: prefer endian.h for byte order conversions
+	* bootstrap.conf (gnulib_modules): Remove byteswap. Add endian.
+	* src/cksum.c: Include endian.h instead of byteswap.h.
+	(SWAP): Remove macro.
+	(cksum_slice8): Use htobe32 instead of SWAP.
+	(output_crc): Likewise.
+	* src/sum.c: Include endian.h instead of byteswap.h.
+	(SWAP): Remove macro.
+	(output_bsd): Use htobe16 instead of SWAP.
+	(output_sysv): Use htobe16 instead of SWAP.
+	* .gitignore: Add /lib/endian.h.
+
+	build: update gnulib submodule to latest
+	* gnulib: Update to latest
+
+2024-06-27  Pádraig Brady  <P@draigBrady.com>
+
+	ls: treat --time=mtime consistently with other time selectors
+	* src/ls.c: Track if --time=mtime is explicitly specified,
+	so that we can apply the GNU extension of sorting by the
+	specified time, when not displaying (-l not specified),
+	and not explicitly sorting (-t not specified).
+	* tests/ls/ls-time.sh: Add / Update test cases.
+	Fixes https://bugs.gnu.org/71803
+
+2024-06-26  Pádraig Brady  <P@draigBrady.com>
+
+	doc: document the c-maybe quoting style
+	* doc/coreutils.texi (ls invocation): Document the "c-maybe"
+	--quoting-style, which was added as an option in 2008.
+	Reported at https://bugs.debian.org/1074334
+
+2024-06-25  Bruno Haible  <bruno@clisp.org>
+
+	stat: reactivate a translator comment (lost on 2012-01-09)
+	* src/stat.c (default_format): Move translator comment to immediately
+	precede the _() invocation.
+
+2024-06-01  Bernhard Voelker  <mail@bernhard-voelker.de>
+
+	maint: improve ERE in sc_tests_list_consistency
+	The ERE used lacks the grouping of the extensions and therefore would
+	also match files where the first two patterns are not at the end of
+	the line:
+	  grep -E '\.sh|\.pl|\.xpl$'
+
+	* cfg.mk (sc_tests_list_consistency): Add grouping (...) around the
+	sub-patterns.  While at it, also remove the redundant escaping, i.e.,
+	\$$ -> $$ to be consistent with the rest of this file.
+
+2024-05-28  Pádraig Brady  <P@draigBrady.com>
+
+	stat,tail: sync with latest Linux file systems
+	* src/stat.c (human_fstype): Rename "FUSEBLK" to "FUSE" to sync with
+	kernel adjustments.  Add "bcachefs", and "pidfs".  Both are local,
+	with the latter being similar to "proc" which is also local.
+	* NEWS: Mention the change in behavior, and the improvement.
+
+2024-05-24  Paul Eggert  <eggert@cs.ucla.edu>
+
+	ls: improve sorting doc
+	Problem reported by Dan Jaobson (Bug#71171).
+	* doc/coreutils.texi: Clarify that directory entries are sorted,
+	not command-line arguments.
+	* src/ls.c (usage): Be less chatty about -U and
+	about --group-directories-first.
+
+2024-05-22  Sylvestre Ledru  <sylvestre@debian.org>
+
+	tests: cksum: extend with --status, --ignore-missing and --warn
+	* tests/cksum/cksum-c.sh: Add test cases for these option combinations.
+
+2024-05-21  Pádraig Brady  <P@draigBrady.com>
+
+	build: fix build failure in --enable-single-binary mode
+	* src/local.mk: Avoid overriding automake generated DEPENDENCIES,
+	so that it applies its adjustments to LDADD to avoid propagating
+	flags (like -Wl,-rpath) into make targets.  This was seen on FreeBSD
+	where LIBINTL is set to:
+	/usr/local/lib/libintl.so -Wl,-rpath -Wl,/usr/local/lib
+	Instead let automake generate a sanitized src_coreutils_DEPENDENCIES
+	(based on LDADD), which we then augment with the EXTRA_... variable.
+
+	maint: add lib/stdbit.h to .gitignore
+	Following recent gnulib update
+
+2024-05-20  Paul Eggert  <eggert@cs.ucla.edu>
+
+	stty: port test to Alpine Linux
+	* tests/stty/stty.sh: Port to Alpine Linux 3.20.0_rc1, whose musl
+	implementation’s printf invokes ioctl on stdout, so --version
+	does an ioctl.
+
+2024-05-17  Paul Eggert  <eggert@cs.ucla.edu>
+
+	dd: skip some alloc tests on ZFS
+	* tests/dd/sparse.sh: Skip some tests on ZFS.
+
+	maint: prefer stdbit.h to count-leading-zeros.h
+	<stdbit.h> is in C23 and should be more portable in the long run,
+	now that Gnulib supports it.
+	* bootstrap.conf (gnulib_modules): Remove count-leading-zeros.
+	Add stdc_leading_zeros.
+	* gl/lib/randperm.c, src/ioblksize.h:
+	Include stdbit.h instead of count-leading-zeros.h.
+	* gl/lib/randperm.c (floor_lg): Remove; no longer needed.
+	(randperm_bound): Use stdc_bit_width instead of floor_lg;
+	* gl/modules/randperm (Depends-on): Remove count-leading-zeros.
+	Add stdc_bit_width.
+	* src/ioblksize.h (io_blksize): Use stdc_leading_zeros_ull
+	instead of count_leading_zeros_ll.
+
+	maint: port test warnings to GCC 14
+	* configure.ac: Disable GCC 14’s -Wmissing-variable-declarations
+	in the test directory, as it’s not worth the aggravation there.
+	Likewise for GCC's -Wsuggest-attribute=cold.
+
+	maint: update bootstrap from Gnulib
+
+	build: update gnulib submodule to latest
+
+	sort: better -Wmissing-variable-declarations
+	* src/sort.c: Ignore -Wmissing-variable-declarations only
+	with GCC 14 and newer, since it didn’t exist earlier.
+	Ignore the warning only when including md5.h, where it
+	needs to be ignored, as the warning might be useful elsewhere.
+
+	cksum: improve API consistency checking
+	* src/cksum.c (main) [CRCTAB]: Generate updated crctab.c (see below).
+	* src/crctab.c: Include cksum.h, to check consistency
+	between decl and defn.  Include stdio.h since cksum.h needs it.
+
+2024-05-15  Nikolaos Chatzikonstantinou  <nchatz314@gmail.com>
+
+	doc: improve the man page for sleep
+	This patch is part of work done for a project from Google Summer of
+	Code, see the project details at
+	<https://summerofcode.withgoogle.com/programs/2024/projects/E9Jp7RUx>.
+
+	* src/sleep.c (usage): Directly mention the floating-point option,
+	which is typical for sleeping milliseconds.
+	Also reorganize the text to be 3 lines rather than 4.
+
+2024-05-11  Sylvestre Ledru  <sylvestre@debian.org>
+
+	tests: cksum: add incorrect data to verify --check & --strict
+	* tests/cksum/cksum-c.sh: Add test cases.
+
+2024-05-09  Pádraig Brady  <P@draigBrady.com>
+
+	wc: increase I/O size from 16 KiB to 256KiB
+	Similarly to commit v9.4-143-gfcfba90d0,
+	and enabled for AVX by commit v9.5-25-g0e4450103.
+
+	This was seen to improve AVX performance by about 10%
+	on an AMD 7800X3D (Ryzen 7 (2023)) CPU,
+	while having neutral AVX performance,
+	on an Intel i7-5600U (Broadwell-U (2015)) CPU.
+	With avx not enabled, this gives about a 3% performance boost,
+	on an Intel i7-5600U.
+
+	* src/wc.c: Use the centrally configured optimum buffer size.
+	* src/wc_avx2.c: Likewise.
+	* NEWS: Mention the change in performance.
+
+2024-05-09  Evgeny Nizhibitsky  <nizhibitsky@gmail.com>
+
+	wc: simplify and generalize AVX code
+	* src/wc_avx2.c (wc_lines_avx2): Change from
+	_mm256_sub_epi8() + _mm256_sad_epu8() to
+	_mm256_movemask_epi8() + __builtin_popcount().
+	This will allow adjusting the I/O size above 16KiB.
+	* configure.ac: Align check with routines used in wc_avx2.c.
+
+2024-05-07  Bruce Jerrick  <bmj001@gmail.com>
+
+	doc: pwd: improve the -P help description
+	* src/pwd.c (usage): Say that symlinks are resolved,
+	rather than the somewhat ambiguous "avoided".
+
+2024-05-05  Nikolay Nechaev  <Nikolay_Nechaev@mail.ru>
+
+	maint: rename octhexdigits macros
+	isodigit -> isoct; octtobin -> fromoct; hextobin -> fromhex.
+	* src/octhexdigits.h: Rename macros.
+	* src/stat.c, src/printf.c: Use new macros.
+
+	maint: factor out common macros of stat and printf
+	* src/octhexdigits.h: isodigit, hextobin, octtobin macros.
+	* src/stat.c, src/printf.c: Use octhexdigits.h.
+	* src/local.mk: Corresponding adjustments.
+
+	maint: factor out the common show_date functionality
+	* src/show-date.{h,c}: Declaration and definition of show_date.
+	* src/du.c: Wse the common show_date instead of the previous local
+	function.
+	* src/date.c: Wse the common show_date via a wrapper show_date_helper.
+	* src/local.mk: Corresponding adjustments.
+
+2024-05-04  Sylvestre Ledru  <sylvestre@debian.org>
+
+	cksum: add tests to verify the presence of "*"
+	* tests/cksum/cksum-a.sh: Add a test case.
+
+2024-05-03  Pádraig Brady  <P@draigBrady.com>
+
+	cp: actually support --update=none-fail
+	* src/cp.c: Add the entries for the --update=none-fail option.
+	* tests/mv/update.sh: Add a test case.
+	* NEWS: Mention the bug fix.
+	Fixes https://bugs.gnu.org/70727
+
+2024-05-01  Collin Funk  <collin.funk1@gmail.com>
+
+	maint: pacify GCC 14 -Wmissing-variable-declarations
+	* src/local.mk: Include extern decl for 'Version'.
+	* src/crctab.c (crctab): Add an extern decl.
+	* src/cksum.c: Generate an extern decl.
+
+2024-05-01  Pádraig Brady  <P@draigBrady.com>
+
+	maint: pacify GCC 14 -Wmissing-variable-declarations wrt md5.h
+	* src/sort.c: Use pragmas to avoid warnings with our
+	openssl adjustment and to minimize coupling with openssl.
+
+	maint: avoid syntax check failure with long lines
+	* cfk.mk: Exclude bootstrap from sc_long_lines
+	as it comes from gnulib.
+
+2024-04-27  Pádraig Brady  <P@draigBrady.com>
+
+	build: bootstrap with python gnulib-tool by default
+	* gnulib: Update to support bootstrapping with python by default.
+	* bootstrap: Sync with gnulib.
+	* cfg.mk: Don't force python implementation with `make world`,
+	rather rely on the auto selection of python if appropriate.
+
+2024-04-23  Pádraig Brady  <P@draigBrady.com>
+
+	doc: sort: give example for sorting on the last field
+	* doc/coreutils.texi (sort invocation): Give a DSU example
+	for sorting names which may have a variable number of fields.
+	Addresses https://bugs.gnu.org/70532
+
+	build: provide way to bootstrap with python gnulib-tool
+	* cfg.mk: Add a new "world" default target so that one
+	can bootstrap (using the python implementation), configure,
+	and make, by using `make -f cfg.mk`.
+	* gnulib: Update to latest primarily to test the
+	bootstrap python implementation which is now in beta test.
+	* README-hacking: Document the `make -f cfg.mk` shortcut.
+
+2024-04-20  Paul Eggert  <eggert@cs.ucla.edu>
+
+	tail: avoid infloop with -c on /dev/zero
+	Problem reported by Ionut Nicula in:
+	https://bugs.gnu.org/70477
+	* src/tail.c (tail_bytes): Do not loop forever on commands
+	like 'tail -c 4096 /dev/zero'.
+	* tests/tail/tail-c.sh: Test this fix.
+
+2024-04-17  Paul Eggert  <eggert@cs.ucla.edu>
+
+	ls: -f now means -a -U
+	Problem reported by Toby Kelsey <https://bugs.gnu.org/70418>.
+	* src/ls.c (decode_switches): -f now simply means -a -U.
+	(usage): Adjust to match.
+
+2024-04-17  Collin Funk  <collin.funk1@gmail.com>
+
+	maint: remove unnecessary stdbool.h include
+	* src/temp-stream.c: Don't include <stdbool.h> since it is defined in
+	config.h if the compiler does not support the C23 keyword.
+
+2024-04-12  Pádraig Brady  <P@draigBrady.com>
+
+	join: fix error message for -a and -v
+	* src/join.c (main): s/field/file/ in the error message
+	for -a and -v, introduced in TEXTUTILS-1_13-24-g6f63d53e1.
+	Reported at https://bugs.debian.org/1068864
+
+2024-04-07  Pádraig Brady  <P@draigBrady.com>
+
+	doc: NEWS: mention sort being more efficient with /proc files
+	* NEWS: Mention the improvement in commit v9.5-6-g8ff390328
+
+2024-04-06  Paul Eggert  <eggert@cs.ucla.edu>
+
+	split: don’t trust st_size on /proc files
+	* src/split.c (create): Don’t trust st_size == 0.
+
+	sort: don’t trust st_size on /proc files
+	Problem and fix reported by Takashi Kusumi in:
+	https://bugs.gnu.org/70231
+	* src/sort.c (sort_buffer_size): Don’t trust st_size == 0.
+
+	dd: don’t trust st_size on /proc/files
+	* src/dd.c (skip): Don’t trust st_size == 0.
+
+	cat: don’t trust st_size on /proc files
+	* src/cat.c (main):
+	Improve test for when copying will exhaust the output device.
+	Do not rely on st_size, which is unreliable in /proc.
+	Use lseek instead; this is good enough here.
+	* tests/cat/cat-self.sh: Test the relaxation of the heuristic
+	for self-copying.
+
+2024-04-04  Pádraig Brady  <P@draigBrady.com>
+
+	build: update gnulib submodule to latest
+	* gnulib: Update to latest.
+	* NEWS: Document 2 bugs fixed.
+
+2024-04-01  Pádraig Brady  <P@draigBrady.com>
+
+	doc: chown,chgrp: fix missing full stop in --help
+	* src/chown.c (usage): Add a missing full stop.
+	Fixes https://bugs.gnu.org/70126
+
+2024-03-28  Pádraig Brady  <P@draigBrady.com>
+
+	maint: post-release administrivia
+	* NEWS: Add header line for next release.
+	* .prev-version: Record previous version.
+	* cfg.mk (old_NEWS_hash): Auto-update.
+
+	version 9.5
+	* NEWS: Record release date.
+
+2024-03-27  Bruno Haible  <bruno@clisp.org>
+
+	tests: od: avoid outputting undefined floating point values
+	od was seen to abort() on glibc on ia64 and m68k with the error:
+	Fatal glibc error: printf_fp.c:501 (__printf_fp_buffer_1):
+	assertion failed:
+	  cy == 1 || (p.frac[p.fracsize - 2] == 0 && p.frac[0] == 0)
+
+	* tests/od/od-multiple-t.sh: Avoid outputting long double floats
+	to avoid undefined behavior. 'float' and 'double' are standardized
+	by IEEE 754 (except on Linux/m68k) and don't have undefined values.
+
+2024-03-26  Pádraig Brady  <P@draigBrady.com>
+
+	build: update with gnulib fixes
+	* gnulib: Update to incorporate gnulib fixes
+	from Bruno Haible
+
+	tests: numfmt: fix false failures on some systems
+	* tests/misc/numfmt.pl: Verify that printf field width specs
+	count characters and not bytes before enabling locale tests.
+	This was seen on FreeBSD 14.0 and Solaris 11 OpenIndiana.
+	Reported by Bruno Haible
+
+	ls: avoid ENOENT from readdir() on FreeBSD 14
+	* src/ls.c (print_dir): readdir() on FreeBSD 14 was
+	seen to pass ENOENT through.  ENOENT in this context
+	means "Directory unlinked but still open".
+	Reported by Bruno Haible with tests/ls/removed-directory.sh
+
+2024-03-26  Pádraig Brady  <P@draigBrady.com>
+
+	tests: avoid false failure due to mismatched isblank()
+	There is a mismatch between isblank() used by tr and c32isblank() now
+	used by uniq on Solaris 11 OpenIndiana. isblank() was seen to return
+	true for non breaking space, while c32isblank() returned false.
+	Interestingly on Solaris, non breaking space is considered a blank
+	character, and isblank() and c32isblank() honor this in all locales.
+
+	* tests/uniq/uniq.pl: Adjust the blank check to use join(1) rather than
+	tr(1), as join uses the same blank determination routines as uniq(1).
+
+2024-03-25  Pádraig Brady  <P@draigBrady.com>
+
+	cp: with --no-preserve=mode ensure set-group-ID bits maintained on dirs
+	This issue was introduced in commit v8.19-145-g24ebca6
+
+	* src/copy.c (copy_internal): On systems that don't support ACLs,
+	the fallback default chmod done on directories should maintain
+	the set-group-ID, as that's generally auto-set by the system.
+	* NEWS: Mention the fix.
+	Reported by Bruno Haible on Alpine (with tests/cp/preserve-mode.sh)
+
+2024-03-25  Pádraig Brady  <P@draigBrady.com>
+
+	tests: avoid false failure with partial locale info
+	* tests/misc/numfmt.pl: Some systems with the fr_FR.UTF-8
+	locale installed, do not have a thousands grouping character defined.
+	In this case we skip the locale tests which depend on a non empty
+	grouping character.
+
+	tests: avoid triggering obsolete tail option processing
+	* tests/ls/dired.sh: With 2 options, the latter is taken
+	as a file name on some systems.  This avoids a false
+	failure on Solaris and FreeBSD at least.
+
+	tests: remove debugging from a test
+	* tests/ls/dired.sh: Remove temp debugging output.
+
+	tests: fix false failure on systems that can chmod symlinks
+	* tests/chmod/symlinks.sh: The count of adjusted modes was
+	one more on systems where symlink modes can be adjusted.
+	Therefore only include the non symlinks in the count.
+
+2024-03-24  Pádraig Brady  <P@draigBrady.com>
+
+	doc: fix translation issue in chown/chgrp amalgamation
+	* src/chown-core.h (emit_from_option_description): The conditional
+	string composition here caused issues for translators.
+	Instead move to a more general description ...
+	(src/chown.c (usage): ... here.
+	Fixes https://bugs.gnu.org/69985
+
+	doc: fix various translation issues
+	 src/chown.c (usage): Translate parameterized strings.
+	 src/copy.c (copy_internal): Translate each part of ternary.
+	* src/cp.c (usage): Fix typo; s/exisiting/existing/.
+
+	test: avoid false failure with setgid directories
+	* tests/chmod/symlinks.sh: Ensure this new test is immune
+	to setgid directories by resetting modes with =777 rather than 777.
+	Also output more debugging in all failure cases.
+
+	tests: avoid false failure on new mv --exchange test
+	* tests/mv/mv-exchange.sh: Canonicalize different
+	"operation not supported" messages, so we can ignore correctly.
+	Reported by Bruno Haible on AIX, NetBSD, and OpenBSD.
+
+	doc: update THANKS related to env --argv0 option
+	* THANKS.in: Add Matheus who was central to the env --argv0
+	addition in commit v9.4-167-g193449b17.
+
+2024-03-24  Stephane Chazelas  <stephane@chazelas.org>
+
+	doc: ls: detail output format for device files
+	* doc/coreutils.texi (ls invocation): State that device numbers
+	are output, instead of file size.
+
+2024-03-23  Pádraig Brady  <P@draigBrady.com>
+
+	doc: remove older ChangeLog items
+	* Makefile.am: Update the oldest documented version
+	to 8.31 which is now about 5 years old.
+
+2024-03-23  Paul Eggert  <eggert@cs.ucla.edu>
+
+	mv: treat --exchange more like non-exchange
+	Also, improve quality of diagnostics.
+	Problems/suggestions by Bernhard Voelker in
+	<https://bugs.gnu.org/69532#82>.
+	* src/copy.c (emit_verbose): New arg FORMAT.  All uses changed,
+	to improve quality of diagnostics when --exchange is used.
+	(copy_internal): Don’t try to optimize --exchange so much; this
+	simplifies the code and keeps it closer to the non --exchange case.
+
+	cp,ln,mv: improve dir vs nondir diagnostics
+	* src/copy.c (copy_internal): Simplify logic for copying
+	from directory to non-directory or vice versa, and always
+	diagnose with both source and destination file names.
+
+2024-03-22  Pádraig Brady  <P@draigBrady.com>
+
+	env: add -a,--argv0 to set the first argument passed to exec
+	Using the shell's exec -a feature can be awkward
+	so add support for setting overriding argv[0].
+	This gives env full control over the arguments it passes.
+
+	* src/env.c: Accept -a,--argv0 and set argv[0] appropriately.
+	* tests/env/env.sh: Add test cases.
+	* doc/coreutils.texi (env invocation): Describe -a,--argv0.
+	* NEWS: Mention the new feature.
+
+2024-03-21  Pádraig Brady  <P@draigBrady.com>
+
+	doc: pr: give solution to expanding TABs in multicolumn output
+	* doc/coreutils.texi (pr invocation): Explicitly state that
+	multicolumn output will convert spaces to TABs, and show that
+	this can be undone with the `pr -t -e` or `expand` commands.
+	Suggested by Douglas McIlroy in https://bugs.gnu.org/69807
+
+2024-03-20  Paul Eggert  <eggert@cs.ucla.edu>
+
+	doc: clarify mv --exchange
+	In the manual, say it exchanges all data and metadata.
+	Suggested by Pádraig Brady in:
+	https://debbugs.gnu.org/cgi/bugreport.cgi?bug=69532#59
+
+	mv: new option --exchange
+	* src/copy.h (struct cp_options): New member 'exchange'.
+	* src/copy.c (copy_internal): Support the new member.
+	* src/mv.c (EXCHANGE_OPTION): New constant.
+	(long_options): Add --exchange.
+	(usage): Document --exchange.
+	(main): Support --exchange.
+	* tests/mv/mv-exchange.sh: New test case.
+	* tests/local.mk (all_tests): Add it.
+
+2024-03-19  Pádraig Brady  <P@draigBrady.com>
+
+	chmod: fix TOCTOU security issue with symlink replacement
+	This is an issue with -[H]R mode, where an attacker
+	may replace a traversed file with a symlink
+	between where we stat() the file and chmod() the file.
+
+	* src/chmod.c (process_file): Remove the first !S_ISLNK guard
+	as that's now just an optimization, and instead consistently
+	apply fchmodat() to files/symlinks.  Ensure AT_SYMLINK_NOFOLLOW
+	is set when traversing in default (-H) mode.
+	* NEWS: Mention the bug fix.
+	Fixes https://bugs.gnu.org/11108
+
+2024-03-19  Pádraig Brady  <P@draigBrady.com>
+
+	chmod: add support for -h, -H,-L,-P, --dereference options
+	There have been various requests to add -h to avoid following symlinks
+	for security reasons.  This wasn't provided previously as chmod(1)
+	already ignored symlinks unless specified on the command line.
+	Note chmod defaults to -H mode rather than the chown default of -P,
+	as usually chown can work directly on symlinks and so defaults
+	to not traversing those specified on the command line.
+	Note FreeBSD chmod does default to -P mode, but we retain the -H mode
+	default also for compatibility with existing chmod behavior.
+
+	Adding -HLP will allow chmod to disable traversing CLI symlinks to dirs.
+	Adding -h will allow to disable following CLI symlinks to files/dirs,
+	  also operating on all symlinks on systems that support that.
+	Adding --dereference will be significant with -H (the default).  I.e.
+	  symlinks to dirs not recursed, but symlinks are dereferenced.
+	Adding these options will also be consistent with chown(1), chgrp(1),
+	and chmod(1) on other systems.
+
+	Note since chmod(1) currently ignores symlinks by default,
+	and -h is primarily a mechanism to avoid following symlinks, rather than
+	for operating on the symlink itself, we make -h try to chmod a symlink,
+	but ignore ENOTSUP.  In that way we're consistent with chown(1)
+	where it also ignores ENOTSUP for symlinks, and we don't fail when
+	trying to be extra secure with command line params.
+
+	* doc/coreutils.texi (chmod invocation): Reference the -H,-L,-P
+	descriptions, and adjust the corresponding macros to say
+	the default is -H or -P as appropriate.
+	Add --dereference and -h,--no-dereference descriptions.
+	* man/chmod.x: Adjust discussion of symlink handling.
+	* src/chmod.c (main): Accept new options and set
+	fts flags appropriately.
+	(process_file): Process / dereference symlinks as necessary.
+	* src/system.h (emit_symlink_recurse_options): A new function
+	refactored from chown.c and chmod.c usage().
+	* tests/chmod/symlinks.sh: New test for the new options.
+	* tests/local.mk: Reference the new test.
+	* NEWS: Mention the new feature.
+
+2024-03-19  Pádraig Brady  <P@draigBrady.com>
+
+	maint: basenc: consistently check buffer bounds when encoding
+	* src/basenc.c (base16_encode, base2msbf_encode, base2lsbf_encode):
+	Ensure we don't overflow the output buffer, whose length is
+	passed in the OUTLEN parameter.  This issue was flagged by clang
+	with -Wunused-but-set-parameter.
+
+2024-03-19  Pádraig Brady  <P@draigBrady.com>
+
+	pinky: disable location canonicalization by default
+	Behave like who(1) in requiring --lookup to enable this
+	often slow feature.  pinky(1) is supposed to be lightweight after all.
+
+	* doc/coreutils.texi (who invocation): Adjust the description to no
+	longer reference dialup, and be more general about the still significant
+	delays.
+	(pinky invocation): Reference the same --lookup description.
+	* src/pinky.c (main): Accept --lookup to enable DNS lookups.
+	* NEWS: Mention the change in behavior.
+	Fixes https://bugs.debian.org/628815
+
+2024-03-18  Pádraig Brady  <P@draigBrady.com>
+
+	doc: fix stale --dereference info for chown/chgrp
+	Following v5.2.1-679-g7e29ef8b8 symlinks specified on the command line
+	no longer induce an error if lchown() is not supported on the system.
+
+	* doc/coreutils.texi (chown invocation, chgrp invocation): Adjust
+	accordingly, and also use a macro to avoid duplication.
+	* src/chown-core.c: Use our more standard is_ENOTSUP() wrapper
+	in the code related to this.
+
+2024-03-17  Paul Eggert  <eggert@cs.ucla.edu>
+
+	build: update gnulib submodule to latest
+
+2024-03-15  Pádraig Brady  <P@draigBrady.com>
+
+	build: provide a cross-compiling default for 16 bit float checks
+	* configure.ac: Provide a conservative 16 bit float support default
+	when cross-compiling, to avoid configure failing in that case.
+
+2024-03-13  Grisha Levit  <grishalevit@gmail.com>
+
+	env,kill,timeout: support unnamed signals
+	Some signals with values less that the max signal number for the system
+	do not have defined names.  For example, currently on amd64 Linux,
+	signals 32 and 33 do not have defined names, and Android has a wider
+	gap of undefined names where it reserves some realtime signals.
+
+	Previously the signal listing in env ended up reusing the name
+	of the last printed valid signal (the repeated HUP below):
+
+	    $ env --list-signal-handling true
+	    HUP        ( 1): IGNORE
+	    HUP        (32): BLOCK
+	    HUP        (38): IGNORE
+
+	..and the corresponding signal numbers were rejected as operands for the
+	env, kill, and timeout commands.
+
+	This patch removes the requirement that sig2str returns 0 for a signal
+	number associated with an operand.  This allows unnamed signals to be in
+	the sets `env' attempts to manipulate when a --*-signal option is used
+	with no argument, and kill(1) and timeout(1) to send such unnamed
+	signals.
+
+	* src/operand2sig.c (operand2sig): Drop signame argument, accept all
+	signal numbers <= SIGNUM_BOUND.  All callers updated.
+	* src/env.c (parse_signal_action_params, reset_signal_handlers)
+	(parse_block_signal_params, set_signal_proc_mask)
+	(list_signal_handling): Accept all signal numbers <= SIGNUM_BOUND,
+	use SIG%d for printing if necessary.
+	* src/kill.c (list_signals, main): Likewise.
+	(send_signals): Check errno from kill(3) for bad signo.
+	* src/timeout.c (main): Update operand2sig call.
+	* tests/misc/kill.sh: Test listing all signal numbers.
+	* NEWS: Mention the improvement.
+
+2024-03-13  Pádraig Brady  <P@draigBrady.com>
+
+	build: add caching for involved configure checks
+	* configure.ac: Wrap the following with AC_CACHE_VAL,
+	so that they can be cached / overridden.  We use
+	the "utils_cv_" prefix as they're coreutils specific overrides.
+	utils_cv_avx2_intrinsic_exists,
+	utils_cv_brain_16_bit_supported,
+	utils_cv_ieee_16_bit_supported,
+	utils_cv_pclmul_intrinsic_exists,
+	utils_cv_stdbuf_supported.
+
+2024-03-13  Grisha Levit  <grishalevit@gmail.com>
+
+	build: strengthen 16 bit float support checks
+	Recent clang provides __bf16 on aarch64 but it is broken.
+
+	If built with -O0, the conversion is wrong:
+
+	    $ printf '\x3F\x80' | od --end=big -An -tfB | tr -d ' '
+	    1.875
+
+	If built with -O1 or higher, compilation fails:
+
+	    fatal error: error in backend:
+	    Cannot select: 0xb400007a58d29780: f32 = fp_extend 0xb40000...
+	    0xb40000...: bf16,ch = CopyFromReg 0xb40000..., Register:bf16 %13
+	    0xb40000...: bf16 = Register %13
+	    In function: print_bfloat
+
+	The latter issue does not cause the existing configure test to fail
+	because the promotion is optimized out.
+
+	* configure.ac: Ensure 16 bit float promotion code does not get
+	optimized out, and produces an expected result.
+
+2024-03-12  Collin Funk  <collin.funk1@gmail.com>
+
+	maint: prefer minmax.h instead of defining our own
+	* src/comm.c (min): Remove.
+	(compare_files): Use MIN which is referenced by system.h.
+
+2024-03-12  Ville Skyttä  <ville.skytta@iki.fi>
+
+	dircolors: add more archive extensions
+	* src/dircolors.hin: Add .apk (Alpine Linux/Android package); .drpm
+	(delta rpm); .egg, .pyz, and .whl (Python related); and .udeb (form of
+	.deb).
+
+2024-03-12  Collin Funk  <collin.funk1@gmail.com>
+
+	doc: add basic documentation for 'pinky'
+	* doc/coreutils.texi: Add 'pinky' under 'who'.
+
+2024-03-12  Pádraig Brady  <P@draigBrady.com>
+
+	timeout: fix narrow race in failing to kill processes
+	* src/timeout.c (main): Block cleanup signals earlier so that cleanup()
+	is not runnable until monitored_pid is in a deterministic state.
+	This ensures we always send a termination signal to the child
+	once it's forked.
+	* NEWS: Mention the bug fix.
+	Reported at https://github.com/coreutils/coreutils/issues/82
+
+2024-03-11  Pádraig Brady  <P@draigBrady.com>
+
+	timeout: fix race where we might kill arbitrary processes
+	* src/timeout.c (cleanup): Handle the case where monitored_pid
+	might be -1, which could happen if a signal was received
+	immediately after a failed fork() call.  In that case it would
+	send the termination signal to all processes that the timeout
+	process has permission to send signals too.
+	* NEWS: Mention the bug fix.
+
+2024-03-06  Pádraig Brady  <P@draigBrady.com>
+
+	cksum: ensure appropriate "binary" mode with --untagged
+	* src/digest.c (main): If --binary was enabled with a previous --tag,
+	then reset the binary mode to auto select if --untagged then specified.
+	* tests/cksum/cksum-a.sh: Add a test case.
+
+2024-03-05  Pádraig Brady  <P@draigBrady.com>
+
+	mv: revert add --swap (-x) option
+	Since this functionality is recently available
+	in the exch(1) utility from util-linux,
+	it was thought best not to complicate mv with it.
+
+	This reverts commit 6cd2d5e5335b5c286ff39e154e9dd38ba6923775
+
+2024-03-04  Pádraig Brady  <P@draigBrady.com>
+
+	cksum: consistently validate --length attributes
+	* src/digest.c (main): Only validate the last used --length
+	for being a multiple of 8.
+	* tests/cksum/b2sum.sh: Add a test case.
+	Fixes https://bugs.gnu.org/69546
+
+2024-03-03  Pádraig Brady  <P@draigBrady.com>
+
+	doc: fix spellings in NEWS
+	* NEWS: s/user/uses/; s/exisiting/existing/
+
+2024-03-03  Petr Malat  <oss@malat.biz>
+
+	mv: add --swap (-x) option to atomically swap 2 paths
+	renameat2() syscall allows atomically swapping 2 paths on one
+	file system. Expose this ability to the user with --swap.
+
+	* doc/coreutils.texi: Describe mv --swap option.
+	* src/mv.c (main): Support --swap.
+	* tests/mv/mv-swap.sh: Add test for mv -x.
+	* tests/local.mk: Reference new test.
+	* NEWS: Mention the new option.
+
+2024-02-28  Pádraig Brady  <P@draigBrady.com>
+
+	cat,cp,mv,dd,install,split: set the default IO size to 256KiB
+	* src/ioblksize.h: Add updated test results and
+	increase value from 128KiB to 256KiB, which was last
+	updated 10 years ago.
+	* NEWS: Mention the improvement.
+
+2024-02-27  lvgenggeng  <lvgenggeng@uniontech.com>
+
+	mktemp: fix template diagnostic with --suffix
+	* src/mktemp.c (main): When --suffix is specified, TEMPLATE
+	points to the meraged buffer DEST_NAME. As X's in the suffix are
+	not significant to the generated random characters, the diagnostic
+	for too few X's should only refer to the template portion.
+	* tests/misc/mktemp.pl: Adjust accordingly.
+	* NEWS: Mention the bug fix.
+
+2024-02-27  Pádraig Brady  <P@draigBrady.com>
+
+	tests: move join tests to their own directory
+	* tests/misc/join-utf8.sh: Move to tests/join
+	since there are now multiple join tests.
+	* tests/misc/join.pl: Likewise.
+
+	tests: simplify treatment of the $LOCALE_FR_UTF8 variable
+	* tests/df/problematic-chars.sh: Rely on gnulib setting
+	this to "none" where not usable.
+	* tests/misc/sleep.sh: Likewise.
+	* tests/printf/printf-mb.sh: Likewise.
+	* tests/printf/printf-quote.sh: Likewise.
+	* tests/sort/sort-debug-keys.sh: Likewise.
+
+2024-02-27  Bruno Haible  <bruno@clisp.org>
+
+	join: avoid test failure on systems with no French UTF-8 locale
+	* tests/misc/join-utf8.sh: Test the value of LOCALE_FR_UTF8 against
+	'none', not against a missing value.
+	Fixes https://bugs.gnu.org/69418
+
+	sort: make the startup time optimization effective on glibc < 2.34
+	* configure.ac: Test where to find the dlopen function. Set LIB_DL.
+	Use it in the DLOPEN_LIBCRYPTO test.
+	* src/local.mk (src_sort_LDADD): Add $(LIB_DL).
+
+2024-02-26  Pádraig Brady  <P@draigBrady.com>
+
+	build: improve libcrypto library detection
+	* configure.ac: Match literal '.' in the file name
+	to avoid potential mismatches with similarly named libs.
+	Reported by Andreas Schwab
+
+2024-02-26  Aearil  <aearil@paranoici.org>
+
+	wc: fix -w with breaking space over UCHAR_MAX
+	* src/wc.c (wc): Fix regression introduced in commit v9.4-48-gf40c6b5cf.
+	* tests/wc/wc-nbsh.sh: Add test cases for "standard" spaces.
+	Fixes https://bugs.gnu.org/69369
+
+2024-02-26  Pádraig Brady  <P@draigBrady.com>
+
+	cp,mv: add --update=none-fail to fail if existing files
+	* src/cp.c (main): Add support for --update=none-fail to provide the
+	functionality of diagnosing files in the destination,
+	and exiting with failure status.
+	(usage): Mark -n as deprecated.
+	* src/mv.c: Likewise.
+	* src/copy.h: Add UPDATE_NONE_FAIL definition.
+	* src/system.h (emit_update_parameters_note): Add --update=none-fail
+	description.
+	* doc/coreutils.texi (cp invocation): Likewise.
+	Also mention why -n is deprecated.
+	* tests/mv/update.sh: Add a test case, including precedence
+	with -n and other --update options.
+	* tests/cp/cp-i.sh: Verify that --backup and --update=none{,-fail}
+	are mutually exclusive.
+	* tests/mv/mv-n.sh: Likewise.
+	* NEWS: Mention the new feature.
+	Addresses https://bugs.gnu.org/62572
+
+	cp,mv: reinstate that -n exits with success if files skipped
+	* src/cp.c (main): Adjust so that -n will exit success if skipped files.
+	* src/mv.c (main): Likewise.
+	* doc/coreutils.texi (cp invocation): Adjust the description of -n.
+	* src/system.h (emit_update_parameters_note): Adjust --update=none
+	comparison.
+	* tests/cp/cp-i.sh: Adjust -n exit status checks.
+	* tests/mv/mv-n.sh: Likewise.
+	* NEWS: Mention the change in behavior.
+	Fixes https://bugs.gnu.org/62572
+
+2024-02-26  Pádraig Brady  <P@draigBrady.com>
+
+	build: fix libcrypto version linked by sort at runtime
+	One should link the versioned lib at runtime,
+	and the unversioned lib at build time,
+	as the unversioned lib may not be installed,
+	and better couples the binary with the required version.
+
+	* configure.ac: Define LIBCRYPTO_SONAME, determined from
+	the test binary linked with -lcrypto.  Also document
+	why we use SHA512() in the check, rather than MD5().
+	* src/sort.c (link_libcrypto): Use the versioned lib in dlopen().
+
+2024-02-26  Pádraig Brady  <P@draigBrady.com>
+
+	maint: avoid sc_tight_scope failure in sort.c
+	* cfg.mk: Exclude the ptr_MD5_* symbols added in
+	commit v9.4-130-g7f57ac2d2, as there is no way
+	to declare these static given they way they're defined.
+
+2024-02-26  Paul Eggert  <eggert@cs.ucla.edu>
+
+	doc: mention -lcrypto change in NEWS
+
+	sort: dynamically link -lcrypto if -R
+	This saves time in the usual case, which does not need -lcrypto.
+	* configure.ac (DLOPEN_LIBCRYPTO): New macro.
+	* src/sort.c [DLOPEN_LIBCRYPTO && HAVE_OPENSSL_MD5]: New macros
+	MD5_Init, MD5_Update, MD5_Final.  Include "md5.h" after defining
+	them.  Include <dlfcn.h>, and define new functions link_failure
+	and symbol_address.
+	(link_libcrypto): New function.
+	(random_md5_state_init): Call it before using crypto functions.
+
+	doc: de-“note” the documentation
+	* doc/coreutils.texi, man/readlink.x, man/runcon.x:
+	* src/comm.c (usage):
+	* src/digest.c (usage):
+	* src/echo.c (usage):
+	* src/join.c (usage):
+	* src/ln.c (usage):
+	* src/rm.c (usage):
+	* src/stat.c (usage):
+	* src/system.h (USAGE_BUILTIN_WARNING):
+	* src/test.c (usage):
+	* src/touch.c (usage):
+	* src/uniq.c (usage):
+	Rewrite to avoid most uses of “Note that” and similar wording.
+	These circumlocutions are rarely needed, and avoiding them
+	improves readability and lessens preaching.
+
+2024-02-22  Daan De Meyer  <daan.j.demeyer@gmail.com>
+
+	cp: add --keep-directory-symlink option
+	When recursively copying files into OS trees, it often happens that
+	some subdirectory of the source directory is a symlink in the target
+	directory. Currently, cp will fail in that scenario with the error:
+
+	"cannot overwrite non-directory %s with directory %s"
+
+	However, we'd like cp in this scenario to follow the destination
+	directory symlink and copy the files into the symlinked directory
+	instead. Let's support this by adding a new option
+	--keep-directory-symlink that makes cp follow destination directory
+	symlinks.
+
+	We name the option --keep-directory-symlink to keep consistent with
+	tar which has the same option with the same effect.
+
+	* doc/coreutils.texi (cp invocation): Describe the new option.
+	* src/copy.h: Add the new setting.
+	* src/copy.h: Adjust to follow symlinks if setting enabled.
+	* src/cp.c (usage): Describe the new option.
+	(main): Accept the new option.
+	* tests/cp/keep-directory-symlink.sh: A new test.
+	* tests/local.mk: Reference the new test.
+	* NEWS: Mention the new feature.
+
+2024-02-19  Michel Lind  <michel@michel-slm.name>
+
+	dircolors: update list of archive file extensions
+	* src/dircolors.hin: Sort archive section by extension.
+	Treat .crate (Rust archives) as archive files
+	(they're essentially tar.gz files).
+
+2024-02-19  Collin Funk  <collin.funk1@gmail.com>  (tiny change)
+
+	maint: prefer #include <...> for gnulib substitute headers
+	* src/shuf.c: Change #include "getopt.h" to #include <getopt.h>.
+	* src/stat.c: Change #include "getopt.h" to #include <getopt.h>.
+	* src/system.h: Change #include "error.h" to #include <error.h>.
+
+2024-02-19  Pádraig Brady  <P@draigBrady.com>
+
+	doc: add '[' to the info index
+	* doc/coreutils.texi (test invocation): Add '[' to the index.
+
+2024-02-18  Paul Eggert  <eggert@cs.ucla.edu>
+
+	build: update gnulib submodule to latest
+
+	nohup: document GCC bug number
+	* src/nohup.c: Add GCC bug number to comment.
+
+	ls: remove unnecessary pragmas
+	* src/ls.c (decode_switches): Remove pragmas.  They are no longer
+	needed to pacify GCC 13.2.1 with --enable-gcc-checking, and there’s
+	little point keeping them around for older GCC versions.
+
+	maint: update GCC version comment
+	* src/copy.c: Update comment.
+
+	maint: document fix for GCC bug 109628
+	* src/fmt.c [14 <= __GNUC__]: Stop using pragma workaround,
+	as the GCC folks say the bug is no longer present in GCC 14.
+
+	maint: remove unneeded suggest-attributes pragmas
+	* gl/lib/fadvise.c: Remove pragma that works around GCC bug 83559
+	<https://gcc.gnu.org/bugzilla/show_bug.cgi?id=83559>.
+	This bug was fixed in GCC 9, and we needn’t worry about
+	--enable-gcc-warnings for compilers that old.
+	* src/test.c: Likewise.
+
+2024-02-17  Greg Wooledge  <greg@wooledge.org>
+
+	doc: fix typo in shred example
+	* doc/coreutils.texi (shred invocation): Fix the example
+	to correctly close file descriptor 3.
+	* THANKS.in: Remove old email since now recorded in repo history.
+	Reported at https://bugs.debian.org/1063837
+
+2024-02-07  Collin Funk  <collin.funk1@gmail.com>  (tiny change)
+
+	maint: avoid -Wshadow warning under clang
+	* src/env.c (parse_signal_action_params, parse_signal_block_params):
+	Rename OPTARG to ARG so that it does not conflict with OPTARG used by
+	getopt.
+
+2024-02-07  Pádraig Brady  <P@draigBrady.com>
+
+	build: fix od build on clang < 17
+	* configure.ac: Ensure the compiler can promote 16 bit floating point
+	types to float, before enabling that code in od.  This was an issue
+	with clang 16 at least.
+	* src/od.c: Adjust for the new defines.
+	* tests/od/od-float.sh: Likewise.  Also port to the dash shell,
+	whose inbuilt printf doesn't support hex escapes.
+
+2024-02-05  Pádraig Brady  <P@draigBrady.com>
+
+	od: support half precision floating point
+	Rely on compiler support for _Float16 and __bf16
+	to support -fH and -fB formats respectively.
+	I.e. IEEE 16 bit, and brain 16 bit floats respectively.
+	Modern GCC and LLVM compilers support both types.
+
+	clang-sect=half-precision-floating-point
+	https://gcc.gnu.org/onlinedocs/gcc/Half-Precision.html
+	https://clang.llvm.org/docs/LanguageExtensions.html#$clang-sect
+	https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0192r4.html
+	https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1467r9.html
+
+	This was tested on:
+	gcc 13, clang 17 x86 (Both types supported)
+	gcc 7 aarch64 (Only -fH supported)
+	gcc 13 ppc(be) (Neither supported. Both will be with GCC 14)
+
+	* src/od.c: Support -tf2 or -tfH to print IEEE 16 bit floating point,
+	or -tfB to print Brain 16 bit floating point.
+	* configure.ac: Check for _Float16 and __bf16 types.
+	* doc/coreutils.texi (od invocation): Mention the new -f types.
+	* tests/od/od-float.sh: Add test cases.
+	* NEWS: Mention the new feature.
+	Addresses https://bugs.gnu.org/68871
+
+2024-01-29  Paul Eggert  <eggert@cs.ucla.edu>
+
+	seq: say why not ‘x += step’
+	* src/seq.c (print_numbers): Add comment.
+
+2024-01-18  Pádraig Brady  <P@draigBrady.com>
+
+	doc: split -C: test and document a heap overflow
+	This was introduced in coreutils 9.2 through commit v9.1-184-g40bf1591b,
+	and was fixed in coreutils 9.5 through commit v9.4-111-gc4c5ed8f4.
+	This issue has been assigned CVE-2024-0684.
+
+	* NEWS: Mention the bug fix.
+	* tests/split/line-bytes.sh: Add a test case.
+	Reported by Valentin Metz.
+
+2024-01-17  Pádraig Brady  <P@draigBrady.com>
+
+	tests: make ulimit -v interact better with ASAN
+	ulimit -v is generally not supported with ASAN, giving errors like:
+	  "ReserveShadowMemoryRange failed while trying to map 0x... bytes.
+	   Perhaps you're using ulimit -v"
+
+	* tests/cp/link-heap.sh: Mention ASAN as a possible reason for skipping.
+	* tests/csplit/csplit-heap.sh: Likewise.
+	* tests/cut/cut-huge-range.sh: Likewise.
+	* tests/dd/no-allocate.sh: Likewise.
+	* tests/printf/printf-surprise.sh: Likewise.
+	* tests/rm/many-dir-entries-vs-OOM.sh: Likewise.
+	* tests/head/head-c.sh: Only skip the part of the test needing ulimit.
+	* tests/split/line-bytes.sh: Likewise.
+
+2024-01-17  Paul Eggert  <eggert@cs.ucla.edu>
+
+	split: do not shrink hold buffer
+	* src/split.c (line_bytes_split): Do not shrink hold buffer.
+	If it’s large for this batch it’s likely to be large for the next
+	batch, and for ‘split’ it’s not worth the complexity/CPU hassle to
+	shrink it.  Do not assume hold_size can be bufsize.
+
+2024-01-10  Sylvestre Ledru  <sylvestre@debian.org>
+
+	tests: ls: add a test to verify that '+' is added
+	* tests/ls/acl.sh: Add a new test.
+	* tests/local.mk: Reference the new test.
+
+2024-01-06  Samuel Tardieu  <sam@rfc1149.net>
+
+	maint: add attributes to two functions without side effects
+	* src/date.c (res_width): This function computes its result solely
+	from the value of its parameter and qualifies for the const attribute.
+	* src/tee.c (get_next_out): This function has no side effect and
+	qualifies for the pure attribute.
+	* THANKS.in: Remove duplicate now that author has a commit in the repo.
+
+	Those two functions were flagged by GCC 12.3.0,
+	though not by GCC 13.2.1.
+
+2024-01-01  Pádraig Brady  <P@draigBrady.com>
+
+	maint: update all copyright year number ranges
+	Update to latest gnulib with new copyright year.
+	Run "make update-copyright" and then...
+
+	* gnulib: Update included in this commit as copyright years
+	are the only change from the previous gnulib commit.
+	* tests/init.sh: Sync with gnulib to pick up copyright year.
+	* bootstrap: Manually update copyright year,
+	until we fully sync with gnulib at a later stage.
+	* tests/sample-test: Adjust to use the single most recent year.
+
+2024-01-01  Paul Eggert  <eggert@cs.ucla.edu>
+
+	maint: pacify recent clang better
+	* configure.ac: Clang now seems to have -Wformat-extra-args,
+	-Wimplicit-const-int-float-conversion, and
+	-Wtautological-constant-out-of-range-compare on by default,
+	so disable them even if --enable-gcc-warnings is not used.
+	Rely on Gnulib’s check for clang rather than rolling our own.
+
+	maint: pacify clang -Winclude-next-absolute-path
+	* gl/lib/xdectoint.c: Use #include <...> instead of #include "...".
+
+	build: update gnulib submodule to latest
+
+	ls: omit bad_cast
+	* src/ls.c (decode_switches): Declare some local vars to be
+	char const *, not char *, and omit unnecessary bad_cast calls.
+
+	split: omit bad_cast
+	* src/split.c (infile): Now char const *, not char *.
+	(main): Omit unnecessary bad_cast calls.
+
+2023-12-29  Pádraig Brady  <P@draigBrady.com>
+
+	sort: fix thousands grouping handling on single byte locales
+	* gl/lib/strnumcmp-in.h (numcompare): After commit v9.0-8-g6cafb122f,
+	we need to treat characters as signed to avoid invalid comparisons
+	between negative integers and unsigned characters.
+	* NEWS: Mention the bug fix.
+
+	tests: numfmt: fix test related to lower case 'k' SI unit
+	* tests/misc/numfmt.pl: Following on from v9.4-86-g615167cc4,
+	adjust this test accordingly.  This test was being skipped
+	on some systems, and so only noticed now.
+	Reported by Jim Meyering.
+
+	tests: run locale tests on more systems
+	* tests/misc/numfmt.pl: Determine the thousands grouping character
+	in use, rather than skipping locale tests when it's not a space.
+	For example fr_FR.UTF-8 uses "NARROW NO-BREAK SPACE" as the grouping
+	char on modern glibc systems at least.
+	* tests/sort/sort-h-thousands-sep.sh: Likewise.
+
+	maint: distribute new header from previous commit
+	* src/local.mk: Reference the new header, so it's distributed.
+
+2023-12-27  Pádraig Brady  <P@draigBrady.com>
+
+	maint: merge chgrp and chown sources
+	chown is a close superset of chgrp functionality,
+	so merge sources to avoid unwanted divergence in future.
+	This removes about 300 lines in chgrp.c
+
+	* build-aux/gen-single-binary.sh: Generate new rules for chgrp.
+	* cfg.mk: Exclude new wrappers.
+	* po/POTFILES.in: Remove chgrp.c
+	* src/chgrp.c: Remove.
+	* src/chown-chgrp.c: New wrapper.
+	* src/chown-chown.c: Likewise.
+	* src/chown.c (main): Prepend ':' for chgrp(1).
+	* src/chown.h: Define both operating modes.
+	(usage): Adjust depending on utility being called.
+	* src/coreutils-chgrp.c: Likewise.
+	* src/local.mk: Reference new wrappers.
+
+2023-12-19  Christian Göttsche  <cgzones@googlemail.com>
+
+	copy,install: avoid unnecessary security context translations
+	Do not perform SELinux context translation for operations not involving
+	user input or output.  Context translation converts MCS/MLS labels into
+	human readable form, which is useful for user facing applications like
+	ls(1) or the --context=CTX argument of cp(1).
+
+	* src/copy.c (set_process_security_ctx): Use raw selinux variants.
+	* src/install.c (need_copy): Likewise.
+	(setdefaultfilecon): Likewise.
+	* src/selinux.c (computecon): Likewise.
+	(defaultcon): Likewise.
+	* tests/cp/no-ctx.sh: Add raw variants to preload lib.
+	* NEWS: Mention the improvement.
+
+2023-12-19  Pádraig Brady  <P@draigBrady.com>
+
+	build: update gnulib to latest
+	* gnulib: Primarily to get raw selinux wrappers
+
+2023-12-17  Pádraig Brady  <P@draigBrady.com>
+
+	maint: avoid false positive warning with newer gcc
+	* src/pr.c (read_line): GCC 13.2.1 can't discern that CHARS
+	is not used with '\n', so avoid the -Werror=maybe-uninitialized
+	issue in dev builds.
+
+	doc: cp --no-clobber: improve documentation
+	* doc/coreutils.texi (cp invocation): Reference the related --update
+	option, like we had already done in mv invocation.
+	* src/cp.c (usage): State clearly what --no-clobber does,
+	indicating it's protection focused, rather than being update focused.
+
+2023-12-15  Pádraig Brady  <P@draigBrady.com>
+
+	chgrp: add --from parameter similar to chown
+	* doc/coreutils.texi (chown invocation): Convert --from option
+	description to a macro and call from ...
+	(chgrp description): ... here.
+	* src/chown-core.h (emit_from_option_description): A new function
+	refactored from ...
+	* src/chown.c (usage): ... here, and called from ...
+	* src/chgrp.c (usage): ... here.
+	(main): Accept the --from option as chown(1) does.
+	* po/POTFILES.in: Add chown-core.h as now translated.
+	* tests/chown/basic.sh: Decouple the root user from id 0.
+	* tests/chgrp/from.sh: A new test largely based on chown/basic.sh.
+	* tests/local.mk: Reference the new test.
+	* NEWS: Mention the new feature.
+	Suggested by Ed Neville.
+
+2023-12-11  Pádraig Brady  <P@draigBrady.com>
+
+	maint: remove obsolete AC_PROG_GCC_TRADITIONAL
+	* configure.ac: Remove obsolete macro call.
+	Recent autoconf warns that it is obsolete.
+	AC_PROG_CPP sets up the -traditional-cpp option if required.
+	GCC ignores -traditional since commit f458d1d5 (2002).
+	Fixes https://bugs.gnu.org/67756
+
+2023-12-11  Pádraig Brady  <P@draigBrady.com>
+
+	doc: ls: fix regression in -f description
+	The description of -f regressed in coreutils 9.0
+
+	* doc/coreutils.texi (ls invocation): Detail which options
+	are enabled/disabled with -f.
+	* src/ls.c (usage): Likewise.
+	(decode_switches): Update comments.
+	Fixes https://bugs.gnu.org/67765
+
+2023-12-11  Pádraig Brady  <P@draigBrady.com>
+
+	maint: add list/obstack.h to .gitignore
+	Following recent gnulib update
+
+2023-12-10  Pádraig Brady  <P@draigBrady.com>
+
+	build: update gnulib submodule to latest
+	* bootstrap: Copy from latest Gnulib,
+	to fix --bootstrap-sync with other options.
+
+2023-12-06  Pádraig Brady  <P@draigBrady.com>
+
+	doc: touch: clarify --time description in man page
+	* src/touch.c (usage): Reorganise the description to be similar to
+	the format used for the ls --time description, which formats better
+	when converted to a man page.  Also separate the description
+	to allow for more granular translations.
+	Fixes https://bugs.gnu.org/67656
+
+2023-12-01  dann frazier  <dann.frazier@canonical.com>
+
+	tail: fix tailing sysfs files where PAGE_SIZE > BUFSIZ
+	* src/tail.c (file_lines): Ensure we use a buffer size >= PAGE_SIZE when
+	searching backwards to avoid seeking within a file,
+	which on sysfs files is accepted but also returns no data.
+	* tests/tail/tail-sysfs.sh: Add a new test.
+	* tests/local.mk: Reference the new test.
+	* NEWS: Mention the bug fix.
+	Fixes https://bugs.gnu.org/67490
+
+2023-11-27  Pádraig Brady  <P@draigBrady.com>
+
+	numfmt: support lowercase 'k' for Kilo and Kibi
+	For consistency with the "SI" standard, and with other coreutils
+	which output a lowercase 'k' in "SI" mode.
+
+	* src/numfmt.c (suffix_power): Treat 'k' like 'K' on input.
+	(double_to_human): Output lowercase 'k' in SI mode.
+	(usage): Adjust accordingly.
+	* doc/coreutils.texi: Mention 'k' accepted, and printed in SI mode.
+	* tests/misc/numfmt.pl: Adjust accordingly.
+	* NEWS: Mention the change in behavior.
+	Fixes https://bugs.gnu.org/47103
+
+2023-11-16  Paul Eggert  <eggert@cs.ucla.edu>
+
+	uniq: fix bug with -w in multibyte locales
+	-w counted bytes not characters, which is wrong in multibyte locales.
+	This bug exists even in Fedora, which is why the recently-added
+	test cases from Fedora didn’t catch it.
+	* src/uniq.c (find_field): New arg PLEN.  All callers changed.
+	Compute length of field correctly in multi-byte locales.
+	(different): Don’t worry about check_chars; find_field now does that.
+	* tests/uniq/uniq.pl: Test for this bug.
+
+	tests: omit inapplicable test code
+	* tests/misc/join.pl, tests/uniq/uniq.pl:
+	Remove test for "invalid byte, character or field list" message
+	that is not generated.
+
+	uniq: change macro to function
+	* src/uniq.c (swap_lines): New static function, replacing
+	the old SWAP_LINES macro.  These days this is just as fast.
+	All uses changed.
+
+	uniq: prefer static init
+	* src/uniq.c (skip_fields, skip_chars, check_chars, count_occurrences)
+	(output_unique, output_first_repeated, output_later_repeated)
+	(delimit_groups): Initialize statically, rather than in ‘main’.
+	This shrinks the executable a bit.
+
+	uniq: simplify and fix unlikely bug by using bool
+	* src/uniq.c (enum countmode): Remove this type.
+	(count_occurrences): New static var, replacing the old countmode,
+	and of type boolean instead of a two-value enum type that was
+	confusing (and which caused a hard-to-test bug when the count
+	exceeded INTMAX_MAX - 1).  All uses changed.
+
+2023-11-15  Paul Eggert  <eggert@cs.ucla.edu>
+
+	uniq: prefer signed integers
+	* src/uniq.c (skip_fields, skip_chars, check_chars, size_opt)
+	(find_field, different, writeline, check_file, main):
+	Prefer signed to unsigned integer types, since this allows
+	for better runtime checking with -fsanitize=undefined.
+
+	maint: DECIMAL_DIGIT_ACCUMULATE uses stdckdint.h
+	* src/system.h: Include <stdckdint.h>, since the new
+	DECIMAL_DIGIT_ACCUMULATE uses it.
+	Do not include stdckdint.h from files that also include system.h.
+	(DECIMAL_DIGIT_ACCUMULATE): Omit last arg, which is no longer needed.
+	Reimplement by using C23-style stdckdint.h’s ckd_mul and ckd_add,
+	as that’s more standard and is more likely to generate better code.
+
+2023-11-11  Paul Eggert  <eggert@cs.ucla.edu>
+
+	pinky: fix string size calculation
+	* src/pinky.c (count_ampersands): Simplify and return idx_t.
+	(create_fullname): Compute proper destination string size,
+	basically, by adding (ulen - 1) * ampersands rather than ulen *
+	(ampersands - 1).  Problem found on CHERI-64.
+
+	maint: port randread to FreeBSD 14
+	* gl/lib/randread.c (POINTER_IS_ALIGNED): Rename from
+	ALIGNED_POINTER to avoid a collision with <machine/param.h>
+	on FreeBSD 14.
+
+	build: update gnulib submodule to latest
+
+2023-11-03  Pádraig Brady  <P@draigBrady.com>
+
+	ls: fix recent regression in size alignment
+	* src/ls.c (print_long_format): Use correct column width,
+	introduced due to a copy/paste error in commit v9.4-2-gcbb6dfec5
+	* tests/ls/size-align.sh: Add a test.
+	* tests/local.mk: Reference the new test.
+	Fixes https://bugs.gnu.org/66919
+
+2023-10-30  Paul Eggert  <eggert@cs.ucla.edu>
+
+	join: fix recently introduced NUL bug
+	* src/join.c (xfields): Simplify and fix bug with fields
+	that start with a NUL byte when -t is not used.
+	* tests/misc/join-utf8.sh: Also test when -t is not used,
+	and when a field starts with NUL.
+
+	maint: pacify ‘make syntax-check’
+	* tests/misc/join-utf8.sh: Omit fail=0.
+	Fix framework_failure_ typo.
+	* tests/misc/join.pl: Change ` to '.
+
+	maint: copy join, uniq tests from Fedora
+	* tests/misc/join.pl, tests/uniq/uniq.pl:
+	Copy from Fedora 39.  This adds more multi-byte tests.
+
+	join,uniq: support multi-byte separators
+	* NEWS: Mention this.
+	* bootstrap.conf (gnulib_modules): Remove cu-ctype, as this module
+	is now more trouble than it’s worth.  All uses removed.
+	Add skipchars.
+	* gl/lib/cu-ctype.c, gl/lib/cu-ctype.h, gl/modules/cu-ctype:
+	Remove.
+	* gl/lib/skipchars.c, gl/lib/skipchars.h, gl/modules/skipchars:
+	* tests/misc/join-utf8.sh:
+	New files.
+	* src/join.c: Include skipchars.h and mcel.h instead of cu-ctype.h.
+	(tab): Now mcel_t, not int.  All uses changed.
+	(output_separator, output_seplen): New static vars.
+	(eq_tab, newline_or_blank, comma_or_blank): New functions.
+	(xfields, prfields, prjoin, add_field_list, main):
+	Support multi-byte characters.
+	* src/numfmt.c: Include ctype.h, skipchars.h.
+	Do not include cu-ctype.h.
+	(newline_or_blank): New function.
+	(next_field): Support multi-byte characters.
+	* src/sort.c: Include ctype.h instead of cu-ctype.h.
+	(inittables): Open-code field_sep since it no longer exists.
+	‘sort’ is not multi-byte safe yet, but when it is this code
+	will need revamping anyway.
+	* src/uniq.c: Include mcel.h and skipchars.h instead of cu-ctype.h.
+	(newline_or_blank): New function.
+	(find_field): Support multi-byte characters.
+	* tests/local.mk (all_tests): Add tests/misc/join-utf8.sh
+
+	test: allow non-blank white space in numbers
+	* src/test.c (find_int): Use isspace, not isblank,
+	for compatibility with how strtol works, which
+	is how most other shells do this.
+
+	stdbuf: port to oddball toupper
+	* src/stdbuf.c: Do not include ctype.h.
+	(set_libstdbuf_options): Use c_toupper, not toupper,
+	since the C locale is intended here.
+
+	dircolors: assume C-locale spaces
+	* src/dircolors.c: Include c-ctype.h, not ctype.h.
+	(parse_line): Use c_isspace, not isspace, as the .dircolors
+	file format (which does not seem to be documented!) appears
+	to be ASCII.
+
+	maint: port to oddball tolower
+	* src/digest.c (hex_equal): Work even in oddball locales
+	where tolower does not work as expected on ASCII letters.
+
+2023-10-30  Paul Eggert  <eggert@cs.ucla.edu>
+
+	maint: include ctype.h selectively
+	Include ctype.h only in files that need it.  Many of its uses
+	are incorrect, as they assume single-byte locales.  The idea is
+	to remove the incorrect uses later, when there is time.
+	* src/chroot.c, src/csplit.c, src/dd.c, src/digest.c, src/dircolors.c:
+	* src/expand-common.c, src/expand.c, src/fmt.c, src/fold.c, src/ls.c:
+	* src/od.c, src/pinky.c, src/pr.c, src/ptx.c, src/seq.c:
+	* src/set-fields.c, src/split.c, src/stdbuf.c, src/test.c:
+	* src/tr.c, src/truncate.c, src/unexpand.c, src/wc.c:
+	Include ctype.h.
+	* src/system.h: Do not include ctype.h.
+
+	include ctype.h.o
+
+2023-10-30  Paul Eggert  <eggert@cs.ucla.edu>
+
+	maint: move field_sep into separate module
+	This is so that we don’t need to have every source file
+	include ctype.h.
+	* bootstrap.conf (gnulib_modules): Add cu-ctype.
+	* gl/lib/cu-ctype.c, gl/lib/cu-ctype.h, gl/modules/cu-ctype:
+	New files.
+	* src/join.c, src/numfmt.c, src/sort.c, src/uniq.c:
+	Include cu-ctype.h, for field_sep.
+	* src/system.h (field_sep): Remove; now supplied by cu-ctype.
+
+	digest: omit unnecessary b2sum includes
+	* src/blake2/b2sum.c: Do not include string.h, errno.h,
+	ctype.h, unistd.h, getopt.h.
+
+	maint: prefer c_isxdigit when that is the intent
+	* src/digest.c (valid_digits, split_3):
+	* src/echo.c (main):
+	* src/printf.c (print_esc):
+	* src/ptx.c (unescape_string):
+	* src/stat.c (print_it):
+	When the code is supposed to support only POSIX-locale hex digits,
+	use c_isxdigit rather than isxdigit.  Include c-ctype.h as needed.
+	This defends against oddball locales where isxdigit != c_isxdigit.
+
+2023-10-28  Pádraig Brady  <P@draigBrady.com>
+
+	maint: fix syntax check issue
+	* src/basenc.c: Fix preprocessor indentation.
+
+2023-10-28  Pádraig Brady  <P@draigBrady.com>
+
+	base32,base64: disallow non-canonical encodings
+	This will make decoding more resilient to corruption
+	whether due to transmission errors or nefarious adjustment.
+	See https://eprint.iacr.org/2022/361.pdf
+
+	* gnulib: Update to commit 3f463202bd enforcing canonical encoding.
+	* tests/basenc/base64.pl: Add test cases, and adjust existing cases.
+	* NEWS: Mention the change in behavior.
+
+2023-10-25  Paul Eggert  <eggert@cs.ucla.edu>
+
+	basenc: fix unlikely locale issue; tune
+	This sped up ‘basenc -d --base16’ by 60% on my old platform,
+	AMD Phenom II X4 910e, Fedora 38.
+	* src/basenc.c (struct base16_decode_context): Simplify by
+	omitting have_nibble.  ‘nibble’ is now negative if it’s missing.
+	All uses changed.
+	(B16): New macro, inspired by ../lib/base64.c.
+	(base16_to_int): New static var, likewise.
+	(isubase16): Reimplement using base16_to_int, since isxdigit is
+	not guaranteed to succeed on the chars we want when the locale is
+	oddball.
+	(base16_decode_ctx): Tune by using base16_to_int and by
+
+2023-10-25  Paul Eggert  <eggert@cs.ucla.edu>
+
+	basenc: tweak checks to use unsigned char
+	This tends to generate better code, at least on x86-64,
+	because callers are just as fast and callees can avoid a conversion.
+	* src/basenc.c: The following renamings also change the arg type
+	from char to unsigned char.  All uses changed.
+	(isubase): Rename from isbase.
+	(isubase64url): Rename from isbase64url.
+	(isubase32hex): Rename from isbase32hex.
+	(isubase16): Rename from isbase16.
+	(isuz85): Rename from isz85.
+	(isubase2): Rename from isbase2.
+
+	2023-10-24  Paul Eggert  <eggert@cs.ucla.edu>
+
+	* src/basenc.c (struct base16_decode_context):
+	Simplify by storing -1 for missing nibbles.  All uses changed.
+
+2023-10-25  Paul Eggert  <eggert@cs.ucla.edu>
+
+	build: update gnulib submodule to latest
+
+2023-10-25  Pádraig Brady  <P@draigBrady.com>
+
+	basenc: --base16: also allow lower case with --ignore-garbage
+	* src/basenc.c (isbase16): Also return true for lower case.
+	* tests/basenc/basenc.pl: Add a test case.
+	Reported by Paul Eggert.
+
+2023-10-23  Pádraig Brady  <P@draigBrady.com>
+
+	basenc: --base16: support lower case hex digits
+	* src/basenc.c (base16_decode_ctx): Convert to uppercase
+	before converting from hex.
+	* tests/basenc/basenc.pl: Add a test case.
+	* NEWS: Mention the change in behavior.
+	Addresses https://bugs.gnu.org/66698
+
+	doc: fix RFC references
+	* doc/coreutils.texi: Adjust RFC URLs as the original
+	now give 404 errors.
+
+2023-10-06  Pádraig Brady  <P@draigBrady.com>
+
+	tests: move all basenc tests to their own directory
+	* tests/misc/base64.pl: Move to tests/basenc/base64.pl
+	* tests/misc/basenc.pl: Move to tests/basenc/basenc.pl
+	* tests/local.mk: Adjust accordingly
+
+2023-10-06  Pádraig Brady  <P@draigBrady.com>
+
+	basenc: auto pad base32 and base64 inputs when decoding
+	Padding of encoded data is useful in cases where
+	base64 encoded data is concatenated / streamed.
+	I.e. where there are padding chars _within_ the stream.
+	In other cases padding is optional and can be inferred.
+	Note we continue to treat partial padding as invalid,
+	as that would be indicative of truncation.
+
+	* src/basenc.c (do_decode): Auto pad the end of the input.
+	* NEWS: Mention the change in behavior.
+	* tests/misc/base64.pl: Adjust to not fail for missing padding.
+	Addresses https://bugs.gnu.org/66265
+
+2023-09-29  Paul Eggert  <eggert@cs.ucla.edu>
+
+	sort: improve --help
+	Problem reported by Jorge Stolfi (bug#66253).
+	* src/sort.c (usage): Suggest looking at the manual for -n details.
+
+2023-09-25  Pádraig Brady  <P@draigBrady.com>
+
+	doc: rm --help: mention that '.' or '..' are rejected
+	* src/rm.c (usage): State that '.' or '..' are rejected.
+
+2023-09-24  Paul Eggert  <eggert@cs.ucla.edu>
+
+	wc: pacify ‘make syntax-check’
+	* src/wc_avx2.c (wc_lines_avx2): Explicitly make it ‘extern’.
+	Not sure why this is needed.
+
+	wc: distribute src/wc.h
+	* src/local.mk (noinst_HEADERS): Add src/wc.h.
+
+	wc: goto considered harmful
+	* src/wc.c: Do not include assure.h.  Replace the only
+	use of ‘assure’ with ‘unreachable’ which is good enough.
+	(wc, main): Remove labels and gotos.  This doesn’t affect
+	performance in any way I can measure, and makes the code
+	a bit easier to follow.
+
+	wc: prefer signed integers
+	Prefer signed to unsigned integers, to make it easier to catch
+	integer overflow errors.
+	* src/wc.c: Do not include safe-read.
+	(total_lines_overflow, total_words_overflow, total_chars_overflow)
+	(total_bytes_overflow): Now bool, not uintmax_t.  All uses changed.
+	(max_line_length): Now intmax_t, not uintmax_t.  All uses changed.
+	The total_... vars are still uintmax_t because overflow into them
+	is checked.
+	(page_size): Now idx_t, not size_t.
+	(wc_lines, wc, get_input_fstatus, compute_number_width, main):
+	Prefer signed to unsigned ints where either should do.
+	(wc_lines, wc): Use read rather than safe_read, since we don’t
+	need safe_read’s checks for huge buffers.
+	(wc): Redo call to mbrtoc32 to lessen the number of comparisons
+	against its returned value.  Do this partly by keeping a pointer
+	to the end of the buffer rather than a count.  Simplify
+	overflow-checking code.
+	(compute_number_width): Check for integer overflow.
+	Don’t assume size_t fits into unsigned long.
+	* src/wc.h (struct wc_lines): Prefer signed integers.
+	* src/wc_avx2.c: Do not include safe-read.h.
+	(wc_lines_avx2): Prefer signed integers.  Use read, not safe_read.
+
+	wc: improve avx2 API
+	* src/wc.c: Use "#include <...>" for files not in the current dir.
+	Include "wc.h" instead of declaring wc_lines_avx2 by hand.
+	(wc_lines): New API, with no file name (no longer needed) and
+	with a return struct rather than arg pointers.  All uses changed.
+	Use avx2_supported directly instead of using a function pointer.
+	Exploit C99-style declarations after statements.
+	Multiply by 15 rather than dividing; it’s faster and more accurate
+	and cannot overflow here.
+	(wc): Simplify based on wc_lines API change.
+	* src/wc.h: New file.
+	* src/wc_avx2.c: Include it, to check API better.
+	(wc_lines_avx2): Use new API.  All uses changed.  Exploit C99.
+	Make locals more local.
+
+2023-09-23  Paul Eggert  <eggert@cs.ucla.edu>
+
+	factor,tail: avoid quadratic reallocation
+	* src/factor.c (struct mp_factors): New member nalloc.
+	(mp_factor_init): Initialize it.
+	* src/factor.c (mp_factor_insert):
+	* src/tail.c (parse_options): Use xpalloc to avoid quadratic
+	worst-case behavior on reallocation.
+	* src/tail.c (pids_alloc): New static var.
+
+	doc: mention Unicode exceptions for wc
+
+	wc: simplify by removing SUPPORT_OLD_MBRTOWC
+	* src/wc.c (SUPPORT_OLD_MBRTOWC): Remove.  All uses removed.
+	(wc): Simplify by assuming C99-or-later behavior for mbrtoc32,
+	which after all is a C11 API.  Fix the !SUPPORT_OLD_MBRTOWC
+	code, which evidently was never tested seriously.
+
+	wc: 3× speedup in C locale
+	The 3× speedup was measured by invoking 'wc $(find * -type f)'
+	on the coreutils sources etc. on an Ubuntu 23.04 x86-64.
+	These changes also speed up wc 20% in UTF-8 locales.
+	* src/wc.c (wc_isprint, wc_isspace): New static vars.
+	(wc): Use them for speed.
+	(main): Initialize them if needed.
+	(isnbspace): Remove; no longer used.
+
+	wc: treat encoding errors as non white space
+	* src/wc.c (wc): Treat encoding errors like non white space
+	characters.
+
+	wc: fix word count bug
+	* bootstrap.conf (gnulib_modules): Remove c32isprint.
+	* src/wc.c (wc): Consider all non-white-space characters
+	to be word constituents, even if they are not printable.
+	POSIX requires this, and it is what BSD does.
+	Partly do this by simplifying the check for a word,
+	by counting word starts rather than word ends.
+	* tests/wc/wc.pl: Test for the bug.
+
+	maint: omit some unused function tests
+	* m4/jm-macros.m4: Do not check for ftruncate, iswspace,
+	mkfifo, mbrlen, sysctl.  Coreutils no longer uses the
+	corresponding HAVE_* macros, typically because Gnulib
+	handles them now.
+	* src/wc.c (iswspace): Remove; unused.
+
+	sort: not a special case for mbrtowc
+	* configure.ac (GNULIB_MBRTOWC_SINGLE_THREAD): Define.
+
+	maint: prefer char32_t to wchar_t
+	This should work better on non-glibc platforms that don’t
+	use Unicode for wchar_t.  However, POSIX appears to prohibit
+	this for printf.c so leave that alone.
+	* bootstrap.conf (gnulib_modules): Add btoc32, c32iscntrl,
+	c32isprint, c32isspace, c32width, mbrtoc32.  Remove btoc, wcwidth.
+	* src/df.c, src/ls.c, src/wc.c:
+	Include uchar.h instead of wchar.h and wctype.h.
+	* src/df.c (replace_invalid_chars):
+	* src/ls.c (quote_name_buf):
+	* src/wc.c (isnbspace, wc):
+	Use char32_t instead of wchar_t.
+
+	wc: simplify #if MB_LEN_MAX
+	* src/wc.c: Don’t have special #ifs for platforms where
+	MB_LEN_MAX is 1.  On these platforms, MB_CUR_MAX is 1 as well,
+	so the compiler should optimize away all multi-byte code.
+
+	wc: avoid undefined conversion state
+	* src/wc.c (wc): When mbrtowc returns (size_t) -1, zero the
+	conversion state, since POSIX says it’s undefined.
+
+	maint: use mbszero
+	* bootstrap.conf (gnulib_modules): Add mbszero.
+	* src/df.c (replace_invalid_chars):
+	* src/ls.c (quote_name_buf):
+	* src/pathchk.c (portable_chars_only):
+	* src/printf.c (STRTOX):
+	* src/wc.c (wc):
+	Prefer mbszero to clearing an mbstate_t by hand.
+
+	maint: prefer mcel
+	This causes Gnulib code to also use mcel, which is more consistent.
+	* bootstrap.conf (avoided_gnulib_modules): Avoid mbuiter
+	and mbuiterf, since we can now just use mcel.  This avoids
+	the need to ship and compile mbchar and these modules.
+	(gnulib_modules): Change mcel to mcel-prefer.
+
+	wc: stop worrying about EBCDIC, shift-JIS, etc
+	* src/wc.c: Do not include mbchar.h.
+	(wc): Check for ASCII characters instead of using is_basic.
+	Other parts of Gnulib and coreutils already assume the encoding
+	is upward compatible with ASCII, and the old code wouldn’t
+	have worked anyway with shift-JIS.
+
+	expr: use mcel
+	The mcel API is simpler and corresponds more closely to how
+	Emacs etc. behave when the input has encoding errors,
+	since it treats each encoding-error byte separately.
+	* bootstrap.conf (gnulib_modules): Add mcel.
+	* src/expr.c: Include mcel.h instead of mbuiter.h.
+	(mbs_logical_cspn, mbs_logical_substr, mbs_offset_to_chars):
+	Use mcel API.
+	(mbs_logical_substr): Use ximemdup0 so as not to waste memory in
+	the result, fixing a FIXME.
+
+	build: update gnulib submodule to latest
+
+2023-09-21  Pádraig Brady  <P@draigBrady.com>
+
+	build: avoid build failures on gcc <= 10, or clang
+	On gcc 10 the following build failure occurs:
+	  "error: a label can only be part of a statement
+	   and a declaration is not a statement"
+	This is because the current code is non standards conforming,
+	but GCC >= 11 will compile it (even with the -Wpedantic option).
+	This issue is tracked for GCC at:
+	https://gcc.gnu.org/bugzilla/show_bug.cgi?id=111526
+
+	* src/tail.c (parse_options): Avoid a declaration after label,
+	by using a surrounding block.
+
+2023-09-20  Stephen Kitt  <skitt@redhat.com>
+
+	tail: allow multiple PIDs
+	tail can watch multiple files, but currently only a single writer. It
+	can be useful to watch files from multiple writers, or even processes
+	not directly related to the files (e.g. watch log files written by a
+	server process, for the duration of a test driven by a separate
+	client).
+
+	* src/tail.c (writers_are_dead): New function.
+	(tail_forever): Use it to wait for writers.
+	(tail_forever_inotify): As above.
+	(parse_options): Manage --pid options in an array.
+	* doc/coreutils.texi: Update documentation.
+	* tests/tail/pid.sh: Add a variant with two PIDs.
+	* News: Mention the new feature.
+
+2023-09-17  Sylvestre Ledru  <sylvestre@debian.org>
+
+	ls: --dired now implies long format with hyperlinks disabled
+	Currently --dired is silently ignored
+	with conflicting output formats
+
+	* src/ls.c (decode_switches): Set default format and hyperlink mode
+	when the --dired option is specified.
+	* tests/ls/dired.sh: Check that formats are implied / overridden.
+	* NEWS: Mention the change in behavior.
+	* doc/coreutils.texi (ls invocation): Adjust --dired description.
+
+2023-09-15  Sylvestre Ledru  <sylvestre@debian.org>
+
+	tests: improve ls --dired testing
+	* tests/ls/dired.sh: Verify ls --dired output against varying offsets.
+
+2023-09-13  Pádraig Brady  <P@draigBrady.com>
+
+	maint: use C99 int size specifiers rather than PRI.MAX defines
+	Following on from commit v9.3-128-gf31229ebd
+	replace all uses of the PRI.MAX portability defines
+	with C99 size specifiers %z, %j, and %t.
+
+2023-09-11  Pádraig Brady  <P@draigBrady.com>
+
+	doc: add subsections for cksum nodes
+	* doc/coreutils.texi: Specify each of the cksum nodes as a subsection,
+	so that the docs are organised appropriately in the pdf and html manual.
+
+2023-09-09  Paul Eggert  <eggert@cs.ucla.edu>
+
+	cp,mv,install: add copy_internal comment
+	* src/copy.c (copy_internal): Add comment about
+	some particularly tricky logic.
+
+	cp: avoid needless unlinkat after fstatat ELOOP
+	* src/copy.c (copy_internal): When cp -f's fstatat fails on the
+	destination with ELOOP, report an error immediately when fstatat
+	used AT_SYMLINK_NOFOLLOW, as the later unlinkat would fail too.
+
+	cp,mv,install: minor copy_internal refactoring
+	* src/copy.c (copy_internal): Redo to avoid need for calculating
+	fstatat_flags when not needed.  This is for clarity, not speed.
+
+	cp,mv,install: fix comment punctuation
+	* src/copy.h: Fix punctuation in comment.
+
+	cp,mv,install: simplify copy_internal
+	* src/copy.c (copy_internal): Simplify.
+
+2023-09-05  Paul Eggert  <eggert@cs.ucla.edu>
+
+	maint: prefer psame_inode, PSAME_INODE, STP_*
+	Prefer psame_inode, PSAME_INODE, STP_NBLOCKS, and STP_BLKSIZE,
+	which take addresses of objects, to their counterparts that
+	take the whole objects.  In some cases the whole objects might
+	not be initialized, which would be undefined behavior strictly
+	speaking.
+	* gl/lib/root-dev-ino.h (ROOT_DEV_INO_CHECK):
+	* src/cp-hash.c (src_to_dest_compare):
+	* src/ls.c (dev_ino_compare):
+	* src/pwd.c (robust_getcwd):
+	Prefer PSAME_INODE to SAME_INODE.
+	* src/chown-core.c (restricted_chown):
+	* src/copy.c (copy_reg, same_file_ok, source_is_dst_backup)
+	(copy_internal):
+	* src/ln.c (do_link):
+	* src/pwd.c (logical_getcwd):
+	* src/sort.c (avoid_trashing_input):
+	* src/split.c (create):
+	* src/stat.c (find_bind_mount):
+	Prefer psame_inode to SAME_INODE.
+	* src/copy.c (infer_scantype):
+	* src/du.c (process_file):
+	* src/ls.c (gobble_file, print_long_format)
+	(print_file_name_and_frills, length_of_file_name_and_frills):
+	* src/stat.c (print_stat):
+	Prefer STP_NBLOCKS to ST_NBLOCKS.
+	* src/copy.c (copy_reg):
+	* src/head.c (elide_tail_bytes_file, elide_tail_lines_file):
+	* src/ioblksize.h (io_blksize):
+	* src/od.c (skip):
+	* src/shred.c (do_wipefd):
+	* src/stat.c (print_stat):
+	* src/tail.c (tail_bytes):
+	* src/truncate.c (do_ftruncate):
+	* src/wc.c (wc):
+	Prefer STP_BLKSIZE to ST_BLKSIZE.
+	* src/ioblksize.h (io_blksize):
+	Arg is now struct stat const *, not struct stat.  All callers changed.
+
+	build: update gnulib submodule to latest
+
+	cp,mv,install: a bit more up-to-date source stat
+	* src/copy.c (copy_reg): Replace caller’s source status
+	with the more recent version.
+
+2023-09-02  Paul Eggert  <eggert@cs.ucla.edu>
+
+	cp,mv,install: fix chmod on Linux CIFS
+	This bug occurs only when temporarily setting the mode to the
+	intersection of old and new modes when changing ownership.
+	* src/copy.c (owner_failure_ok): Treat EACCES like EPERM.
+
+2023-09-01  Paul Eggert  <eggert@cs.ucla.edu>
+
+	cp,mv,install: fix chown on Linux CIFS
+	* src/copy.c (chown_failure_ok): Also treat EACCES as OK.
+
+	maint: simplify set_owner
+	* src/copy.c (HAVE_FCHOWN, fchown): Remove.
+	(fchmod_or_lchmod): Move up.
+	(fchown_or_lchown): New function.
+	(set_owner): Use it to simplify.
+
+	chown: port to mingw and MSVC 14
+	* src/chown-core.c (restricted_chown): Don’t assume fchown exists.
+	The Gnulib doc says that nowadays this is needed only for
+	ports to mingw and MSVC 14, but it’s an easy port so let’s do it.
+
+2023-08-31  Pádraig Brady  <P@draigBrady.com>
+
+	maint: avoid syntax check failure
+	* tests/misc/numfmt.pl: Keep lines <= 80 chars.
+
+2023-08-31  Paul Eggert  <eggert@cs.ucla.edu>
+
+	maint: Gnulib module gc
+	Remove Gnulib modules that coreutils code no longer use directly.
+	Some of these are used indirectly, but gnulib-tool should do that.
+	* bootstrap.conf (gnulib_modules): Remove calloc-gnu, cloexec,
+	getgroups, getpass-gnu, getugroups, getusershell, gnu-mae,
+	group-member, lchown, mgetgroups, netinet_in, readlink,
+	realloc-gnu, rename, rpmatch, stpncpy, tzset, wchar-single,
+	wcswidth.
+
+	maint: assume non-rare encodings
+	* configure.ac (GNULIB_WCHAR_SINGLE_LOCALE): Define.
+	This can improve performance, while dropping support for
+	rare encodings on non-GNU platforms.  Nowadays these encodings
+	are typically not worth the hassle.
+
+	maint: tune for single thread & locale
+	* configure.ac (GNULIB_EXCLUDE_SINGLE_THREAD)
+	(GNULIB_REGEX_SINGLE_THREAD, GNULIB_WCHAR_SINGLE_LOCALE):
+	Define.
+
+	maint: regularize struct initializers
+	* src/chmod.c (process_file):
+	* src/df.c (replace_invalid_chars):
+	* src/iopoll.c (iopoll_internal):
+	* src/ls.c (quote_name_buf):
+	* src/pathchk.c (portable_chars_only):
+	* src/printf.c (STRTOX):
+	* src/shred.c (main):
+	* src/stat.c (neg_to_zero, do_stat):
+	* src/timeout.c (settimeout):
+	* src/tr.c (card_of_complement):
+	* src/wc.c (wc):
+	Prefer ‘{0}’ to initialize everything to zero.
+	* src/stat.c (do_stat):
+	* src/timeout.c (settimeout):
+	Do not assume the usual order for struct members,
+	as POSIX does not guarantee this.
+
+	maint: rely on Gnulib fdatasync
+	* m4/jm-macros.m4: Remove fdatasync-related code,
+	as Gnulib now does this.
+	* src/dd.c (fdatasync) [!HAVE_FDATASYNC]:
+	* src/shred.c (dosync) [!HAVE_FDATASYNC]: Rely on Gnulib fdatasync.
+
+	maint: use modern Gnulib LIB_ macros
+	* src/local.mk (src_timeout_LDADD, src_dd_LDADD)
+	(src_shred_LDADD, src_sync_LDADD): Use TIMER_TIME_LIB
+	and FDATASYNC_LIB instead of LIB_TIMER_TIME and
+	LIB_FDATASYNC.
+
+	kill: rely on Gnulib strsignal
+	Omit checks no longer needed now that we use strsignal.
+	* configure.ac: Do not check for strsignal-related decls.
+	* src/kill.c (sys_siglist, strsignal): Remove.
+
+2023-08-30  Paul Eggert  <eggert@cs.ucla.edu>
+
+	maint: remove rename macro
+	* src/copy.h (rename) [RENAME_TRAILING_SLASH_BUG]:
+	Remove: unused, now that Gnulib takes care of this.
+
+	maint: remove need for mbsalign
+	This simplifies memory allocation a bit, and removes an arbitrary
+	limitation from numfmt, which formerly limited cell output to 127
+	bytes.
+	* bootstrap.conf (gnulib_modules): Remove mbsalign, strncat.
+	Add strnlen (the code already used strnlen directly, and we were
+	saved only because Gnulib used the module indirectly)
+	* gl/lib/mbsalign.c, gl/lib/mbsalign.h, gl/modules/mbsalign:
+	* gl/modules/mbsalign-tests, gl/tests/test-mbsalign.c: Remove.
+	* src/df.c, src/ls.c: Do not include mbsalign.h.
+	(MBSWIDTH_FLAGS): New constant, now used for all
+	mbswidth calls.  All callers changed to check for -1 return.
+	* src/df.c (struct field_data_t): ‘width’ is now int not size_t,
+	since mbswidth can’t do widths greater than INT_MAX anyway.
+	Replace ‘align’ with ‘align_right’.  All uses changed.
+	(print_table): Redo to avoid the need for ambsalign.
+	(get_header, get_dev): mbswidth returns int, not size_t.
+	* src/ls.c (MAX_MON_WIDTH): Remove; no longer used.
+	(abmon_init): Use strnlen to cheaply discard too-long month names.
+	Align by hand instead of using mbsalign.
+	* src/numfmt.c: Include stdckdint.h, mbswidth.h.
+	Do not include mbsalign.h.
+	(padding_buffer_size): Now idx_t.  All uses changed.
+	(padding_width): Now intmax_t, since it’s no longer an object
+	size.  Its sign now records alignment.  All uses changed.
+	(zero_padding_width): Now int, since it’s given to sprintf.
+	All uses changed.
+	(padding_alignment): Remove; it’s now taken from padding_width’s sign.
+	(double_to_human): Return string length.  BUF_SIZE arg is now idx_t.
+	Include suffix in output.  All callers changed.  Simplify by not
+	calling strncat or stpcpy.  Calculate fmt size bound more carefully.
+	(setup_padding_buffer): Remove.  All uses removed.
+	(parse_format_string): Use intmax_t, not long, for pad.
+	On overflow, set widths to large values that cause later code
+	to do the right thing, rather than separately checking for
+	overflow here.
+	(prepare_padded_number): Return bool, not int 0/1.  New arg
+	PADDING.  All uses changed.  Do not limit padded output to 127
+	bytes; instead, use xpalloc to expand the output buffer.
+	(print_padded_number): New arg PADDING.  All uses changed.
+	(process_suffixed_number): Simplify.
+	(main): Take extremum if xstrtoimax overflows, as this does
+	the right thing.
+	* tests/misc/numfmt.pl: New test suf-20 to test for truncation bug.
+	Remove tests pad-3.2, fmt-err-7, as they’re no longer invalid but
+	are quite expensive.
+
 2023-08-29  Pádraig Brady  <P@draigBrady.com>
+
+	maint: post-release administrivia
+	* NEWS: Add header line for next release.
+	* .prev-version: Record previous version.
+	* cfg.mk (old_NEWS_hash): Auto-update.
 
 	version 9.4
 	* NEWS: Record release date.
@@ -8301,872 +12328,6 @@
 2019-03-10  Pádraig Brady  <P@draigBrady.com>
 
 	version 8.31
-	* NEWS: Record release date.
-
-	tests: test-N: include subsecond values in gating check
-	* tests/misc/test-N.sh: The subsecond values for atime and mtime
-	were potentially seen to differ on newlyl created files.
-	So we include the subsecond portion when comparing stat values.
-
-	tests: wc-nbsp: fix false failures on various systems
-	* tests/misc/wc-nbsp.sh: Add gating checks for all characters,
-	as there are disparate classifications on various systems:
-	SunOS 5.10 treats \u202F, \u2060 as !iswprint()
-	SunOS 5.10 treats \u00A0, \u2007 as iswspace()
-	AIX 7.2, Darwin 17.4.0, NetBSD 7.1 treat \u2060 as !iswprint()
-
-2019-03-07  Pádraig Brady  <P@draigBrady.com>
-
-	tests: tail-2/pipe-f: avoid false failure closing stdout
-	* tests/tail-2/pipe-f.sh: Check closing stdout with >&-
-	is effective, which avoids a false failure on NetBSD 7.1
-	Reported by Assaf Gordon
-
-	tests: tac-2-nonseekable: ensure we don't block indefinitely
-	* tests/misc/tac-2-nonseekable.sh: Add a timeout to both
-	protect and check whether we can close stdin correctly.
-
-	tests: id/zero: avoid false failure due to sed differences
-	* tests/id/zero.sh: sed on OSX will output a \n even
-	if the input doesn't have a \n on the last "line".
-	So ensure we always have a trailing '\n' to avoid the disparity.
-
-2019-03-07  Pádraig Brady  <P@draigBrady.com>
-
-	tests: test-N: fix false positives on some systems
-	Testing by Assaf Gordon on OSX showed the atime wasn't
-	being updated when explicitly set back in time.
-	Also Debian 8.11 / mips64 was seen to not update the
-	mtime when truncating an empty file.
-
-	* tests/misc/test-N.sh: Isolate from different timestamping
-	behaviors of various (file) systems, by correlating
-	the timestamps with stat(1) before using `test -N`.
-
-2019-03-07  Assaf Gordon  <assafgordon@gmail.com>
-
-	doc: replace @hashchar{} with actual hash character
-	Very old makeinfo-4.13 fails with:
-	  ./doc/coreutils.texi:2286: Unknown command `hashchar'.
-	  ./doc/coreutils.texi:2286: Misplaced {.
-	  ./doc/coreutils.texi:2286: Misplaced }.
-
-	Reported Bernhard Voelker in
-	https://lists.gnu.org/r/coreutils/2019-03/msg00016.html .
-
-	* doc/coreutils.texi (basenc invocation): Replace @hashchar{} with
-	actual hash character.  The special syntax is only required
-	when referring to #line directives.
-
-2019-03-06  Pádraig Brady  <P@draigBrady.com>
-
-	build: avoid statx related build failure on AIX
-	* src/stat.c (get_birthtime): Check also for STATX_BTIME define,
-	as a different statx is available on AIX 7.2.
-
-	tests: wc-nbsp.sh: avoid failure on FreeBSD
-	* tests/misc/wc-nbsp.sh: FreeBSD and OS X don't
-	treat non breaking space as printable characters.
-	So use wc -L to determine printability before
-	testing non breaking space functionality.
-
-	build: fix env build where SIGNUM_BOUND is not constant
-	* src/env.c (initialize_signals): A new function to initialize
-	the signals array on the heap, to avoid a build failure on
-	opensolaris, where SIGNUM_BOUND is not a constant.
-
-2019-03-04  Pádraig Brady  <P@draigBrady.com>
-
-	doc: remove older ChangeLog items
-	* Makefile.am: Update the oldest documented version
-	to 8.22 which is now about 5 years old.
-
-	build: revert recent change with distributed man page handling
-	* man/local.mk: commit f114495e added an extra check to ensure
-	a binary was working before using it to generate the man page.
-	However this was not working for the false(1) command,
-	and also one can generally specify that one should not
-	be using generated commands on the current system by passing
-	'cross_compiling=yes' to the configure invocation.
-
-	env: add --list-signal-handling to output non default handling
-	* src/env.c (main): Output blocked or ignored signals
-	before a command is executed.
-	* doc/coreutils.texi (env invocation): Add the option.
-	* tests/misc/env-signal-handler.sh: Add a test case.
-	* NEWS: Mention the new feature.
-
-2019-03-04  Assaf Gordon  <assafgordon@gmail.com>
-
-	env: new options --{default,ignore,block}-signal[=SIG]
-	New options to set signal handlers for the command being executed.
-	--block-signal suggested by Paul Eggert in http://bugs.gnu.org/34488#71
-	--default-signal is useful to overcome the POSIX limitation that shell
-	must not override inherited signal state, e.g. the second 'trap' here is
-	a no-op:
-
-	   trap '' PIPE && sh -c 'trap - PIPE ; seq inf | head -n1'
-
-	Instead use:
-
-	   trap '' PIPE && sh -c 'env --default-signal=PIPE seq inf | head -n1'
-
-	Similarly, the following will prevent CTRL-C from terminating the
-	program:
-
-	   env --ignore-signal=INT seq inf > /dev/null
-
-	See https://bugs.gnu.org/34488#8
-
-	* NEWS: Mention new options.
-	* doc/coreutils.texi (env invocation): Document new options.
-	* man/env.x: Add example of --default-signal=SIG usage.
-	(SEE ALSO): Mention sigprocmask.
-	* src/env.c (signals): New global variable.
-	(longopts): Add new options.
-	(usage): Print new options.
-	(parse_signal_params): Parse comma-separated list of signals, store in
-	signals variable.
-	(reset_signal_handlers): Set each signal to SIG_DFL/SIG_IGN.
-	(parse_block_signal_params): Parse command-line options.
-	(set_signal_proc_mask): Call sigprocmask to block/unblock signals.
-	(main): Process new options.
-	* src/local.mk (src_env_SOURCES): Add operand2sig.c.
-	* tests/misc/env-signal-handler.sh: New test.
-	* tests/local.mk (all_tests): Add new test.
-
-2019-03-04  Martin Bukatovic  <martin.bukatovic@gmail.com>
-
-	stat: print birth time on systems supporting statx
-	* configure.ac: Check for statx(), available on glibc >= 2.28.
-	* src/stat.c (get_birthtime): Call statx() when available.
-	* NEWS: Mention the improvement.
-
-2019-03-04  Pádraig Brady  <P@draigBrady.com>
-
-	df: support different file system encodings when not using tty
-	* src/df.c (replace_problematic_chars): A new wrapper to be
-	more conservative in our replacement when not connected to a tty.
-	* tests/df/problematic-chars.sh: Add a test case.
-
-	maint: tidy up recent additions to NEWS
-	* NEWS: Move date change to improvements and fix nohup grammar.
-
-2019-02-27  Bernhard Voelker  <mail@bernhard-voelker.de>
-
-	doc: further clarify 'yes' alternative in seq invocation
-	* doc/coreutils.texi (node seq invocation): Clarify to use the tool
-	'yes'; otherwise the reader may interpret the sentence as if one
-	could pass 'yes' as the INCREMENT value.
-
-2019-02-26  Pádraig Brady  <P@draigBrady.com>
-
-	wc: treat non breaking space as a word separator
-	* src/wc.c (iswnbspace): A new function to match
-	characters in this class.
-	(isnbspace): Likewise for single byte charsets.
-	(main): Initialize posixly_correct from the environment,
-	to allow disabling honoring NBSP in non C locales.
-	(wc): Call is[w]nbspace() along with is[w]space.
-	* bootstrap.conf: Ensure btowc is available.
-	* tests/misc/wc-nbsp.sh: A new test.
-	* tests/local.mk: Reference the new test.
-	* NEWS: Mention the change in behavior.
-
-2019-02-25  Paul Eggert  <eggert@cs.ucla.edu>
-
-	doc: more date +%F clarifications
-	* doc/coreutils.texi (Date conversion specifiers):
-	Plain %F is actually like %+4Y-%m-%d.
-	(Padding and other flags): Mention POSIX restrictions.
-	* src/date.c (usage): Document recent changes.
-
-	doc: give date +%+F example
-	* doc/coreutils.texi (Padding and other flags):
-	Give example for + conversion specification.
-
-	doc: fix typo in previous patch
-
-	date: ‘+’ conversion specification flag
-	The recent Gnulib update fixed Bug#34608; document and test this.
-	* NEWS: Mention the change.
-	* doc/coreutils.texi (Padding and other flags):
-	Update doc to cover new flag and other POSIX.1-2017 changes.
-	* tests/misc/date.pl (date-century-plus): New test.
-
-	build: update gnulib submodule to latest
-
-2019-02-24  Bernhard Voelker  <mail@bernhard-voelker.de>
-
-	all: detect --help and --version more consistently
-	For select programs which accept only --help and --version options
-	(in addition to non-option arguments), process these options before
-	any other options.
-
-	Before:
-
-	  $ dd bs=1 --help
-	  dd: unrecognized option '--help'
-	  Try 'dd --help' for more information.
-
-	  $ yes me --help
-	  me --help
-	  me --help
-	  ...
-
-	After:
-	Any occurrence of '--help' in the arguments (prior to '--') will
-	show the help screen.
-
-	Discussed in https://bugs.gnu.org/33468 .
-
-	* NEWS: Mention change.
-	* src/cksum.c, src/dd.c, src/hostid.c, src/hostname.c, src/link.c,
-	src/logname.c, src/nohup.c, src/sleep.c, src/tsort.c, src/unlink.c,
-	src/uptime.c, src/users.c, src/whoami.c, src/yes.c (main): Replace
-	parse_long_options() + getopt_long() calls with
-	parse_gnu_standard_options_only(); Remove <getopt.h> inclusion;
-	Remove empty 'struct long_options' variable;
-	* tests/misc/help-version-getopt.sh: Add test.
-	* tests/local.mk (all_tests): Reference it.
-
-2019-02-24  Pádraig Brady  <P@draigBrady.com>
-
-	gnulib: update to the latest
-	update to a version with parse_gnu_standard_options_only()
-
-2019-02-20  Martin Castillo  <castilma@uni-bremen.de>
-
-	doc: fix join examples in texinfo
-	* doc/coreutils.texi (join invocation): Fix various errors.
-	Fixes https://bugs.gnu.org/34583
-	Fixes https://bugs.gnu.org/34584
-
-2019-02-19  Daming Yang  <lion@aosc.io>
-
-	ls: better align month abbreviations containing digits
-	* src/ls.c (abmon_init): Align numeric abbreviations right.
-	* NEWS: Mention the improvement.
-
-2019-02-18  Pádraig Brady  <P@draigBrady.com>
-
-	sort: clarify in --debug; only text comparisons affected
-	* src/sort.c (main): Adjust the debug info regarding locales,
-	to clarify that only textual comparisons are affected.
-	* tests/misc/sort-debug-warn.sh: Adjust accordingly.
-	Fixes https://bugs.gnu.org/34490
-
-2019-02-12  Pádraig Brady  <P@draigBrady.com>
-
-	comm,join: ensure warnings are apparent upon exit
-	* src/comm.c (main): Output a warning right before exit,
-	in case previous errors have scrolled from view.
-	* src/join.c (main): Likewise.
-	* tests/misc/comm.pl: Addjust accordingly.
-	* tests/misc/join.pl: Likewise.
-	Fixes https://bugs.gnu.org/34347
-
-2019-02-12  Filipp Gunbin  <fgunbin@fastmail.fm>
-
-	doc: fix typo referencing RFC 2822
-	* doc/coreutils.texi (date invocation): s/822/2822/.
-	Fixes https://bugs.gnu.org/34438
-
-2019-02-11  Pádraig Brady  <P@draigBrady.com>
-
-	gnulib: update to use new strtold module
-	* gnulib: Update to make the new strtold module available.
-	* bootstrap.conf: strtod is now a dependency of c-strtod,
-	which in turn is a dependency of cl-strtod.  This treats
-	strtold and strtod similarly.
-	* gl/lib/cl-strtod.c: Adjust to assume strtold is available.
-	* tests/misc/sort-float.sh: Likewise.
-	* src/sort.c: Likewise.
-	(nan_compare): Adjust comment to indicate
-	we still have to init padding bits as per
-	https://sourceware.org/bugzilla/show_bug.cgi?id=13246
-
-2019-02-04  Pádraig Brady  <P@draigBrady.com>
-
-	seq: output decimal points consistently with invalid locales
-	* src/seq.c (print_numbers): Only reset the locale if it
-	was successfully set originally.
-	* tests/misc/seq-locale.sh: Add a new test.
-	* tests/local.mk: Reference the new test.
-	* NEWS: Mention the fix.
-
-	build: ensure sys/select.h is included
-	bootstrap.conf: Explicitly depend on select, rather than transitively.
-	* src/tail.c: Unconditionally include select.h as we use select()
-	outside inotify contexts now.
-
-	stat,tail: fix android build and support inotify
-	* src/extract-magic: Treat android like linux,
-	which fixes the build by ensuring the constants are defined.
-	* src/stat.c: Support all constants on android, including
-	the android specific "sdcardfs".
-	* src/tail.c: Fix inclusion of statfs headers to be independent
-	of inotify availability, as fremote() is used on linux even
-	if inotify has been disabled.  Also enable fremote() on android.
-	* NEWS: Mention the improvment.
-	Fixes https://bugs.gnu.org/34239
-
-2019-01-31  Pádraig Brady  <P@draigBrady.com>
-
-	tests: add test for locale decimal processing
-	* tests/misc/sleep.sh: Check locale processing of printf, sleep,
-	and timeout, when the french locale data is available.
-
-2019-01-31  Pádraig Brady  <P@draigBrady.com>
-
-	build: fix recent build failure on systems without strtold
-	Recently introduced in commit v8.30-50-geb73e23
-
-	* gl/lib/cl-strtod.c: Fall back to strtod() on systems
-	without strtold() (like we already do in sort).
-
-2019-01-28  Pádraig Brady  <P@draigBrady.com>
-
-	maint: fix new syntax-check failure from recent change
-	* cfg.mk: Exclude cl-strtold.c wrapper from requiring config.h
-
-2019-01-27  Paul Eggert  <eggert@cs.ucla.edu>
-
-	printf,seq: remove c-strtod dependency
-	* gl/modules/cl-strtold (Files): Add lib/cl-strtod.c, lib/cl-strtod.h.
-	(Depends-on): Remove cl-strtod.
-	(configure.ac): Redquire AC_C_RESTRICT.
-
-	printf,seq: improve long double accuracy
-	This fixes a thinko in the previous patch.
-	* gl/lib/cl-strtod.c (STRTOD): New macro.
-	(CL_STRTOD): Use it.
-
-	printf,seq,sleep,tail,timeout: accept current-locale floats
-	These commands now accept floating-point numbers in the
-	current locale, as well as in the C locale.
-	Compatibility problem reported by Robert Elz.
-	* NEWS: Document this.
-	* bootstrap.conf (gnulib_modules): Add cl-strtod, cl-strtold.
-	Remove c-strtold.
-	* doc/coreutils.texi (Floating point, tail invocation)
-	(printf invocation, timeout invocation, sleep invocation)
-	(seq invocation): Document this.
-	* gl/lib/cl-strtod.c, gl/lib/cl-strtod.h, gl/lib/cl-strtold.c:
-	* gl/modules/cl-strtod, gl/modules/cl-strtold: New files.
-	* src/printf.c, src/seq.c, src/sleep.c, src/tail.c, src/timeout.c:
-	Include cl-strtod.h instead of c-strtod.
-	* src/printf.c (vstrtold):
-	* src/seq.c (scan_arg, print_numbers):
-	* src/sleep.c (main):
-	* src/tail.c (parse_options):
-	* src/timeout.c (parse_duration):
-	Use cl_strtold instead of c_strtold.
-
-2019-01-25  Paul Eggert  <eggert@cs.ucla.edu>
-
-	doc: update Goldberg URL
-	* doc/coreutils.texi (Floating point): Update URL.
-
-	sleep: improve doc
-	Problem reported by Robert Elz.
-	* doc/coreutils.texi (sleep invocation):
-	Say that arguments must be non-negative, which means they cannot
-	be arbitrary floating-point numbers.  Mention POSIX, not
-	“historical implementations” that are no longer of practical
-	interest.  List the extensions to POSIX.
-	* src/sleep.c (usage): Omit needless words, removing dubious
-	commentary about “most implementations” and incorrect commentary
-	about “arbitrary”.  Details about exactly which numbers are
-	allowed can be found in the documentation.
-
-2019-01-20  Pádraig Brady  <P@draigBrady.com>
-
-	tail: fix handling of broken pipes with SIGPIPE ignored
-	* init.cfg (trap_sigpipe_or_skip_): A new function refactored from...
-	* tests/misc/printf-surprise.sh: ...here.
-	* tests/misc/seq-epipe.sh. Likewise.
-	* src/tail.c (die_pipe): Ensure we exit upon sending SIGPIPE.
-	* tests/tail-2/pipe-f.sh: Ensure we exit even if SIGPIPE is ignored.
-	* NEWS: Mention the bug fix.
-
-2019-01-20  Ayappan  <ayappap2@in.ibm.com>
-
-	tail: fix recent ineffective AIX change
-	* src/tail.c: Fix commit v8.30-40-gd5ab4cb which was ineffective.
-	Fixes http://bugs.gnu.org/33946
-
-2019-01-20  Pádraig Brady  <P@draigBrady.com>
-
-	build: ensure VLAs are not used
-	Fail developer builds if VLAs are used,
-	as there are portability concerns to consider with them.
-
-	* configure.ac: Enable -Wvla which is implicit in the full list added.
-	* m4/jm-macros.m4: Define GNULIB_NO_VLA which disables use of
-	VLAs within gnulib code.
-
-2019-01-20  Pádraig Brady  <P@draigBrady.com>
-
-	gnulib: update to the latest
-	* gnulib: Update to a version supporting GNULIB_NO_VLA
-	* bootstrap: Sync with latest
-
-2019-01-16  Bernhard Voelker  <mail@bernhard-voelker.de>
-
-	build: use distributed man pages when running with --help fails
-	When building against an incompatible GLIBC version compared to that
-	on the build host, then running the just-built binary might fail
-	although it is the same platform - thus CROSS_COMPILING is false.
-	As a result, generating the man pages fails.
-
-	* man/local.mk (.x.1): Add a check to verify that running the utility
-	with --help succeeds, otherwise falling back to using 'dummy-man'.
-
-2019-01-13  Pádraig Brady  <P@draigBrady.com>
-
-	ls: with --group-directories-first, also group symlinked dirs
-	* src/ls.c (is_linked_directory): A new function to
-	also consider symlinked directories.
-	(main): Rename check_symlink_color to check_symlink_mode,
-	and enable that with --group-directories-first.
-	(DIRFIRST_CHECK): Adjust to use is_linked_directory,
-	rather than just is_directory.
-	(gobble_file): Simplify to always update f->linkmode
-	if the stat() succeeds.
-	* tests/ls/group-dirs.sh: A new test.
-	* tests/local.mk: Reference the new test.
-	* NEWS: Mention the change in behavior.
-	Suggested by Amin Bandali in
-	https://lists.gnu.org/r/coreutils/2018-12/msg00017.html
-
-	tail: don't exit immediately with filters on AIX
-	* src/tail.c: Fix the check_output_available check on AIX.
-	Note we don't use poll for all systems as the overhead
-	of adding the gnulib poll module wouldn't be worth it
-	just for this single use.
-	* tests/tail-2/pipe-f.sh: Fix the test which always passed
-	due to only the exit code of sleep being checked.
-	* NEWS: Mention the bug fix and rearrange alphabetically.
-	Fixes http://bugs.gnu.org/33946
-
-2019-01-06  Assaf Gordon  <assafgordon@gmail.com>
-
-	basenc: allocate buffers on heap
-	Allocate the encoding/decoding buffers dynamically on the heap instead
-	of using variable-length-array (VLA) on the stack.
-	Discussed in https://lists.gnu.org/r/coreutils/2019-01/msg00004.html .
-
-	* src/basenc.c (do_encode,do_decode): Allocate inbuf/outbuf using
-	xmalloc, and free if using LINT.
-
-2019-01-04  Pádraig Brady  <P@draigBrady.com>
-
-	doc: adjust URLs in help to avoid wrapping
-	* src/system.h: Adjust lines containing URLs so that
-	they don't wrap on 80 column terminals.  One could also
-	use .UR macros, but these aren't universally available.
-	Note the adjustments here need to be compatible with
-	the pattern matching done in help2man.
-	Addresses https://bugs.gnu.org/33914
-
-2019-01-01  Assaf Gordon  <assafgordon@gmail.com>
-
-	maint: update all copyright year number ranges
-	Run "make update-copyright" and then...
-
-	* gnulib: Update to latest with copyright year adjusted.
-	* tests/init.sh: Sync with gnulib to pick up copyright year.
-	* bootstrap: Likewise.
-	* tests/sample-test: Adjust to use the single most recent year.
-
-2019-01-01  Bernhard Voelker  <mail@bernhard-voelker.de>
-
-	maint: mention base32 in the title line of common basenc.c
-	* src/basenc.c: Do the above, and remove a redundant comment.
-
-2019-01-01  Assaf Gordon  <assafgordon@gmail.com>
-
-	base64,base32: fix 'extra operand' error message
-	In the following invocation, 'a' is the input file, and 'b' is the extra
-	operand:
-
-	  $ base64 a b
-
-	Report 'b' in the error message instead of 'a':
-
-	  $ base64 a b
-	  base64: extra operand 'b'
-
-	Discussed in https://lists.gnu.org/r/coreutils/2018-12/msg00008.html .
-
-	* src/basenc.c (main): If there is more than one non-option operand,
-	report the second one (assuming the first is a the input file name).
-	* tests/misc/base64.pl: Add tests.
-	* tests/misc/basenc.pl: Adjust expectedc error message in tests.
-	* NEWS: Mention bugfix.
-
-2018-12-31  Pádraig Brady  <P@draigBrady.com>
-
-	doc: mention that more than 8 colors are supported by ls
-	* src/dircolors.hin: Mention any codes supported by the terminal
-	are allowed.
-	Addresses https://bugs.gnu.org/33915
-
-2018-12-28  Assaf Gordon  <assafgordon@gmail.com>
-
-	basenc: A new program complementary to base64/base32
-	Encodes/decodes data in various common formats:
-	base64,base64url,base32,base32,base16,base2,z85.
-
-	Discussed here:
-	https://lists.gnu.org/r/coreutils/2018-11/msg00014.html
-	https://lists.gnu.org/r/coreutils/2018-12/msg00019.html
-
-	* AUTHORS: Add basenc.
-	* README: Reference the new program.
-	* NEWS: Mention the new program.
-	* build-aux/gen-lists-of-programs.sh: Add basenc.
-	* doc/coreutils.texi: (basenc invocation): Document the new command.
-	* man/.gitignore: Ignore the generated man page.
-	* man/basenc.x: A new template, with few examples.
-	* man/local.mk: Reference the new man page.
-	* scripts/git-hooks/commit-msg: Allow basenc as program prefix.
-	* src/.gitignore: Ignore the new binary.
-	* src/basenc.c:
-	(usage): Mention new options.
-	(main): Handle new options.
-	(isbase*, base*_length, base*_encode, base*_decode_ctx): Implement new
-	encoding/decoding formats.
-	* src/local.mk: Add new program.
-	* tests/local.mk: Add new test.
-	* tests/misc/basenc.pl: New tests.
-	* tests/misc/help-version.sh (basenc_setup): use '--version' for default
-	invocation (basenc errors with no parameters).
-
-2018-12-21  Assaf Gordon  <assafgordon@gmail.com>
-
-	maint: rename base64.c to basenc.c
-	In preparation for adding 'basenc' program.
-	Suggested in https://lists.gnu.org/r/coreutils/2018-11/msg00019.html .
-
-	* src/base64.c: Rename to src/basenc.c.
-	* src/local.mk: Update base*_SOURCES definitions.
-	* po/POTFILEs.in: Rename base64 to basenc.
-
-2018-12-15  Paul Eggert  <eggert@cs.ucla.edu>
-
-	shred,sort,split: add NEWS item
-
-	shred,sort,split: fix ftruncate error reporting
-	Problem reported for split by Scott Worley (Bug#33761):
-	* src/shred.c (do_wipefd):
-	Also report an error if ftruncate fails	on a shared memory object.
-	* src/sort.c (get_outstatus): New function.
-	(stream_open, avoid_trashing_input): Use it.
-	* src/sort.c (stream_open):
-	* src/split.c (create):
-	If ftruncate fails, do not report an error
-	unless it is a regular file or a shared memory object.
-
-2018-11-07  Bernhard Voelker  <mail@bernhard-voelker.de>
-
-	sync: add NEWS and test for the fix in the previous commit
-	* NEWS (Bug fixes): Mention the fix in commit 94d364f157f0.
-	While at it, remove duplicate "Changes in behavior" heading.
-	* tests/misc/sync.sh: Add a test with a write-only file for the fix.
-
-2018-11-06  Paul Eggert  <eggert@cs.ucla.edu>
-
-	sync: fix open fallback bug
-	Problem caught by Coverity Analysis
-	and reported by Kamil Dudka (Bug#33287).
-	* src/sync.c (sync_arg): Fix typo in fallback code.
-
-2018-10-28  Paul Eggert  <eggert@cs.ucla.edu>
-
-	ln: use linkat and symlinkat
-	Open a target directory and use its file descriptor in linkat,
-	symlinkat, etc. syscalls, instead of constructing long file names
-	by concatenating the target directory name to a basename.
-	This avoids O(N²) behavior with ‘ln F1 F2 ... Fn DIR’ when DIR is
-	a long file name with many slashes.  It also avoids some races if
-	DIR is renamed while ln is running.
-	* bootstrap.conf (gnulib_modules): Add openat-safer.
-	* src/ln.c: Include fcntl-safer.h.
-	(O_PATHSEARCH): New constant.
-	(errno_nonexisting, target_directory_operand): Remove; no longer used.
-	(atomic_link, do_link): New arg DESTDIR_FD.  All uses changed.
-	(do_link): New arg DEST_BASE.  All uses changed.
-	(main): Open target directory and use its file descriptor
-	as DESTDIR_FD.
-
-	build: update gnulib submodule to latest
-	* src/copy.c (copy_internal):
-	* src/cp.c (do_copy):
-	* src/ln.c (do_link):
-	Adjust to Gnulib API change.
-
-2018-10-27  Bernhard Voelker  <mail@bernhard-voelker.de>
-
-	tests: provide 100% coverage for echo
-	*  src/echo.c (usage): Assert that STATUS is always EXIT_SUCCESS.
-	* tests/misc/echo.sh: Add further tests for all hex and escape and
-	escape characters.
-
-	To get coverage statistics, run:
-	  make coverage -j 4 TESTS=tests/misc/echo.sh SUBDIRS=.
-	  xdg-open doc/coverage/src/echo.c.gcov.frameset.html
-
-2018-10-27  Pádraig Brady  <P@draigBrady.com>
-
-	echo: always process escapes when POSIXLY_CORRECT is set
-	* src/echo.c (main): Always enable backslash processing if
-	POSIXLY_CORRECT is set.
-	* tests/misc/echo.sh: Add (the first) test for the echo command.
-	* tests/local.mk: Reference the new test.
-	* tests/misc/printf.sh: Update a stale comment.
-	* doc/coreutils.texi (echo invocation). Mention that POSIXLY_CORRECT
-	now always enables backslash processing.
-	* NEWS: Mention the change in behavior.
-	Fixes https://bugs.gnu.org/32703
-	Issue identified by Eric Blake.
-
-2018-10-26  Bernhard Voelker  <mail@bernhard-voelker.de>
-
-	test: add -N unary operator
-	Bash knows 'test -N FILE'.  Add it to GNU 'test' as well.
-
-	* src/test.c (unary_operator): Add a case for 'N'.
-	(usage): Document it.
-	* doc/coreutils.texi (node File characteristic tests): Likewise.
-	* NEWS (New features): Likewise.
-	* tests/misc/test-N.sh: Add a test.
-	* tests/local.mk (all_tests): Reference it.
-
-2018-10-26  Bernhard Voelker  <mail@bernhard-voelker.de>
-
-	test: simplify redundant code
-	Remove the function 'test_unop', as the cases therein are redundant to
-	those handled by 'unary_operator'; exception: the cases 'o' and 'N':
-	they had been present in test_unop and handling the commands
-	  test -N STR
-	  test -o STR
-	and
-	  test x = x -a -N STR
-	  test x = x -a -o STR
-	which ran into an error later on anyway.
-	With this commit, the error diagnostic will change from ...
-	  $ /usr/bin/test -N STR
-	  /usr/bin/test: extra argument '-N'
-	  $ /usr/bin/test -o STR
-	  /usr/bin/test: extra argument '-o'
-	... to ...
-	  $ src/test -N STR
-	  src/test: '-N': unary operator expected
-	  $ src/test -o STR
-	  src/test: '-o': unary operator expected
-
-	* src/test.c (test_unop): Remove.
-	(unary_operator): Fail with test_syntax_error in the default case.
-	(term): Directly call unary_operator.
-	(two_arguments): Likewise.
-	* tests/misc/test-diag.pl: Adjust error diagnostic.
-
-2018-10-26  Bernhard Voelker  <mail@bernhard-voelker.de>
-
-	test: remove support for the ambigous -a unary operator
-	* src/test.c (unary_operator): Remove case 'a'.
-	(test_unop): Likewise.
-	* NEWS (Changes in behavior): Document the change.
-
-	Discussed at https://bugs.gnu.org/33097
-
-2018-10-21  Bernhard Voelker  <mail@bernhard-voelker.de>
-
-	test: avoid FP in chroot-credentials.sh for different group list order
-	On my openSUSE:Tumbleweed system, I get a false positive test failure
-	in the above 'check-root' test because the group lists inside and
-	outside the chroot have a different order:
-
-	  ++ chroot --userspec=berny / id -G
-	  ++ id -G berny
-	  + test '100 454 457 480 492' = '100 480 492 457 454'
-	  + fail=1
-
-	* tests/misc/chroot-credentials.sh (num_sort): Add function to sort
-	group lists, and use it in the test cases which test multiple groups.
-
-2018-10-20  Paul Eggert  <eggert@cs.ucla.edu>
-
-	doc: tidy up setuid commentary
-	* doc/perm.texi (Mode Structure): Improve wording.
-	(Numeric Modes): Don’t say “on execution” (Bug#9594).
-
-2018-10-19  Paul Eggert  <eggert@cs.ucla.edu>
-
-	ln: avoid directory hard-link races
-	Previously, 'ln A B' did 'stat("B"), lstat("A"), link("A","B")'
-	where the stat and lstat were necessary to avoid hard-linking
-	directories on systems that can hard-link directories.
-	Now, in situations that prohibit hard links to directories,
-	'ln A B' merely does 'link("A","B")'.  The new behavior
-	avoids some races and should be more efficient.
-	This patch was inspired by Bug#10020, which was about 'ln'.
-	* bootstrap.conf (gnulib_modules): Add unlinkdir.
-	* src/force-link.c (force_linkat, force_symlinkat): New arg for
-	error number of previous try.  Return error number, 0, or -1 if
-	error, success, or success after removal.  All callers changed.
-	* src/ln.c: Include priv-set.h, unlinkdir.h.
-	(beware_hard_dir_link): New static var.
-	(errnoize, atomic_link): New functions.
-	(target_directory_operand): Use errnoize for simplicity.
-	(do_link): New arg for error number of previous try.  All callers
-	changed.  Do each link atomically if possible.
-	(main): Do -r check earlier.  Remove linkdir privileges so we can
-	use a single linkat/symlinkat instead of a racy substitute for the
-	common case of 'ln A B' and 'ln -s A B'.  Set beware_hard_dir_link
-	to disable this optimization.
-
-	cp: 'cp -il A B' no longer fails if user OKs it
-	* NEWS: Mention the change.
-	* src/copy.c (copy_internal): Replace the link if the
-	user has okayed it.
-
-	build: update gnulib submodule to latest
-	* gl/modules/tempname.diff: Update to match Gnulib.
-
-2018-10-17  Paul Eggert  <eggert@cs.ucla.edu>
-
-	doc: add chmod examples
-	Discussed in https://bugs.gnu.org/11043 .
-
-	* doc/coreutils.texi (chmod invocation): Add examples.
-
-2018-10-02  Bjarni Ingi Gislason  <bjarniig@rhi.hi.is>
-
-	doc: fix minor mistakes in "env.x"
-	* man/env.x (OPTIONS): Fix a spelling mistake.  Protect a period at the
-	beginning of a line.
-
-2018-09-30  Achilles Gaikwad  <agaikwad@redhat.com>
-
-	id: support multiple specified users
-	  $ id root nobody
-	  uid=0(root) gid=0(root) groups=0(root)
-	  uid=99(nobody) gid=99(nobody) groups=99(nobody)
-
-	* src/id.c (main): Make variables opt_zero, just_group_list,
-	just_group, use_real, just_user global to be used in a new
-	function.
-	(print_stuff): New function that will print user and group
-	information for the specified USER.
-	When using -G option delimit each record with two NULs.
-	Restructure the code in the file to have global variables
-	followed by functions.
-	* tests/id/zero.sh: Add test cases to check the usage
-	of -z option with multiple users.
-	* tests/id/uid.sh: Add a test case to ensure all users
-	are queried in the presence of errors.
-	* doc/coreutils.texi: Document the interface changes.
-	* NEWS: Mention the new feature.
-
-2018-09-25  Stéphane Campinas  <stephane.campinas@gmail.com>
-
-	doc: csplit: clarify handling of regexps with negative offsets
-	* doc/coreutils.texi (csplit invocation): Detail the behavior
-	with regexp patterns and negative offsets, which differs from
-	line number patterns, to avoid looping on the input.  For example:
-	  $ seq 50 | csplit -s - /15/-5 /12/
-	  csplit: ‘/12/’: match not found
-
-2018-09-24  Pádraig Brady  <P@draigBrady.com>
-
-	doc: csplit: clarify input may not be reproducible from output
-	* doc/coreutils.texi (csplit invocation): Clarify that
-	portions of the input may be skipped and thus the input
-	may not be reproducible by just concatenating the output files.
-	Fixes https://bugs.gnu.org/32317
-
-2018-07-27  Paul Eggert  <eggert@cs.ucla.edu>
-
-	df: omit redundant comparison
-	Trivial inefficiency reported by Bruno Haible in:
-	http://lists.gnu.org/r/bug-gnulib/2018-07/msg00109.html
-	* src/df.c (hide_problematic_chars): Omit redundant test.
-
-	df: tune slightly
-	* src/df.c (get_header, get_dev):
-	Avoid calling mbswidth twice when once will do.
-
-	df: avoid multibyte character corruption on macOS
-	This improves on the earlier fix for the problem reported by
-	Chih-Hsuan Yen (Bug#32236), by also looking for other control
-	characters and for encoding errors.
-	* src/df.c: Include wchar.h and wctype.h instead of c-ctype.h.
-	(hide_problematic_chars): Process the string as multibyte.
-	Use iswcntrl, not c_iscntrl.
-
-2018-07-26  Chih-Hsuan Yen  <yan12125@gmail.com>
-
-	df: avoid multibyte character corruption on macOS
-	* src/df.c (hide_problematic_chars): Use c_iscntrl() as
-	passing 8 bit characters to iscntrl() is not supported on macOS.
-	* NEWS: Mention the bug fix.
-	Fixes https://bugs.gnu.org/32236
-
-2018-07-22  Wodry  <coreutils3422@runbox.com>  (tiny change)
-
-	doc: improve documentation of binary prefixes
-	* doc/coreutils.texi (Common options):
-	* src/dd.c, src/head.c, src/od.c, src/stdbuf.c, src/tail.c (usage):
-	* src/system.h (emit_size_note):
-	Mention binary prefixes (Bug#32242).
-
-2018-07-21  Pádraig Brady  <P@draigBrady.com>
-
-	tests: avoid false failure on sparc 32 bit
-	* tests/rm/rm-readdir-fail.sh: Skip the test entirely on 32 bit,
-	so we avoid conflating the 32bit and 64 bit types, as that
-	triggers alignment issues (SIGBUS) on Gentoo sparc.
-	Fixes https://bugs.gnu.org/29886
-
-2018-07-05  Paul Eggert  <eggert@cs.ucla.edu>
-
-	build: update gnulib submodule to latest
-	* bootstrap.conf, src/copy.c, src/mv.c, src/shred.c:
-	Adjust to renaming of renameat2 to renameatu.
-
-2018-07-05  Pádraig Brady  <P@draigBrady.com>
-
-	tests: fix skipping in some tests
-	* tests/cp/cp-a-selinux.sh: Use 'skip_' rather than the probably
-	undefined 'skip'.
-	* tests/du/2g.sh: Likewise.
-	* tests/install/install-Z-selinux.sh: Likewise.
-	* tests/misc/chcon.sh: Likewise.
-	* tests/misc/selinux.sh: Likewise.
-	* tests/mkdir/restorecon.sh: Likewise.
-	* cfg.mk (sc_prohibit-skip): A new syntax check to catch the issue.
-
-2018-07-02  Jim Meyering  <meyering@fb.com>
-
-	maint: init.cfg: fix a minor test-related quoting bug
-	* init.cfg (require_membership_in_two_groups_): This fixes a bug
-	introduced by me in v8.15-8-gdd0e4c562.  Luckily, the consequence
-	of low-probability triggering the bug was the mere added backslash
-	in the diagnostic: "...but running id -G\ either...".  It would be
-	triggered in a test failure for one who is a member of only one or
-	fewer groups.
-
-2018-07-02  Pádraig Brady  <P@draigBrady.com>
-
-	maint: post-release administrivia
-	* NEWS: Add header line for next release.
-	* .prev-version: Record previous version.
-	* cfg.mk (old_NEWS_hash): Auto-update.
-
-	version 8.30
 	* NEWS: Record release date.
 
 

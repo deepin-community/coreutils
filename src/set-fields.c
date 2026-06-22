@@ -1,5 +1,5 @@
 /* set-fields.c -- common functions for parsing field list
-   Copyright (C) 2015-2023 Free Software Foundation, Inc.
+   Copyright (C) 2015-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,6 +19,8 @@
 #include <config.h>
 
 #include "system.h"
+#include <ctype.h>
+#include "c-ctype.h"
 #include "quote.h"
 #include "set-fields.h"
 
@@ -26,10 +28,10 @@
 struct field_range_pair *frp;
 
 /* Number of finite ranges specified by the user. */
-size_t n_frp;
+idx_t n_frp;
 
 /* Number of `struct field_range_pair's allocated. */
-static size_t n_frp_allocated;
+static idx_t n_frp_allocated;
 
 #define FATAL_ERROR(Message)                                            \
   do                                                                    \
@@ -46,7 +48,7 @@ static void
 add_range_pair (uintmax_t lo, uintmax_t hi)
 {
   if (n_frp == n_frp_allocated)
-    frp = X2NREALLOC (frp, &n_frp_allocated);
+    frp = xpalloc (frp, &n_frp_allocated, 1, -1, sizeof *frp);
   frp[n_frp].lo = lo;
   frp[n_frp].hi = hi;
   ++n_frp;
@@ -69,7 +71,7 @@ static void
 complement_rp (void)
 {
   struct field_range_pair *c = frp;
-  size_t n = n_frp;
+  idx_t n = n_frp;
 
   frp = nullptr;
   n_frp = 0;
@@ -78,7 +80,7 @@ complement_rp (void)
   if (c[0].lo > 1)
     add_range_pair (1, c[0].lo - 1);
 
-  for (size_t i = 1; i < n; ++i)
+  for (idx_t i = 1; i < n; ++i)
     {
       if (c[i - 1].hi + 1 == c[i].lo)
         continue;
@@ -229,7 +231,7 @@ set_fields (char const *fieldstr, unsigned int options)
           lhs_specified = false;
           rhs_specified = false;
         }
-      else if (ISDIGIT (*fieldstr))
+      else if (c_isdigit (*fieldstr))
         {
           /* Record beginning of digit string, in case we have to
              complain about it.  */
@@ -244,14 +246,13 @@ set_fields (char const *fieldstr, unsigned int options)
             lhs_specified = 1;
 
           /* Detect overflow.  */
-          if (!DECIMAL_DIGIT_ACCUMULATE (value, *fieldstr - '0', uintmax_t)
+          if (!DECIMAL_DIGIT_ACCUMULATE (value, *fieldstr - '0')
               || value == UINTMAX_MAX)
             {
               /* In case the user specified -c$(echo 2^64|bc),22,
                  complain only about the first number.  */
-              /* Determine the length of the offending number.  */
-              size_t len = strspn (num_start, "0123456789");
-              char *bad_num = ximemdup0 (num_start, len);
+              char *bad_num = ximemdup0 (num_start,
+                                         strspn (num_start, "0123456789"));
               error (0, 0, (options & SETFLD_ERRMSG_USE_POS)
                            ?_("byte/character offset %s is too large")
                            :_("field number %s is too large"),
@@ -280,9 +281,9 @@ set_fields (char const *fieldstr, unsigned int options)
   qsort (frp, n_frp, sizeof (frp[0]), compare_ranges);
 
   /* Merge range pairs (e.g. `2-5,3-4' becomes `2-5'). */
-  for (size_t i = 0; i < n_frp; ++i)
+  for (idx_t i = 0; i < n_frp; ++i)
     {
-      for (size_t j = i + 1; j < n_frp; ++j)
+      for (idx_t j = i + 1; j < n_frp; ++j)
         {
           if (frp[j].lo <= frp[i].hi)
             {

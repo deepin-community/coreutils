@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # Basic tests for "factor".
 
-# Copyright (C) 1998-2023 Free Software Foundation, Inc.
+# Copyright (C) 1998-2025 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -102,7 +102,7 @@ Test:
 foreach $t (@Tests)
   {
     (my $arg1 = $t->[1]) =~ s| *\+?||;     # strip '+'
-    (my $arg1 = $arg1) =~ s| *-[^ ]+ *||;  # strip option
+    ($arg1 = $arg1) =~ s| *-[^ ]+ *||;     # strip option
 
     # Don't fiddle with expected OUT string if there's a nonzero exit status.
     foreach my $e (@$t)

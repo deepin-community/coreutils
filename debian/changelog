@@ -1,42 +1,57 @@
-coreutils (9.4-2-1deepin5) unstable; urgency=medium
+coreutils (9.7-3) unstable; urgency=high
 
-  * Explicitly disable OpenSSL support (--with-openssl=no) to eliminate 
-    dynamic linking overhead of libcrypto and libzstd.
-  * This restores the startup performance of basic utilities like 'sort', 
-    fixing a 15-25% regression observed in short-lived process benchmarks. 
+  * Correct spurious permission denied errors messages when copying from a file
+    with NFS ACLs to a filesystem which supports different ACLs.
+    (Backport of upstream fix.) (Closes: #1107169)
+  * Additional lintian overrides (for "mono", which is not defined for
+    terminals but is for other output formats) to address remaining lintian
+    warnings.
 
- -- xinpeng.wang <wangxinpeng@uniontech.com>  Wed, 11 Mar 2026 11:39:57 +0800
+ -- Michael Stone <mstone@debian.org>  Wed, 04 Jun 2025 11:14:05 -0400
 
-coreutils (9.4-2-1deepin4) unstable; urgency=medium
+coreutils (9.7-2) unstable; urgency=low
 
-  * implement USEC with libusec.so
+  * Build without y2038 support on hurd-i386 (Closes: #1078000)
+  * Hardening build flags (Closes: #1023556)
+  * Update URLs and metadata (Closes: #1057101)
+  * Support nodoc build profile (Closes: #1057136)
+  * Remove md5sum.textutils link (Closes: #1061302)
+  * Use DEB_VENDOR for packager name
+  * Lintian overrides
+  * Update standards version (no changes)
 
- -- zhouzilong <zhouzilong@uniontech.com>  Fri, 06 Mar 2026 17:44:51 +0800
+ -- Michael Stone <mstone@debian.org>  Sun, 20 Apr 2025 13:39:09 -0400
 
-coreutils (9.4-2-1deepin3) unstable; urgency=medium
+coreutils (9.7-1) unstable; urgency=low
 
-  * fix CVE-2024-0684 
+  * New upstream version
+  * Remove Breaks: usrmerge
+  * Add libsystemd dependency (Closes: #1080330)
+  * Add packager to version output (Closes: #1094325)
 
- -- zengwei <zengwei1@uniontech.com>  Wed, 24 Dec 2025 15:39:19 +0800
+ -- Michael Stone <mstone@debian.org>  Wed, 09 Apr 2025 09:09:41 -0400
 
-coreutils (9.4-2-1deepin2) unstable; urgency=medium
+coreutils (9.6-2) unstable; urgency=low
 
-  * Bump version to 9.4-2-1deepin2 to mitigate previous packaging issue.
-    https://github.com/deepin-community/coreutils/pull/3
+  * Backport upstream commit 915004f4 to address crash in ls -Z
 
- -- Tianyu Chen <sweetyfish@deepin.org>  Thu, 21 Aug 2025 10:47:12 +0800
+ -- Michael Stone <mstone@debian.org>  Fri, 04 Apr 2025 10:54:18 -0400
 
-coreutils (9.4-3.1deepin2) unstable; urgency=medium
+coreutils (9.6-1) unstable; urgency=low
 
-  * feat: add sw64 support
+  * New upstream version
+  * Disable autoreconf on build (for now)
 
- -- Deepin Packages Builder <packages@deepin.org>  Tue, 27 May 2025 14:10:04 +0800
+ -- Michael Stone <mstone@debian.org>  Thu, 03 Apr 2025 13:29:08 -0400
 
-coreutils (9.4-3.1deepin1) unstable; urgency=medium
+coreutils (9.5-1) unstable; urgency=low
 
-  * chore: add missing patch
+  * New upstream version (Closes: #1033277)
+  * drop cp -n patch
+  * drop non-essential attributes in upstream/signing-key.asc to reduce size
+  * update watch file to use https rather than ftp
 
- -- Deepin Packages Builder <packages@deepin.org>  Tue, 27 May 2025 14:08:19 +0800
+ -- Michael Stone <mstone@debian.org>  Wed, 23 Oct 2024 09:08:43 -0400
 
 coreutils (9.4-3.1) unstable; urgency=medium
 

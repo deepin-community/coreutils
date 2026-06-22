@@ -1,12 +1,13 @@
+# chown.m4
 # serial 36
-# Determine whether we need the chown wrapper.
-
-dnl Copyright (C) 1997-2001, 2003-2005, 2007, 2009-2023 Free Software
+dnl Copyright (C) 1997-2001, 2003-2005, 2007, 2009-2025 Free Software
 dnl Foundation, Inc.
-
 dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
 dnl with or without modifications, as long as this notice is preserved.
+dnl This file is offered as-is, without any warranty.
+
+# Determine whether we need the chown wrapper.
 
 # chown should accept arguments of -1 for uid and gid, and it should
 # dereference symlinks.  If it doesn't, arrange to use the replacement

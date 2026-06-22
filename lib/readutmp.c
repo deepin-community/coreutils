@@ -1,6 +1,6 @@
 /* GNU's read utmp module.
 
-   Copyright (C) 1992-2001, 2003-2006, 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 1992-2001, 2003-2006, 2009-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -49,6 +49,12 @@
 
 #if HAVE_OS_H
 # include <OS.h>
+#endif
+
+#if defined _WIN32 && ! defined __CYGWIN__
+# define WIN32_LEAN_AND_MEAN
+# include <windows.h>
+# include <sys/time.h>
 #endif
 
 #include "stat-time.h"
@@ -142,7 +148,7 @@
 /* Size of the ut->ut_host member.  */
 #define UT_HOST_SIZE  sizeof (((struct UTMP_STRUCT_NAME *) 0)->ut_host)
 
-#if 8 <= __GNUC__
+#if _GL_GNUC_PREREQ (8, 0)
 # pragma GCC diagnostic ignored "-Wsizeof-pointer-memaccess"
 #endif
 
@@ -326,7 +332,7 @@ read_utmp_from_file (char const *file, idx_t *n_entries, STRUCT_UTMP **utmp_buf,
       return 0;
     }
 
-  struct utmp_alloc a = {0};
+  struct utmp_alloc a = { NULL, 0, 0, 0 };
 
 # if READUTMP_USE_SYSTEMD || HAVE_UTMPX_H || HAVE_UTMP_H
 
@@ -666,6 +672,22 @@ read_utmp_from_file (char const *file, idx_t *n_entries, STRUCT_UTMP **utmp_buf,
     }
 # endif
 
+# if defined _WIN32 && ! defined __CYGWIN__
+  if ((options & (READ_UTMP_USER_PROCESS | READ_UTMP_NO_BOOT_TIME)) == 0
+      && strcmp (file, UTMP_FILE) == 0
+      && !have_boot_time (a))
+    {
+      struct timespec boot_time;
+      if (get_windows_boot_time_fallback (&boot_time) >= 0)
+        a = add_utmp (a, options,
+                      "reboot", strlen ("reboot"),
+                      "", 0,
+                      "", 0,
+                      "", 0,
+                      0, BOOT_TIME, boot_time, 0, 0, 0);
+    }
+# endif
+
   a = finish_utmp (a);
 
   *n_entries = a.filled;
@@ -795,7 +817,7 @@ read_utmp_from_systemd (idx_t *n_entries, STRUCT_UTMP **utmp_buf, int options)
     {
       char **sessions;
       int num_sessions = sd_get_sessions (&sessions);
-      if (num_sessions >= 0)
+      if (num_sessions >= 0 && sessions != NULL)
         {
           char **session_ptr;
           for (session_ptr = sessions; *session_ptr != NULL; session_ptr++)
@@ -845,10 +867,18 @@ read_utmp_from_systemd (idx_t *n_entries, STRUCT_UTMP **utmp_buf, int options)
                       else if (pty != NULL)
                         tty = pty;
                     }
+                  else if (strcmp (type, "web") == 0)
+                    {
+                      char *service;
+                      if (sd_session_get_service (session, &service) < 0)
+                        service = NULL;
+
+                      tty = service;
+                    }
                 }
 
-              /* Create up to two USER_PROCESS entries: one for the seat,
-                 one for the tty.  */
+              /* Create up to two USER_PROCESS or LOGIN_PROCESS entries:
+                 one for the seat, one for the tty.  */
               if (seat != NULL || tty != NULL)
                 {
                   char *user;
@@ -858,6 +888,13 @@ read_utmp_from_systemd (idx_t *n_entries, STRUCT_UTMP **utmp_buf, int options)
                   pid_t leader_pid;
                   if (sd_session_get_leader (session, &leader_pid) < 0)
                     leader_pid = 0;
+
+                  char *clasz;
+                  if (sd_session_get_class (session, &clasz) < 0)
+                    clasz = missing;
+                  short ctype =
+                    (strncmp (clasz, "manager", 7) == 0 ? LOGIN_PROCESS :
+                     USER_PROCESS);
 
                   char *host;
                   char *remote_host;
@@ -873,7 +910,10 @@ read_utmp_from_systemd (idx_t *n_entries, STRUCT_UTMP **utmp_buf, int options)
                           char *display;
                           if (sd_session_get_display (session, &display) < 0)
                             display = NULL;
-                          host = display;
+                          /* Workaround: gdm "forgets" to pass the display to
+                             systemd, thus display may be NULL here.  */
+                          if (display != NULL)
+                            host = display;
                         }
                     }
                   else
@@ -899,7 +939,7 @@ read_utmp_from_systemd (idx_t *n_entries, STRUCT_UTMP **utmp_buf, int options)
                                   seat, strlen (seat),
                                   host, strlen (host),
                                   leader_pid /* the best we have */,
-                                  USER_PROCESS, start_ts, leader_pid, 0, 0);
+                                  ctype, start_ts, leader_pid, 0, 0);
                   if (tty != NULL)
                     a = add_utmp (a, options,
                                   user, strlen (user),
@@ -907,10 +947,12 @@ read_utmp_from_systemd (idx_t *n_entries, STRUCT_UTMP **utmp_buf, int options)
                                   tty, strlen (tty),
                                   host, strlen (host),
                                   leader_pid /* the best we have */,
-                                  USER_PROCESS, start_ts, leader_pid, 0, 0);
+                                  ctype, start_ts, leader_pid, 0, 0);
 
                   if (host != missing)
                     free (host);
+                  if (clasz != missing)
+                    free (clasz);
                   if (user != missing)
                     free (user);
                 }

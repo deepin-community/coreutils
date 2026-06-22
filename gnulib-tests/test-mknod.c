@@ -1,5 +1,5 @@
 /* Tests of mknod.
-   Copyright (C) 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -51,5 +51,6 @@ main (void)
 
   /* We can only portably test creation of fifos.  Anything else
      requires root privileges and knowledge of device numbers.  */
-  return test_mkfifo (do_mknod, true);
+  int result = test_mkfifo (do_mknod, true);
+  return (result ? result : test_exit_status);
 }

@@ -1,5 +1,5 @@
 /* pwd - print current directory
-   Copyright (C) 1994-2023 Free Software Foundation, Inc.
+   Copyright (C) 1994-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@
 struct file_name
 {
   char *buf;
-  size_t n_alloc;
+  idx_t n_alloc;
   char *start;
 };
 
@@ -59,7 +59,9 @@ Print the full filename of the current working directory.\n\
 "), stdout);
       fputs (_("\
   -L, --logical   use PWD from environment, even if it contains symlinks\n\
-  -P, --physical  avoid all symlinks\n\
+"), stdout);
+      fputs (_("\
+  -P, --physical  resolve all symlinks\n\
 "), stdout);
       fputs (HELP_OPTION_DESCRIPTION, stdout);
       fputs (VERSION_OPTION_DESCRIPTION, stdout);
@@ -84,12 +86,13 @@ file_name_init (void)
 {
   struct file_name *p = xmalloc (sizeof *p);
 
-  /* Start with a buffer larger than PATH_MAX, but beware of systems
+  /* Start with a buffer larger than likely file names, but beware of systems
      on which PATH_MAX is very large -- e.g., INT_MAX.  */
-  p->n_alloc = MIN (2 * PATH_MAX, 32 * 1024);
+  int init_alloc = 2 * MIN (PATH_MAX, 16 * 1024);
+  p->n_alloc = init_alloc;
 
-  p->buf = xmalloc (p->n_alloc);
-  p->start = p->buf + (p->n_alloc - 1);
+  p->buf = xmalloc (init_alloc);
+  p->start = p->buf + init_alloc - 1;
   p->start[0] = '\0';
   return p;
 }
@@ -98,21 +101,18 @@ file_name_init (void)
 static void
 file_name_prepend (struct file_name *p, char const *s, size_t s_len)
 {
-  size_t n_free = p->start - p->buf;
+  idx_t n_free = p->start - p->buf;
   if (n_free < 1 + s_len)
     {
-      size_t half = p->n_alloc + 1 + s_len;
-      /* Use xnmalloc+free rather than xnrealloc, since with the latter
+      /* Call xpalloc with nullptr not p->buf, since with the latter
          we'd end up copying the data twice: once via realloc, then again
-         to align it with the end of the new buffer.  With xnmalloc, we
+         to align it with the end of the new buffer.  By passing nullptr we
          copy it only once.  */
-      char *q = xnmalloc (2, half);
-      size_t n_used = p->n_alloc - n_free;
-      p->start = q + 2 * half - n_used;
-      memcpy (p->start, p->buf + n_free, n_used);
+      idx_t n_used = p->n_alloc - n_free;
+      char *buf = xpalloc (nullptr, &p->n_alloc, 1 + s_len - n_free, -1, 1);
+      p->start = memcpy (buf + p->n_alloc - n_free, p->start, n_used);
       free (p->buf);
-      p->buf = q;
-      p->n_alloc = 2 * half;
+      p->buf = buf;
     }
 
   p->start -= 1 + s_len;
@@ -280,7 +280,7 @@ robust_getcwd (struct file_name *file_name)
   while (true)
     {
       /* If we've reached the root, we're done.  */
-      if (SAME_INODE (dot_sb, *root_dev_ino))
+      if (PSAME_INODE (&dot_sb, root_dev_ino))
         break;
 
       find_dir_entry (&dot_sb, file_name, height++);
@@ -315,7 +315,7 @@ logical_getcwd (void)
     }
 
   /* System call validation.  */
-  if (stat (wd, &st1) == 0 && stat (".", &st2) == 0 && SAME_INODE (st1, st2))
+  if (stat (wd, &st1) == 0 && stat (".", &st2) == 0 && psame_inode (&st1, &st2))
     return wd;
   return nullptr;
 }

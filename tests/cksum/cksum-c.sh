@@ -1,7 +1,7 @@
 #!/bin/sh
 # Validate cksum --check dynamic operation
 
-# Copyright (C) 2021-2023 Free Software Foundation, Inc.
+# Copyright (C) 2021-2025 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -56,4 +56,106 @@ returns_ 1 cksum -a crc -c CHECKSUMS || fail=1
 cksum -a crc 'input' > CHECKSUMS.crc || fail=1
 returns_ 1 cksum -c CHECKSUMS.crc || fail=1
 
+# Test --status
+cksum --status --check CHECKSUMS >out 2>&1 || fail=1
+# Should be empty
+compare /dev/null out || fail=1
+
+# Add a comment. No errors
+echo '# Very important comment' >> CHECKSUMS
+cksum --status --check CHECKSUMS >out 2>&1 || fail=1
+
+# Check for the error mgmt
+echo 'invalid line' >> CHECKSUMS
+# Exit code is 0 in this case
+cksum --check CHECKSUMS >out 2>&1 || fail=1
+grep '1 line is improperly formatted' out || fail=1
+# But not with --strict
+cksum --strict --check CHECKSUMS >out 2>&1 && fail=1
+grep '1 line is improperly formatted' out || fail=1
+echo "invalid line" >> CHECKSUMS
+# plurial checks
+cksum --strict --check CHECKSUMS >out 2>&1 && fail=1
+grep '2 lines are improperly formatted' out || fail=1
+
+# Inject an incorrect checksum
+invalid_sum='aaaaaaaaaaaaaaaaaaaaaaaaaaaaafdb57c725157cb40b5aee8d937b8351477e'
+echo "SM3 (input) = $invalid_sum" >> CHECKSUMS
+cksum --check CHECKSUMS >out 2>&1 && fail=1
+# with --strict (won't change the result)
+grep '1 computed checksum did NOT match' out || fail=1
+grep 'input: FAILED' out || fail=1
+cksum --check --strict CHECKSUMS >out 2>&1 && fail=1
+
+# With a non existing file
+echo "SM3 (input2) = $invalid_sum" >> CHECKSUMS2
+cksum --check CHECKSUMS2 >out 2>&1 && fail=1
+grep 'input2: FAILED open or read' out || fail=1
+grep '1 listed file could not be read' out || fail=1
+# with --strict (won't change the result)
+cksum --check --strict CHECKSUMS2 >out 2>&1 && fail=1
+
+# With errors
+cksum --status --check CHECKSUMS >out 2>&1 && fail=1
+compare /dev/null out || fail=1
+
+# Test --warn
+echo "BLAKE2b (missing-file) = $invalid_sum" >> CHECKSUMS
+cksum --warn --check CHECKSUMS > out 2>&1
+# check that the incorrect lines are correctly reported with --warn
+grep 'CHECKSUMS: 6: improperly formatted SM3 checksum line' out || fail=1
+grep 'CHECKSUMS: 9: improperly formatted BLAKE2b checksum line' out || fail=1
+
+# Test --ignore-missing
+
+echo "SM3 (nonexistent) = $invalid_sum" >> CHECKSUMS-missing
+# we have output on both stdout and stderr
+cksum --check CHECKSUMS-missing > stdout 2> stderr && fail=1
+grep 'nonexistent: FAILED open or read' stdout || fail=1
+grep 'nonexistent: No such file or directory' stderr || fail=1
+grep '1 listed file could not be read' stderr || fail=1
+
+cksum --ignore-missing --check CHECKSUMS-missing  > stdout 2> stderr && fail=1
+# We should not get these errors
+grep 'nonexistent: No such file or directory' stdout && fail=1
+grep 'nonexistent: FAILED open or read' stdout && fail=1
+grep 'CHECKSUMS-missing: no file was verified' stderr || fail=1
+
+# Combination of --status and --warn
+cksum --status --warn --check CHECKSUMS > out 2>&1 && fail=1
+
+grep 'CHECKSUMS: 9: improperly formatted BLAKE2b checksum line' out || fail=1
+grep 'WARNING: 3 lines are improperly formatted' out || fail=1
+grep 'WARNING: 1 computed checksum did NOT match' out || fail=1
+
+# The order matters. --status will hide the results
+cksum --warn --status --check CHECKSUMS > out 2>&1 && fail=1
+grep 'CHECKSUMS: 8: improperly formatted BLAKE2b checksum line' out && fail=1
+grep 'WARNING: 3 lines are improperly formatted' out && fail=1
+grep 'WARNING: 1 computed checksum did NOT match' out && fail=1
+
+# Combination of --status and --ignore-missing
+cksum --status --ignore-missing --check CHECKSUMS > out 2>&1 && fail=1
+# should be empty
+compare /dev/null out || fail=1
+
+# Combination of all three
+cksum --status --warn --ignore-missing --check \
+      CHECKSUMS-missing > out 2>&1 && fail=1
+# Not empty
+test -s out || fail=1
+grep 'CHECKSUMS-missing: no file was verified' out || fail=1
+grep 'nonexistent: No such file or directory' stdout && fail=1
+
+# Check with several files
+# When the files don't exist
+cksum --check non-existing-1 non-existing-2 > out 2>&1 && fail=1
+grep 'non-existing-1: No such file or directory' out || fail=1
+grep 'non-existing-2: No such file or directory' out || fail=1
+
+# When the files are empty
+touch empty-1 empty-2 || framework_failure_
+cksum --check empty-1 empty-2 > out 2>&1 && fail=1
+grep 'empty-1: no properly formatted checksum lines found' out || fail=1
+grep 'empty-2: no properly formatted checksum lines found' out || fail=1
 Exit $fail

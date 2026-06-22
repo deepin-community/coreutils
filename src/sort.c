@@ -1,5 +1,5 @@
 /* sort - sort lines of text (with all kinds of options).
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@
 
 #include <config.h>
 
+#include <ctype.h>
 #include <getopt.h>
 #include <pthread.h>
 #include <sys/resource.h>
@@ -31,6 +32,7 @@
 #include "system.h"
 #include "argmatch.h"
 #include "assure.h"
+#include "c-ctype.h"
 #include "fadvise.h"
 #include "filevercmp.h"
 #include "flexmember.h"
@@ -38,7 +40,6 @@
 #include "hash.h"
 #include "heap.h"
 #include "ignore-value.h"
-#include "md5.h"
 #include "mbswidth.h"
 #include "nproc.h"
 #include "physmem.h"
@@ -190,7 +191,7 @@ struct buffer
                                    - an array of lines, in reverse order.  */
   size_t used;			/* Number of bytes used for input data.  */
   size_t nlines;		/* Number of lines in the line array.  */
-  size_t alloc;			/* Number of bytes allocated. */
+  idx_t alloc;			/* Number of bytes allocated. */
   size_t left;			/* Number of bytes left from previous reads. */
   size_t line_bytes;		/* Number of bytes to reserve for each line. */
   bool eof;			/* An EOF has been read.  */
@@ -325,10 +326,10 @@ static size_t sort_size;
 static char const **temp_dirs;
 
 /* Number of temporary directory names used.  */
-static size_t temp_dir_count;
+static idx_t temp_dir_count;
 
 /* Number of allocated slots in temp_dirs.  */
-static size_t temp_dir_alloc;
+static idx_t temp_dir_alloc;
 
 /* Flag to reverse the order of all comparisons. */
 static bool reverse;
@@ -444,7 +445,10 @@ Ordering options:\n\
   -h, --human-numeric-sort    compare human readable numbers (e.g., 2K 1G)\n\
 "), stdout);
       fputs (_("\
-  -n, --numeric-sort          compare according to string numerical value\n\
+  -n, --numeric-sort          compare according to string numerical value;\n\
+                                see full documentation for supported strings\n\
+"), stdout);
+      fputs (_("\
   -R, --random-sort           shuffle, but group identical keys.  See shuf(1)\n\
       --random-source=FILE    get random bytes from FILE\n\
   -r, --reverse               reverse the result of comparisons\n\
@@ -494,9 +498,8 @@ Other options:\n\
   -T, --temporary-directory=DIR  use DIR for temporaries, not $TMPDIR or %s;\n\
                               multiple options specify multiple directories\n\
       --parallel=N          change the number of sorts run concurrently to N\n\
-  -u, --unique              with -c, check for strict ordering;\n\
-                              without -c, output only the first of an equal run\
-\n\
+  -u, --unique              output only the first of lines with equal keys;\n\
+                              with -c, check for strict ordering\n\
 "), DEFAULT_TMPDIR);
       fputs (_("\
   -z, --zero-terminated     line delimiter is NUL, not newline\n\
@@ -843,7 +846,7 @@ static struct tempnode *
 create_temp_file (int *pfd, bool survive_fd_exhaustion)
 {
   static char const slashbase[] = "/sortXXXXXX";
-  static size_t temp_dir_index;
+  static idx_t temp_dir_index;
   int fd;
   int saved_errno;
   char const *temp_dir = temp_dirs[temp_dir_index];
@@ -1232,7 +1235,7 @@ static void
 add_temp_dir (char const *dir)
 {
   if (temp_dir_count == temp_dir_alloc)
-    temp_dirs = X2NREALLOC (temp_dirs, &temp_dir_alloc);
+    temp_dirs = xpalloc (temp_dirs, &temp_dir_alloc, 1, -1, sizeof *temp_dirs);
 
   temp_dirs[temp_dir_count++] = dir;
 }
@@ -1291,9 +1294,9 @@ inittables (void)
 
   for (i = 0; i < UCHAR_LIM; ++i)
     {
-      blanks[i] = field_sep (i);
+      blanks[i] = i == '\n' || isblank (i);
+      nondictionary[i] = ! blanks[i] && ! isalnum (i);
       nonprinting[i] = ! isprint (i);
-      nondictionary[i] = ! isalnum (i) && ! field_sep (i);
       fold_toupper[i] = toupper (i);
     }
 
@@ -1367,13 +1370,11 @@ specify_nmerge (int oi, char c, char const *s)
 
   if (e == LONGINT_OVERFLOW)
     {
-      char max_nmerge_buf[INT_BUFSIZE_BOUND (max_nmerge)];
       error (0, 0, _("--%s argument %s too large"),
              long_options[oi].name, quote (s));
       error (SORT_FAILURE, 0,
-             _("maximum --%s argument with current rlimit is %s"),
-             long_options[oi].name,
-             uinttostr (max_nmerge, max_nmerge_buf));
+             _("maximum --%s argument with current rlimit is %u"),
+             long_options[oi].name, max_nmerge);
     }
   else
     xstrtol_fatal (e, oi, c, long_options, s);
@@ -1388,7 +1389,7 @@ specify_sort_size (int oi, char c, char const *s)
   enum strtol_error e = xstrtoumax (s, &suffix, 10, &n, "EgGkKmMPQRtTYZ");
 
   /* The default unit is KiB.  */
-  if (e == LONGINT_OK && ISDIGIT (suffix[-1]))
+  if (e == LONGINT_OK && c_isdigit (suffix[-1]))
     {
       if (n <= UINTMAX_MAX / 1024)
         n *= 1024;
@@ -1397,7 +1398,7 @@ specify_sort_size (int oi, char c, char const *s)
     }
 
   /* A 'b' suffix means bytes; a '%' suffix means percent of memory.  */
-  if (e == LONGINT_INVALID_SUFFIX_CHAR && ISDIGIT (suffix[-1]) && ! suffix[1])
+  if (e == LONGINT_INVALID_SUFFIX_CHAR && c_isdigit (suffix[-1]) && ! suffix[1])
     switch (suffix[0])
       {
       case 'b':
@@ -1538,7 +1539,7 @@ sort_buffer_size (FILE *const *fps, size_t nfps,
           != 0)
         sort_die (_("stat failed"), files[i]);
 
-      if (S_ISREG (st.st_mode))
+      if (usable_st_size (&st) && 0 < st.st_size)
         file_size = st.st_size;
       else
         {
@@ -1864,8 +1865,8 @@ fillbuf (struct buffer *buf, FILE *fp, char const *file)
         /* The current input line is too long to fit in the buffer.
            Increase the buffer size and try again, keeping it properly
            aligned.  */
-        size_t line_alloc = buf->alloc / sizeof (struct line);
-        buf->buf = x2nrealloc (buf->buf, &line_alloc, sizeof (struct line));
+        idx_t line_alloc = buf->alloc / sizeof (struct line);
+        buf->buf = xpalloc (buf->buf, &line_alloc, 1, -1, sizeof (struct line));
         buf->alloc = line_alloc * sizeof (struct line);
       }
     }
@@ -1920,7 +1921,7 @@ traverse_raw_number (char const **number)
      to be lacking in units.
      FIXME: add support for multibyte thousands_sep and decimal_point.  */
 
-  while (ISDIGIT (ch = *p++))
+  while (c_isdigit (ch = *p++))
     {
       if (max_digit < ch)
         max_digit = ch;
@@ -1941,7 +1942,7 @@ traverse_raw_number (char const **number)
     }
 
   if (ch == decimal_point)
-    while (ISDIGIT (ch = *p++))
+    while (c_isdigit (ch = *p++))
       if (max_digit < ch)
         max_digit = ch;
 
@@ -2083,6 +2084,64 @@ getmonth (char const *month, char **ea)
   return 0;
 }
 
+/* When using the OpenSSL implementation, dynamically link only if -R.
+   This saves startup time in the usual (sans -R) case.  */
+
+#if DLOPEN_LIBCRYPTO && HAVE_OPENSSL_MD5
+/* In the typical case where md5.h does not #undef HAVE_OPENSSL_MD5,
+   trick md5.h into declaring and using pointers to functions not functions.
+   This causes the compiler's -lcrypto option to have no effect,
+   as sort.o no longer uses any crypto symbols statically.  */
+
+# if 14 <= __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wmissing-variable-declarations"
+# endif
+# define MD5_Init (*ptr_MD5_Init)
+# define MD5_Update (*ptr_MD5_Update)
+# define MD5_Final (*ptr_MD5_Final)
+#endif
+
+#include "md5.h"
+
+#if DLOPEN_LIBCRYPTO && HAVE_OPENSSL_MD5
+# if 14 <= __GNUC__
+#  pragma GCC diagnostic pop
+# endif
+# include <dlfcn.h>
+
+/* Diagnose a dynamic linking failure.  */
+static void
+link_failure (void)
+{
+  error (SORT_FAILURE, 0, "%s", dlerror ());
+}
+
+/* Return a function pointer in HANDLE for SYMBOL.  */
+static void *
+symbol_address (void *handle, char const *symbol)
+{
+  void *address = dlsym (handle, symbol);
+  if (!address)
+    link_failure ();
+  return address;
+}
+#endif
+
+/* Dynamically link the crypto library, if it needs linking.  */
+static void
+link_libcrypto (void)
+{
+#if DLOPEN_LIBCRYPTO && HAVE_OPENSSL_MD5
+  void *handle = dlopen (LIBCRYPTO_SONAME, RTLD_LAZY | RTLD_GLOBAL);
+  if (!handle)
+    link_failure ();
+  ptr_MD5_Init = symbol_address (handle, "MD5_Init");
+  ptr_MD5_Update = symbol_address (handle, "MD5_Update");
+  ptr_MD5_Final = symbol_address (handle, "MD5_Final");
+#endif
+}
+
 /* A randomly chosen MD5 state, used for random comparison.  */
 static struct md5_ctx random_md5_state;
 
@@ -2098,6 +2157,7 @@ random_md5_state_init (char const *random_source)
   randread (r, buf, sizeof buf);
   if (randread_free (r) != 0)
     sort_die (_("close failed"), random_source);
+  link_libcrypto ();
   md5_init_ctx (&random_md5_state);
   md5_process_bytes (buf, sizeof buf, &random_md5_state);
 }
@@ -2312,7 +2372,11 @@ debug_key (struct line const *line, struct keyfield const *key)
       if (key->sword != SIZE_MAX)
         beg = begfield (line, key);
       if (key->eword != SIZE_MAX)
-        lim = limfield (line, key);
+        {
+          lim = limfield (line, key);
+          /* Treat field ends before field starts as empty fields.  */
+          lim = MAX (beg, lim);
+        }
 
       if ((key->skipsblanks && key->sword == SIZE_MAX)
           || key->month || key_numeric (key))
@@ -2567,8 +2631,7 @@ key_warnings (struct keyfield const *gkey, bool gkey_only)
   if ((basic_numeric_field || general_numeric_field) && ! number_locale_warned)
     {
       error (0, 0,
-             _("%snumbers use %s as a decimal point in this locale"),
-             tab == decimal_point ? "" : _("note "),
+             _("numbers use %s as a decimal point in this locale"),
              quote (((char []) {decimal_point, 0})));
 
     }
@@ -3806,7 +3869,7 @@ avoid_trashing_input (struct sortfile *files, size_t ntemps,
                     ? fstat (STDIN_FILENO, &instat)
                     : stat (files[i].name, &instat))
                    == 0)
-                  && SAME_INODE (instat, *outst));
+                  && psame_inode (&instat, outst));
         }
 
       if (same)
@@ -4416,7 +4479,7 @@ main (int argc, char **argv)
           if (optarg[0] == '+')
             {
               bool minus_pos_usage = (optind != argc && argv[optind][0] == '-'
-                                      && ISDIGIT (argv[optind][1]));
+                                      && c_isdigit (argv[optind][1]));
               traditional_usage |= minus_pos_usage && !posixly_correct;
               if (traditional_usage)
                 {
@@ -4641,7 +4704,7 @@ main (int argc, char **argv)
           if (optarg == argv[optind - 1])
             {
               char const *p;
-              for (p = optarg; ISDIGIT (*p); p++)
+              for (p = optarg; c_isdigit (*p); p++)
                 continue;
               optind -= (*p != '\0');
             }

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Test "stty" with rows and columns.
 
-# Copyright (C) 1998-2023 Free Software Foundation, Inc.
+# Copyright (C) 1998-2025 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -53,7 +53,7 @@ tests='
 11 rows_036 30_80
 NA LAST NA
 '
-set $tests
+set -- $tests
 
 saved_size=$(stty size) && test -n "$saved_size" \
   || skip_ "can't get window size"

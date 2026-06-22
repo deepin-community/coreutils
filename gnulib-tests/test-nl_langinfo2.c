@@ -1,5 +1,5 @@
 /* Test of nl_langinfo replacement.
-   Copyright (C) 2023 Free Software Foundation, Inc.
+   Copyright (C) 2023-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -134,11 +134,13 @@ main (int argc, char *argv[])
 
   if (skipped_all)
     {
+      if (test_exit_status != EXIT_SUCCESS)
+        return test_exit_status;
       fputs ("Skipping test: French locale is not installed\n", stderr);
       return 77;
     }
 
-  return 0;
+  return test_exit_status;
 #else
   fputs ("Skipping test: uselocale() not available\n", stderr);
   return 77;

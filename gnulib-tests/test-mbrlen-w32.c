@@ -1,5 +1,5 @@
 /* Test of conversion of multibyte character to wide character.
-   Copyright (C) 2008-2023 Free Software Foundation, Inc.
+   Copyright (C) 2008-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -547,10 +547,12 @@ main (int argc, char *argv[])
 
   if (result == 77)
     {
+      if (test_exit_status != EXIT_SUCCESS)
+        return test_exit_status;
       fprintf (stderr, "Skipping test: found no locale with codepage %d\n",
                codepage);
     }
-  return result;
+  return (result ? result : test_exit_status);
 }
 
 #else

@@ -1,5 +1,5 @@
 /* tr -- a filter to translate characters
-   Copyright (C) 1991-2023 Free Software Foundation, Inc.
+   Copyright (C) 1991-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,12 +18,14 @@
 
 #include <config.h>
 
+#include <ctype.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <getopt.h>
 
 #include "system.h"
 #include "assure.h"
+#include "c-ctype.h"
 #include "fadvise.h"
 #include "quote.h"
 #include "safe-read.h"
@@ -382,7 +384,7 @@ is_char_class_member (enum Char_class char_class, unsigned char c)
       result = iscntrl (c);
       break;
     case CC_DIGIT:
-      result = isdigit (c);
+      result = c_isdigit (c);
       break;
     case CC_GRAPH:
       result = isgraph (c);
@@ -403,9 +405,9 @@ is_char_class_member (enum Char_class char_class, unsigned char c)
       result = isupper (c);
       break;
     case CC_XDIGIT:
-      result = isxdigit (c);
+      result = c_isxdigit (c);
       break;
-    default:
+    case CC_NO_CLASS: default:
       unreachable ();
     }
 
@@ -829,7 +831,7 @@ star_digits_closebracket (const struct E_string *es, size_t idx)
     return false;
 
   for (size_t i = idx + 1; i < es->len; i++)
-    if (!ISDIGIT (to_uchar (es->s[i])) || es->escaped[i])
+    if (!c_isdigit (es->s[i]) || es->escaped[i])
       return es_match (es, i, ']');
   return false;
 }
@@ -1051,15 +1053,13 @@ get_next (struct Spec_list *s, enum Upper_Lower_class *class)
     case RE_CHAR_CLASS:
       if (class)
         {
-          switch (p->u.char_class)
+          switch (+p->u.char_class)
             {
             case CC_LOWER:
               *class = UL_LOWER;
               break;
             case CC_UPPER:
               *class = UL_UPPER;
-              break;
-            default:
               break;
             }
         }
@@ -1138,7 +1138,7 @@ card_of_complement (struct Spec_list *s)
 {
   int c;
   int cardinality = N_CHARS;
-  bool in_set[N_CHARS] = { 0, };
+  bool in_set[N_CHARS] = {0};
 
   s->state = BEGIN_STATE;
   while ((c = get_next (s, nullptr)) != -1)
@@ -1263,7 +1263,7 @@ get_spec_stats (struct Spec_list *s)
           for (int i = 0; i < N_CHARS; i++)
             if (is_char_class_member (p->u.char_class, i))
               ++len;
-          switch (p->u.char_class)
+          switch (+p->u.char_class)
             {
             case CC_UPPER:
             case CC_LOWER:
@@ -1593,8 +1593,8 @@ squeeze_filter (char *buf, size_t size, size_t (*reader) (char *, size_t))
 static size_t
 plain_read (char *buf, size_t size)
 {
-  size_t nr = safe_read (STDIN_FILENO, buf, size);
-  if (nr == SAFE_READ_ERROR)
+  ptrdiff_t nr = safe_read (STDIN_FILENO, buf, size);
+  if (nr < 0)
     error (EXIT_FAILURE, errno, _("read error"));
   return nr;
 }
