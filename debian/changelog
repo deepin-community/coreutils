@@ -1,3 +1,10 @@
+coreutils (9.7-3deepin1) unstable; urgency=medium
+
+  * Port deepin-specific patches from master branch: - 81_uniontech-add-
+    cp-copy-audit-support.patch
+
+ -- lichenggang <lichenggang@uniontech.com>  Tue, 23 Jun 2026 21:21:47 +0800
+
 coreutils (9.7-3) unstable; urgency=high
 
   * Correct spurious permission denied errors messages when copying from a file

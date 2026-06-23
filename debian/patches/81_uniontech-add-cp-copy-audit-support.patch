@@ -1,0 +1,97 @@
+From 48207d7c9c86ea5760fbecedd8165f520172d81c Mon Sep 17 00:00:00 2001
+From: zhangya <zhangya@uniontech.com>
+Date: Wed, 4 Sep 2024 16:22:41 +0800
+Subject: [PATCH] 2
+
+---
+ configure.ac |  2 ++
+ src/copy.c   | 46 +++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 47 insertions(+), 1 deletion(-)
+
+diff --git a/configure.ac b/configure.ac
+index 8ffc0b7..8c3fe09 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -368,6 +368,8 @@ if test $ac_cv_func_syslog = no; then
+   done
+ fi
+ 
++AC_CHECK_LIB([magic], [magic_open], [LIBS="$LIBS -lmagic"],[echo "Error! not found libmagic.so, maybe run 'apt install libmagic-dev'";exit -1])
++
+ AC_CACHE_CHECK([for 3-argument setpriority function],
+   [utils_cv_func_setpriority],
+   [AC_LINK_IFELSE(
+diff --git a/src/copy.c b/src/copy.c
+index b9fff03..f834556 100644
+--- a/src/copy.c
++++ b/src/copy.c
+@@ -22,6 +22,9 @@
+ #include <sys/ioctl.h>
+ #include <sys/types.h>
+ #include <selinux/selinux.h>
++#include <pwd.h>
++#include <magic.h>
++#include <time.h>
+ 
+ #if HAVE_HURD_H
+ # include <hurd.h>
+@@ -1216,7 +1219,6 @@ handle_clone_fail (int dst_dirfd, char const *dst_relname,
+   return true;
+ }
+ 
+-
+ /* Copy a regular file from SRC_NAME to DST_NAME aka DST_DIRFD+DST_RELNAME.
+    If the source file contains holes, copies holes and blocks of zeros
+    in the source file as holes in the destination file.
+@@ -1621,6 +1623,48 @@ copy_reg (char const *src_name, char const *dst_name,
+           return_val = false;
+           goto close_src_and_dst_desc;
+         }
++
++        char src_name_abs[PATH_MAX] = {0};
++        realpath(src_name, src_name_abs);//源文件
++        if (get_file_audit_status(src_name_abs) == 0)
++        {
++          char dst_name_abs[PATH_MAX] = {0};
++          char hostname[256]={0};
++          char timeBuf[256] = {0};
++          time_t t;
++          int copy_count = 1; //拷贝数量
++          int msg_len;
++          char *msg = NULL;
++          struct passwd *pw;
++          realpath(dst_name, dst_name_abs);//目标文件
++          pw = getpwuid(getuid()); // 操作用户
++          assert(pw != NULL);
++          const char *mime = NULL;//文件mime
++          magic_t magic =  magic_open(MAGIC_MIME_TYPE);
++          if (magic)
++          {
++            magic_load(magic, NULL);
++            mime = magic_file(magic, src_name_abs);
++          }
++
++          gethostname(hostname, sizeof(hostname)); //hostname
++          t = time(0);
++          strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", localtime(&t));
++
++          msg_len = strlen(hostname) + strlen(src_name_abs) + strlen(dst_name_abs) + strlen(mime?mime:"") + 128;
++          msg = (char *)malloc(msg_len);
++          if (src_open_sb.st_size  > 1024){
++            snprintf(msg,msg_len,"[%s] %s %s: file_count=%d, src_file=%s, target_file=%s, file_type=%s, file_size=%dKb\n",timeBuf, hostname, pw->pw_name, copy_count, src_name_abs, dst_name_abs, mime?mime:"", src_open_sb.st_size>>10);
++          }else{
++            snprintf(msg,msg_len,"[%s] %s %s: file_count=%d, src_file=%s, target_file=%s, file_type=%s, file_size=%dByte\n",timeBuf, hostname, pw->pw_name, copy_count, src_name_abs, dst_name_abs, mime?mime:"", src_open_sb.st_size);
++          }
++
++          if(magic)
++            magic_close(magic);
++
++          write_audit_log(msg);
++          free(msg);
++        }
+     }
+ 
+   if (x->preserve_timestamps)
+-- 
+2.20.1
+
