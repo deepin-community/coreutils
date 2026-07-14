@@ -1,0 +1,82 @@
+From: zhouzilong <zhouzilong@uniontech.com>
+Date: Fri, 6 Mar 2026 17:42:31 +0800
+Subject: implement USEC with libusec.so
+
+---
+ configure.ac | 15 +++++++++++++++
+ src/copy.c   |  8 ++++++--
+ src/local.mk |  3 +++
+ 3 files changed, 24 insertions(+), 2 deletions(-)
+
+Index: coreutils/configure.ac
+===================================================================
+--- coreutils.orig/configure.ac
++++ coreutils/configure.ac
+@@ -148,6 +148,21 @@ AC_ARG_ENABLE([bold-man-page-references]
+ )
+ AM_CONDITIONAL([BOLD_MAN_REFS], [test "$gl_bold_manpages" != no])
+ 
++AC_ARG_WITH([usec],
++  [AS_HELP_STRING([--with-usec], [enable usec library support (for UOS system auditing)])],
++  [with_usec=$withval],
++  [with_usec=auto])
++
++if test "x$with_usec" != "xno"; then
++  AC_CHECK_LIB([usec], [usec_get_file_audit_status],
++               [LIB_USEC=-lusec
++                AC_DEFINE([HAVE_USEC], [1], [Define to 1 if you have the usec library])],
++               [if test "x$with_usec" != "xauto"; then
++                  AC_MSG_ERROR([usec library requested but not found])
++                fi])
++fi
++AC_SUBST([LIB_USEC])
++
+ AC_ARG_ENABLE([gcc-warnings],
+   [AS_HELP_STRING([--enable-gcc-warnings@<:@=TYPE@:>@],
+     [control generation of GCC warnings.  The TYPE 'no' disables
+Index: coreutils/src/copy.c
+===================================================================
+--- coreutils.orig/src/copy.c
++++ coreutils/src/copy.c
+@@ -24,6 +24,9 @@
+ #include <pwd.h>
+ #include <magic.h>
+ #include <time.h>
++#ifdef HAVE_USEC
++# include <usec/usec.h>
++#endif
+ 
+ #if HAVE_HURD_H
+ # include <hurd.h>
+@@ -1629,7 +1632,7 @@ copy_reg (char const *src_name, char con
+ 
+         char src_name_abs[PATH_MAX] = {0};
+         realpath(src_name, src_name_abs);//源文件
+-        if (get_file_audit_status(src_name_abs) == 0)
++        if (usec_get_file_audit_status(src_name_abs) == 0)
+         {
+           char dst_name_abs[PATH_MAX] = {0};
+           char hostname[256]={0};
+@@ -1665,7 +1668,7 @@ copy_reg (char const *src_name, char con
+           if(magic)
+             magic_close(magic);
+ 
+-          write_audit_log(msg);
++          usec_write_audit_log(msg);
+           free(msg);
+         }
+     }
+Index: coreutils/src/local.mk
+===================================================================
+--- coreutils.orig/src/local.mk
++++ coreutils/src/local.mk
+@@ -301,6 +301,9 @@ src_ls_LDADD += $(FILE_HAS_ACL_LIB)
+ # for various xattr functions
+ copy_ldadd += $(LIB_XATTR)
+ 
++# for usec auditing
++copy_ldadd += $(LIB_USEC)
++
+ # for print_unicode_char
+ src_printf_LDADD += $(LIBICONV)
+ 

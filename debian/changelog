@@ -1,3 +1,34 @@
+coreutils (9.7-3deepin3) unstable; urgency=medium
+
+  * Remove cp-n.diff patch (upstream 9.7 already handles -n correctly
+    via I_ALWAYS_SKIP mapping to --update=none)
+  * Add automake, autoconf to Build-Depends and remove override_dh_autoreconf
+    to let autoreconf regenerate autotools files after patches modify
+    configure.ac (fixes OBS build failure on architectures without
+    automake-1.16 installed)
+
+ -- lichenggang <lichenggang@uniontech.com>  Tue, 14 Jul 2026 15:54:11 +0800
+
+coreutils (9.7-3deepin2) unstable; urgency=medium
+
+  * Port remaining deepin-specific patches from master branch:
+    - cp-n.diff: Revert cp -n behavior to Debian 12 and prior
+    - 0001-feat-add-sw-support.patch: Add sw64 architecture support
+    - 81_uniontech-add-cp-copy-audit-support.patch: cp copy audit
+    - uniontech-implement-USEC-with-libusec.patch: USEC auditing with libusec.so
+  * Explicitly disable OpenSSL support (--with-openssl=no) to eliminate
+    dynamic linking overhead of libcrypto and libzstd.
+  * Add missing Build-Depends: libmagic-dev (required by 81 audit patch).
+
+ -- lichenggang <lichenggang@uniontech.com>  Tue, 14 Jul 2026 14:48:01 +0800
+
+coreutils (9.7-3deepin1) unstable; urgency=medium
+
+  * Port deepin-specific patches from master branch: - 81_uniontech-add-
+    cp-copy-audit-support.patch
+
+ -- lichenggang <lichenggang@uniontech.com>  Tue, 23 Jun 2026 21:21:47 +0800
+
 coreutils (9.7-3) unstable; urgency=high
 
   * Correct spurious permission denied errors messages when copying from a file

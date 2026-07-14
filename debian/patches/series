@@ -1,2 +1,5 @@
 72_id_checkngroups.patch
 gnulib-nfs-acl.patch
+81_uniontech-add-cp-copy-audit-support.patch
+0001-feat-add-sw-support.patch
+uniontech-implement-USEC-with-libusec.patch

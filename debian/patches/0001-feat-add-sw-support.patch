@@ -1,0 +1,36 @@
+From: hudeng <hudeng@deepin.org>
+Date: Tue, 27 May 2025 05:21:09 +0000
+Subject: feat: add sw64 support
+
+Add sw64 (Sunway) architecture support to config.guess and config.sub.
+---
+ build-aux/config.guess | 3 +++
+ build-aux/config.sub   | 1 +
+ 2 files changed, 4 insertions(+)
+
+Index: coreutils/build-aux/config.guess
+===================================================================
+--- coreutils.orig/build-aux/config.guess
++++ coreutils/build-aux/config.guess
+@@ -1183,6 +1183,9 @@ EOF
+     sh*:Linux:*:*)
+ 	GUESS=$UNAME_MACHINE-unknown-linux-$LIBC
+ 	;;
++    sw_64*:Linux:*:*)
++	GUESS=$UNAME_MACHINE-unknown-linux-$LIBC
++	;;
+     sparc:Linux:*:* | sparc64:Linux:*:*)
+ 	GUESS=$UNAME_MACHINE-unknown-linux-$LIBC
+ 	;;
+Index: coreutils/build-aux/config.sub
+===================================================================
+--- coreutils.orig/build-aux/config.sub
++++ coreutils/build-aux/config.sub
+@@ -1405,6 +1405,7 @@ case $cpu-$vendor in
+ 			| s390 \
+ 			| s390x \
+ 			| score \
++			| sw_64 \
+ 			| sh \
+ 			| sh64 \
+ 			| sh64le \
