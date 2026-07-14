@@ -30,13 +30,38 @@ d=debian/coreutils
 override_dh_update_autotools_config:
 	# don't do this
 
+override_dh_autoreconf:
+	# don't do this
+	# quilt patches may update configure.ac, causing make to try
+	# regenerating aclocal.m4 via aclocal-1.16 (not always installed).
+	# Touch key autotools files to prevent spurious regeneration.
+	touch aclocal.m4 configure
+
 override_dh_auto_configure:
+	# No autoreconf (gnulib macros unavailable on OBS builders).
+	# Patches add AC_CHECK_LIB for libmagic and libusec in configure.ac;
+	# since those don't run, pass the flags and HAVE_USEC define manually.
 ifeq ($(shell if [ -f /etc/os-release ]; then grep -iq "uos" /etc/os-release; echo $$?; fi),0)
 	$(info Detected UOS system, enabling usec library support)
-	dh_auto_configure -- --enable-systemd --enable-install-program=arch --with-openssl=no --with-packager=$(DEB_VENDOR) --with-packager-version=$(DEB_VERSION) $(Y2038) --with-usec
+	dh_auto_configure -- CPPFLAGS="-DHAVE_USEC" LIBS="-lmagic -lusec" \
+	  --enable-systemd --enable-install-program=arch --with-openssl=no \
+	  --with-packager=$(DEB_VENDOR) --with-packager-version=$(DEB_VERSION) $(Y2038) --with-usec
 else
-	dh_auto_configure -- --enable-systemd --enable-install-program=arch --with-openssl=no --with-packager=$(DEB_VENDOR) --with-packager-version=$(DEB_VERSION) $(Y2038)
+	dh_auto_configure -- CPPFLAGS="-DHAVE_USEC" LIBS="-lmagic -lusec" \
+	  --enable-systemd --enable-install-program=arch --with-openssl=no \
+	  --with-packager=$(DEB_VENDOR) --with-packager-version=$(DEB_VERSION) $(Y2038)
 endif
+
+override_dh_auto_build:
+	# Pre-generate src/single-binary.mk before 'make' so that make does
+	# not try to regenerate it (it's a dependency of Makefile.in).
+	rm -f src/single-binary.mk src/single-binary.mk-t \
+	  && /bin/bash ./build-aux/gen-single-binary.sh ./src/local.mk >src/single-binary.mk-t \
+	  && chmod a-w src/single-binary.mk-t && mv -f src/single-binary.mk-t src/single-binary.mk
+	# Touch Makefile.in so it's newer than the freshly generated
+	# src/single-binary.mk, preventing the automake-1.16 rebuild rule.
+	touch Makefile.in
+	dh_auto_build
 
 %:
 	dh $@

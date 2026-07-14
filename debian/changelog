@@ -2,10 +2,14 @@ coreutils (9.7-3deepin3) unstable; urgency=medium
 
   * Remove cp-n.diff patch (upstream 9.7 already handles -n correctly
     via I_ALWAYS_SKIP mapping to --update=none)
-  * Add automake, autoconf to Build-Depends and remove override_dh_autoreconf
-    to let autoreconf regenerate autotools files after patches modify
-    configure.ac (fixes OBS build failure on architectures without
-    automake-1.16 installed)
+  * Add automake, autoconf to Build-Depends; skip dh_autoreconf (gnulib
+    macros unavailable on OBS builders) and pre-generate src/single-binary.mk
+    before make to prevent automake-1.16 rebuild rule from firing
+    (fixes OBS build failure on architectures without automake-1.16)
+  * Pass CPPFLAGS="-DHAVE_USEC" LIBS="-lmagic -lusec" to configure since
+    patches' AC_CHECK_LIB for libmagic and libusec never run when autoreconf
+    is skipped (fixes link-time undefined reference to usec_* and magic_*)
+  * Default --with-usec is disabled (only enabled on UOS systems)
 
  -- lichenggang <lichenggang@uniontech.com>  Tue, 14 Jul 2026 15:54:11 +0800
 
