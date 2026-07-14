@@ -1,10 +1,10 @@
-# serial 20
-
-# Copyright (C) 2009-2023 Free Software Foundation, Inc.
-#
-# This file is free software; the Free Software Foundation
-# gives unlimited permission to copy and/or distribute it,
-# with or without modifications, as long as this notice is preserved.
+# stat.m4
+# serial 21
+dnl Copyright (C) 2009-2025 Free Software Foundation, Inc.
+dnl This file is free software; the Free Software Foundation
+dnl gives unlimited permission to copy and/or distribute it,
+dnl with or without modifications, as long as this notice is preserved.
+dnl This file is offered as-is, without any warranty.
 
 AC_DEFUN([gl_FUNC_STAT],
 [
@@ -61,8 +61,8 @@ AC_DEFUN([gl_FUNC_STAT],
             help when passed a file name with a trailing slash]);;
       esac
       case $host_os in
-        dnl Solaris stat can return a negative tv_nsec.
-        solaris*)
+        dnl macOS and Solaris stat can return a negative tv_nsec.
+        darwin* | solaris*)
           REPLACE_FSTAT=1 ;;
       esac
       ;;

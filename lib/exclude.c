@@ -1,6 +1,6 @@
 /* exclude.c -- exclude file names
 
-   Copyright (C) 1992-1994, 1997, 1999-2007, 2009-2023 Free Software
+   Copyright (C) 1992-1994, 1997, 1999-2007, 2009-2025 Free Software
    Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
@@ -34,9 +34,13 @@
 
 #include "exclude.h"
 #include "filename.h"
-#include "fnmatch.h"
+#include <fnmatch.h>
 #include "hash.h"
-#include "mbuiter.h"
+#if GNULIB_MCEL_PREFER
+# include "mcel.h"
+#else
+# include "mbuiter.h"
+#endif
 #include "xalloc.h"
 
 #if GNULIB_EXCLUDE_SINGLE_THREAD
@@ -204,7 +208,16 @@ string_hasher_ci (void const *data, size_t n_buckets)
   char const *p = data;
   size_t value = 0;
 
+#if GNULIB_MCEL_PREFER
+  while (*p)
+    {
+      mcel_t g = mcel_scanz (p);
+      value = value * 31 + (c32tolower (g.ch) - g.err);
+      p += g.len;
+    }
+#else
   mbui_iterator_t iter;
+
   for (mbui_init (iter, p); mbui_avail (iter); mbui_advance (iter))
     {
       mbchar_t m = mbui_cur (iter);
@@ -217,6 +230,7 @@ string_hasher_ci (void const *data, size_t n_buckets)
 
       value = value * 31 + wc;
     }
+#endif
 
   return value % n_buckets;
 }
@@ -246,7 +260,7 @@ new_exclude_segment (struct exclude *ex, enum exclude_type type, int options)
   switch (type)
     {
     case exclude_pattern:
-      sp->v.pat = (struct exclude_pattern) {0};
+      sp->v.pat = (struct exclude_pattern) { NULL, 0, 0 };
       break;
 
     case exclude_hash:

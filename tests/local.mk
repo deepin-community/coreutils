@@ -1,6 +1,6 @@
 ## Process this file with automake to produce Makefile.in -*-Makefile-*-.
 
-## Copyright (C) 2007-2023 Free Software Foundation, Inc.
+## Copyright (C) 2007-2025 Free Software Foundation, Inc.
 
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -108,6 +108,7 @@ EXTRA_DIST +=			\
 
 all_root_tests =				\
   tests/chown/basic.sh				\
+  tests/chgrp/from.sh				\
   tests/cp/cp-a-selinux.sh			\
   tests/cp/preserve-gid.sh			\
   tests/cp/special-bits.sh			\
@@ -123,6 +124,7 @@ all_root_tests =				\
   tests/id/setgid.sh				\
   tests/install/install-C-root.sh		\
   tests/ls/capability.sh			\
+  tests/ls/no-cap.sh				\
   tests/ls/nameless-uid.sh			\
   tests/chcon/chcon.sh				\
   tests/chroot/chroot-credentials.sh		\
@@ -257,6 +259,7 @@ all_tests =					\
   tests/seq/seq-precision.sh			\
   tests/head/head.pl				\
   tests/head/head-elide-tail.pl			\
+  tests/tail/tail-sysfs.sh			\
   tests/tail/tail-n0f.sh			\
   tests/ls/ls-misc.pl				\
   tests/date/date.pl				\
@@ -265,12 +268,12 @@ all_tests =					\
   tests/misc/xstrtol.pl				\
   tests/tail/overlay-headers.sh			\
   tests/tail/pid.sh				\
+  tests/tail/pid-pipe.sh			\
   tests/od/od.pl				\
   tests/od/od-endian.sh				\
   tests/od/od-float.sh				\
   tests/misc/mktemp.pl				\
   tests/misc/arch.sh				\
-  tests/misc/join.pl				\
   tests/pr/pr-tests.pl				\
   tests/pwd/pwd-option.sh			\
   tests/chcon/chcon-fail.sh			\
@@ -288,9 +291,9 @@ all_tests =					\
   tests/cat/cat-proc.sh				\
   tests/cat/cat-buf.sh				\
   tests/cat/cat-self.sh				\
-  tests/misc/base64.pl				\
   tests/misc/basename.pl			\
-  tests/misc/basenc.pl				\
+  tests/basenc/base64.pl			\
+  tests/basenc/basenc.pl			\
   tests/misc/close-stdout.sh			\
   tests/chroot/chroot-fail.sh			\
   tests/cksum/cksum.sh				\
@@ -331,6 +334,8 @@ all_tests =					\
   tests/cksum/md5sum-bsd.sh			\
   tests/cksum/md5sum-newline.pl			\
   tests/cksum/md5sum-parallel.sh		\
+  tests/join/join.pl				\
+  tests/join/join-utf8.sh			\
   tests/misc/mknod.sh				\
   tests/nice/nice.sh				\
   tests/nice/nice-fail.sh			\
@@ -350,6 +355,7 @@ all_tests =					\
   tests/printf/printf.sh			\
   tests/printf/printf-cov.pl			\
   tests/printf/printf-hex.sh			\
+  tests/printf/printf-indexed.sh		\
   tests/printf/printf-mb.sh			\
   tests/printf/printf-surprise.sh		\
   tests/printf/printf-quote.sh			\
@@ -473,6 +479,7 @@ all_tests =					\
   tests/chmod/thru-dangling.sh			\
   tests/chmod/umask-x.sh			\
   tests/chmod/usage.sh				\
+  tests/chmod/symlinks.sh				\
   tests/chown/deref.sh				\
   tests/chown/preserve-root.sh			\
   tests/chown/separator.sh			\
@@ -495,6 +502,7 @@ all_tests =					\
   tests/cp/existing-perm-dir.sh			\
   tests/cp/existing-perm-race.sh		\
   tests/cp/fail-perm.sh				\
+  tests/cp/keep-directory-symlink.sh		\
   tests/cp/sparse-extents.sh			\
   tests/cp/copy-FMR.sh				\
   tests/cp/sparse-perf.sh			\
@@ -545,6 +553,7 @@ all_tests =					\
   tests/dd/no-allocate.sh			\
   tests/dd/nocache.sh				\
   tests/dd/nocache_eof.sh			\
+  tests/dd/nocache_fail.sh			\
   tests/dd/not-rewound.sh			\
   tests/dd/reblock.sh				\
   tests/dd/skip-seek.pl				\
@@ -608,6 +617,7 @@ all_tests =					\
   tests/ln/slash-decorated-nonexistent-dest.sh	\
   tests/ln/target-1.sh				\
   tests/ls/a-option.sh				\
+  tests/ls/acl.sh				\
   tests/ls/abmon-align.sh			\
   tests/ls/birthtime.sh				\
   tests/ls/block-size.sh			\
@@ -631,14 +641,15 @@ all_tests =					\
   tests/ls/w-option.sh				\
   tests/ls/multihardlink.sh			\
   tests/ls/no-arg.sh				\
-  tests/ls/no-cap.sh				\
   tests/ls/selinux-segfault.sh			\
   tests/ls/quote-align.sh			\
+  tests/ls/size-align.sh			\
   tests/ls/readdir-mountpoint-inode.sh		\
   tests/ls/recursive.sh				\
   tests/ls/removed-directory.sh			\
   tests/ls/root-rel-symlink-color.sh		\
   tests/ls/rt-1.sh				\
+  tests/ls/selinux.sh				\
   tests/ls/slink-acl.sh				\
   tests/ls/stat-dtype.sh			\
   tests/ls/stat-failed.sh			\
@@ -692,6 +703,7 @@ all_tests =					\
   tests/mv/into-self-3.sh			\
   tests/mv/into-self-4.sh			\
   tests/mv/leak-fd.sh				\
+  tests/mv/mv-exchange.sh			\
   tests/mv/mv-n.sh				\
   tests/mv/mv-special-1.sh			\
   tests/mv/no-copy.sh				\
@@ -750,7 +762,7 @@ factor_tests = \
   $(tf)/t20.sh $(tf)/t21.sh $(tf)/t22.sh $(tf)/t23.sh $(tf)/t24.sh \
   $(tf)/t25.sh $(tf)/t26.sh $(tf)/t27.sh $(tf)/t28.sh $(tf)/t29.sh \
   $(tf)/t30.sh $(tf)/t31.sh $(tf)/t32.sh $(tf)/t33.sh $(tf)/t34.sh \
-  $(tf)/t35.sh $(tf)/t36.sh
+  $(tf)/t35.sh $(tf)/t36.sh $(tf)/t37.sh
 
 $(factor_tests): $(tf)/run.sh $(tf)/create-test.sh
 	$(AM_V_GEN)$(MKDIR_P) $(tf)

@@ -1,5 +1,5 @@
 /* yes - output a string repeatedly until killed
-   Copyright (C) 1991-2023 Free Software Foundation, Inc.
+   Copyright (C) 1991-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -95,6 +95,11 @@ main (int argc, char **argv)
       bufalloc = BUFSIZ;
       reuse_operand_strings = false;
     }
+
+#if defined __CHERI__
+  /* Cheri capability bounds do not allow for this.  */
+  reuse_operand_strings = false;
+#endif
 
   /* Fill the buffer with one copy of the output.  If possible, reuse
      the operands strings; this wins when the buffer would be large.  */

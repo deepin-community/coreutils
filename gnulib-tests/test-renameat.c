@@ -1,5 +1,5 @@
 /* Tests of renameat.
-   Copyright (C) 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -200,8 +200,8 @@ main (void)
   ASSERT (errno == ENOENT);
   free (cwd);
 
-  if (result)
+  if (result == 77)
     fputs ("skipping test: symlinks not supported on this file system\n",
            stderr);
-  return result;
+  return (result ? result : test_exit_status);
 }

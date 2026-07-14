@@ -1,5 +1,5 @@
 /* nproc - print the number of processors.
-   Copyright (C) 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -101,7 +101,8 @@ main (int argc, char **argv)
           break;
 
         case IGNORE_OPTION:
-          ignore = xdectoumax (optarg, 0, ULONG_MAX, "", _("invalid number"),0);
+          ignore = xnumtoumax (optarg, 10, 0, ULONG_MAX, "",
+                               _("invalid number"), 0, XTOINT_MAX_QUIET);
           break;
 
         default:

@@ -1,5 +1,5 @@
 /* timeout -- run a command with bounded time
-   Copyright (C) 2008-2023 Free Software Foundation, Inc.
+   Copyright (C) 2008-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -56,7 +56,7 @@
 
 #include "system.h"
 #include "cl-strtod.h"
-#include "xstrtod.h"
+#include "dtimespec-bound.h"
 #include "sig2str.h"
 #include "operand2sig.h"
 #include "quote.h"
@@ -85,20 +85,13 @@ static bool preserve_status; /* whether to use a timeout status or not.  */
 static bool verbose;         /* whether to diagnose timeouts or not.  */
 static char const *command;
 
-/* for long options with no corresponding short option, use enum */
-enum
-{
-      FOREGROUND_OPTION = CHAR_MAX + 1,
-      PRESERVE_STATUS_OPTION
-};
-
 static struct option const long_options[] =
 {
+  {"foreground", no_argument, nullptr, 'f'},
   {"kill-after", required_argument, nullptr, 'k'},
+  {"preserve-status", no_argument, nullptr, 'p'},
   {"signal", required_argument, nullptr, 's'},
   {"verbose", no_argument, nullptr, 'v'},
-  {"foreground", no_argument, nullptr, FOREGROUND_OPTION},
-  {"preserve-status", no_argument, nullptr, PRESERVE_STATUS_OPTION},
   {GETOPT_HELP_OPTION_DECL},
   {GETOPT_VERSION_OPTION_DECL},
   {nullptr, 0, nullptr, 0}
@@ -117,7 +110,7 @@ settimeout (double duration, bool warn)
   /* timer_settime() provides potentially nanosecond resolution.  */
 
   struct timespec ts = dtotimespec (duration);
-  struct itimerspec its = { {0, 0}, ts };
+  struct itimerspec its = {.it_interval = {0}, .it_value = ts};
   timer_t timerid;
   if (timer_create (CLOCK_REALTIME, nullptr, &timerid) == 0)
     {
@@ -151,7 +144,7 @@ settimeout (double duration, bool warn)
       else
         tv.tv_usec--;
     }
-  struct itimerval it = { {0, 0}, tv };
+  struct itimerval it = {.it_interval = {0}, .it_value = tv };
   if (setitimer (ITIMER_REAL, &it, nullptr) == 0)
     return;
   else
@@ -207,7 +200,7 @@ cleanup (int sig)
       timed_out = 1;
       sig = term_signal;
     }
-  if (monitored_pid)
+  if (0 < monitored_pid)
     {
       if (kill_after)
         {
@@ -244,8 +237,13 @@ cleanup (int sig)
             }
         }
     }
-  else /* we're the child or the child is not exec'd yet.  */
-    _exit (128 + sig);
+  else if (monitored_pid == -1)
+    { /* were in the parent, so let it continue to exit below.  */
+    }
+  else /* monitored_pid == 0  */
+    { /* parent hasn't forked yet, or child has not exec'd yet.  */
+      _exit (128 + sig);
+    }
 }
 
 void
@@ -266,22 +264,30 @@ Start COMMAND, and kill it if still running after DURATION.\n\
       emit_mandatory_arg_note ();
 
       fputs (_("\
-      --preserve-status\n\
-                 exit with the same status as COMMAND, even when the\n\
-                   command times out\n\
-      --foreground\n\
+  -f, --foreground\n\
                  when not running timeout directly from a shell prompt,\n\
                    allow COMMAND to read from the TTY and get TTY signals;\n\
                    in this mode, children of COMMAND will not be timed out\n\
+"), stdout);
+      fputs (_("\
   -k, --kill-after=DURATION\n\
                  also send a KILL signal if COMMAND is still running\n\
                    this long after the initial signal was sent\n\
+"), stdout);
+      fputs (_("\
+  -p, --preserve-status\n\
+                 exit with the same status as COMMAND,\n\
+                   even when the command times out\n\
+"), stdout);
+      fputs (_("\
   -s, --signal=SIGNAL\n\
                  specify the signal to be sent on timeout;\n\
                    SIGNAL may be a name like 'HUP' or a number;\n\
-                   see 'kill -l' for a list of signals\n"), stdout);
+                   see 'kill -l' for a list of signals\n\
+"), stdout);
       fputs (_("\
-  -v, --verbose  diagnose to stderr any signal sent upon timeout\n"), stdout);
+  -v, --verbose  diagnose to stderr any signal sent upon timeout\n\
+"), stdout);
 
       fputs (HELP_OPTION_DESCRIPTION, stdout);
       fputs (VERSION_OPTION_DESCRIPTION, stdout);
@@ -342,7 +348,7 @@ apply_time_suffix (double *x, char suffix_char)
       return false;
     }
 
-  *x *= multiplier;
+  *x = dtimespec_bound (*x * multiplier, 0);
 
   return true;
 }
@@ -350,22 +356,24 @@ apply_time_suffix (double *x, char suffix_char)
 static double
 parse_duration (char const *str)
 {
-  double duration;
-  char const *ep;
+  char *ep;
+  errno = 0;
+  double duration = cl_strtod (str, &ep);
+  double s = dtimespec_bound (duration, errno);
 
-  if (! (xstrtod (str, &ep, &duration, cl_strtod) || errno == ERANGE)
+  if (ep == str
       /* Nonnegative interval.  */
-      || ! (0 <= duration)
+      || ! (0 <= s)
       /* No extra chars after the number and an optional s,m,h,d char.  */
       || (*ep && *(ep + 1))
       /* Check any suffix char and update timeout based on the suffix.  */
-      || !apply_time_suffix (&duration, *ep))
+      || !apply_time_suffix (&s, *ep))
     {
       error (0, 0, _("invalid time interval %s"), quote (str));
       usage (EXIT_CANCELED);
     }
 
-  return duration;
+  return s;
 }
 
 static void
@@ -447,7 +455,7 @@ disable_core_dumps (void)
 #elif HAVE_SETRLIMIT && defined RLIMIT_CORE
   /* Note this doesn't disable processing by a filter in
      /proc/sys/kernel/core_pattern on Linux.  */
-  if (setrlimit (RLIMIT_CORE, &(struct rlimit) {0,0}) == 0)
+  if (setrlimit (RLIMIT_CORE, &(struct rlimit) {0}) == 0)
     return true;
 
 #else
@@ -462,7 +470,6 @@ int
 main (int argc, char **argv)
 {
   double timeout;
-  char signame[SIG2STR_MAX];
   int c;
 
   initialize_main (&argc, &argv);
@@ -474,30 +481,31 @@ main (int argc, char **argv)
   initialize_exit_failure (EXIT_CANCELED);
   atexit (close_stdout);
 
-  while ((c = getopt_long (argc, argv, "+k:s:v", long_options, nullptr)) != -1)
+  while ((c = getopt_long (argc, argv, "+fk:ps:v", long_options, nullptr))
+         != -1)
     {
       switch (c)
         {
+        case 'f':
+          foreground = true;
+          break;
+
         case 'k':
           kill_after = parse_duration (optarg);
           break;
 
+        case 'p':
+          preserve_status = true;
+          break;
+
         case 's':
-          term_signal = operand2sig (optarg, signame);
+          term_signal = operand2sig (optarg);
           if (term_signal == -1)
             usage (EXIT_CANCELED);
           break;
 
         case 'v':
           verbose = true;
-          break;
-
-        case FOREGROUND_OPTION:
-          foreground = true;
-          break;
-
-        case PRESERVE_STATUS_OPTION:
-          preserve_status = true;
           break;
 
         case_GETOPT_HELP_CHAR;
@@ -532,14 +540,29 @@ main (int argc, char **argv)
   signal (SIGTTOU, SIG_IGN);   /* Don't stop if background child needs tty.  */
   install_sigchld ();          /* Interrupt sigsuspend() when child exits.   */
 
+  /* We configure timers so that SIGALRM is sent on expiry.
+     Therefore ensure we don't inherit a mask blocking SIGALRM.  */
+  unblock_signal (SIGALRM);
+
+  /* Block signals now, so monitored_pid is deterministic in cleanup().  */
+  sigset_t orig_set;
+  block_cleanup_and_chld (term_signal, &orig_set);
+
   monitored_pid = fork ();
   if (monitored_pid == -1)
     {
       error (0, errno, _("fork system call failed"));
       return EXIT_CANCELED;
     }
-  else if (monitored_pid == 0)
-    {                           /* child */
+  else if (monitored_pid == 0)  /* child */
+    {
+      /* Restore signal mask for child.  */
+      if (sigprocmask (SIG_SETMASK, &orig_set, nullptr) != 0)
+        {
+          error (0, errno, _("child failed to reset signal mask"));
+          return EXIT_CANCELED;
+        }
+
       /* exec doesn't reset SIG_IGN -> SIG_DFL.  */
       signal (SIGTTIN, SIG_DFL);
       signal (SIGTTOU, SIG_DFL);
@@ -556,19 +579,14 @@ main (int argc, char **argv)
       pid_t wait_result;
       int status;
 
-      /* We configure timers so that SIGALRM is sent on expiry.
-         Therefore ensure we don't inherit a mask blocking SIGALRM.  */
-      unblock_signal (SIGALRM);
-
       settimeout (timeout, true);
 
-      /* Ensure we don't cleanup() after waitpid() reaps the child,
+      /* Note signals remain blocked in parent here, to ensure
+         we don't cleanup() after waitpid() reaps the child,
          to avoid sending signals to a possibly different process.  */
-      sigset_t cleanup_set;
-      block_cleanup_and_chld (term_signal, &cleanup_set);
 
       while ((wait_result = waitpid (monitored_pid, &status, WNOHANG)) == 0)
-        sigsuspend (&cleanup_set);  /* Wait with cleanup signals unblocked.  */
+        sigsuspend (&orig_set);  /* Wait with cleanup signals unblocked.  */
 
       if (wait_result < 0)
         {

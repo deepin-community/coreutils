@@ -1,5 +1,5 @@
 /* expand-common - common functionality for expand/unexpand
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -16,9 +16,11 @@
 
 #include <config.h>
 
+#include <ctype.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include "system.h"
+#include "c-ctype.h"
 #include "fadvise.h"
 #include "quote.h"
 
@@ -29,28 +31,28 @@
 bool convert_entire_line = false;
 
 /* If nonzero, the size of all tab stops.  If zero, use 'tab_list' instead.  */
-static uintmax_t tab_size = 0;
+static colno tab_size = 0;
 
 /* If nonzero, the size of all tab stops after the last specified.  */
-static uintmax_t extend_size = 0;
+static colno extend_size = 0;
 
 /* If nonzero, an increment for additional tab stops after the last specified.*/
-static uintmax_t increment_size = 0;
+static colno increment_size = 0;
 
 /* The maximum distance between tab stops.  */
-size_t max_column_width;
+idx_t max_column_width;
 
 /* Array of the explicit column numbers of the tab stops;
    after 'tab_list' is exhausted, each additional tab is replaced
    by a space.  The first column is column 0.  */
-static uintmax_t *tab_list = nullptr;
+static colno *tab_list = nullptr;
 
 /* The number of allocated entries in 'tab_list'.  */
-static size_t n_tabs_allocated = 0;
+static idx_t n_tabs_allocated = 0;
 
 /* The index of the first invalid element of 'tab_list',
    where the next element can be added.  */
-static size_t first_free_tab = 0;
+static idx_t first_free_tab = 0;
 
 /* Null-terminated array of input filenames.  */
 static char **file_list = nullptr;
@@ -71,25 +73,24 @@ int exit_status = EXIT_SUCCESS;
 
 /* Add tab stop TABVAL to the end of 'tab_list'.  */
 extern void
-add_tab_stop (uintmax_t tabval)
+add_tab_stop (colno tabval)
 {
-  uintmax_t prev_column = first_free_tab ? tab_list[first_free_tab - 1] : 0;
-  uintmax_t column_width = prev_column <= tabval ? tabval - prev_column : 0;
+  colno prev_column = first_free_tab ? tab_list[first_free_tab - 1] : 0;
+  colno column_width = prev_column <= tabval ? tabval - prev_column : 0;
 
   if (first_free_tab == n_tabs_allocated)
-    tab_list = X2NREALLOC (tab_list, &n_tabs_allocated);
+    tab_list = xpalloc (tab_list, &n_tabs_allocated, 1, -1, sizeof *tab_list);
   tab_list[first_free_tab++] = tabval;
 
   if (max_column_width < column_width)
     {
-      if (SIZE_MAX < column_width)
+      if (ckd_add (&max_column_width, column_width, 0))
         error (EXIT_FAILURE, 0, _("tabs are too far apart"));
-      max_column_width = column_width;
     }
 }
 
 static bool
-set_extend_size (uintmax_t tabval)
+set_extend_size (colno tabval)
 {
   bool ok = true;
 
@@ -106,7 +107,7 @@ set_extend_size (uintmax_t tabval)
 }
 
 static bool
-set_increment_size (uintmax_t tabval)
+set_increment_size (colno tabval)
 {
   bool ok = true;
 
@@ -128,7 +129,7 @@ extern void
 parse_tab_stops (char const *stops)
 {
   bool have_tabval = false;
-  uintmax_t tabval = 0;
+  colno tabval = 0;
   bool extend_tabval = false;
   bool increment_tabval = false;
   char const *num_start = nullptr;
@@ -183,7 +184,7 @@ parse_tab_stops (char const *stops)
           increment_tabval = true;
           extend_tabval = false;
         }
-      else if (ISDIGIT (*stops))
+      else if (c_isdigit (*stops))
         {
           if (!have_tabval)
             {
@@ -193,9 +194,9 @@ parse_tab_stops (char const *stops)
             }
 
           /* Detect overflow.  */
-          if (!DECIMAL_DIGIT_ACCUMULATE (tabval, *stops - '0', uintmax_t))
+          if (!DECIMAL_DIGIT_ACCUMULATE (tabval, *stops - '0'))
             {
-              size_t len = strspn (num_start, "0123456789");
+              idx_t len = strspn (num_start, "0123456789");
               char *bad_num = ximemdup0 (num_start, len);
               error (0, 0, _("tab stop is too large %s"), quote (bad_num));
               free (bad_num);
@@ -230,11 +231,11 @@ parse_tab_stops (char const *stops)
    contains only nonzero, ascending values.  */
 
 static void
-validate_tab_stops (uintmax_t const *tabs, size_t entries)
+validate_tab_stops (colno const *tabs, idx_t entries)
 {
-  uintmax_t prev_tab = 0;
+  colno prev_tab = 0;
 
-  for (size_t i = 0; i < entries; i++)
+  for (idx_t i = 0; i < entries; i++)
     {
       if (tabs[i] == 0)
         error (EXIT_FAILURE, 0, _("tab size cannot be 0"));
@@ -271,42 +272,52 @@ finalize_tab_stops (void)
 }
 
 
-extern uintmax_t
-get_next_tab_column (const uintmax_t column, size_t *tab_index,
-                     bool *last_tab)
+/* Return number of first tab stop after COLUMN.  TAB_INDEX specifies
+   many multiple tab-sizes.  Set *LAST_TAB depending on whether we are
+   returning COLUMN + 1 merely because we're past the last tab.
+   If the number would overflow, diagnose this and exit.  */
+extern colno
+get_next_tab_column (colno column, idx_t *tab_index, bool *last_tab)
 {
   *last_tab = false;
+  colno tab_distance;
 
   /* single tab-size - return multiples of it */
   if (tab_size)
-    return column + (tab_size - column % tab_size);
-
-  /* multiple tab-sizes - iterate them until the tab position is beyond
-     the current input column. */
-  for ( ; *tab_index < first_free_tab ; (*tab_index)++ )
+    tab_distance = tab_size - column % tab_size;
+  else
     {
-        uintmax_t tab = tab_list[*tab_index];
-        if (column < tab)
+      /* multiple tab-sizes - iterate them until the tab position is beyond
+         the current input column. */
+      for ( ; *tab_index < first_free_tab ; (*tab_index)++ )
+        {
+          colno tab = tab_list[*tab_index];
+          if (column < tab)
             return tab;
+        }
+
+      /* relative last tab - return multiples of it */
+      if (extend_size)
+        tab_distance = extend_size - column % extend_size;
+      else if (increment_size)
+        {
+          /* incremental last tab - add increment_size to the previous
+             tab stop */
+          colno end_tab = tab_list[first_free_tab - 1];
+          tab_distance = increment_size - ((column - end_tab) % increment_size);
+        }
+      else
+        {
+          *last_tab = true;
+          tab_distance = 1;
+        }
     }
 
-  /* relative last tab - return multiples of it */
-  if (extend_size)
-    return column + (extend_size - column % extend_size);
-
-  /* incremental last tab - add increment_size to the previous tab stop */
-  if (increment_size)
-    {
-      uintmax_t end_tab = tab_list[first_free_tab - 1];
-
-      return column + (increment_size - ((column - end_tab) % increment_size));
-    }
-
-  *last_tab = true;
-  return 0;
+  colno tab_stop;
+  if (ckd_add (&tab_stop, column, tab_distance))
+    error (EXIT_FAILURE, 0, _("input line is too long"));
+  return tab_stop;
 }
-
-
 
 
 /* Sets new file-list */

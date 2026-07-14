@@ -57,7 +57,8 @@ License: BSD-4-clause-UC
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
 
-Files: lib/rand-isaac.[ch]
+Files: lib/rand-isaac.c
+       lib/rand-isaac.h
 Copyright: (C) 1999-2006 Free Software Foundation, Inc.
            (C) 1997, 1998, 1999 Colin Plumb.
 License: GPL-3+

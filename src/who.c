@@ -1,5 +1,5 @@
 /* GNU's who.
-   Copyright (C) 1992-2023 Free Software Foundation, Inc.
+   Copyright (C) 1992-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -25,7 +25,6 @@
 
 #include <config.h>
 #include <getopt.h>
-#include <stdckdint.h>
 #include <stdio.h>
 
 #include <sys/types.h>
@@ -59,12 +58,6 @@
 # define UT_TYPE_INIT_PROCESS(U) ((U)->ut_type == INIT_PROCESS)
 #else
 # define UT_TYPE_INIT_PROCESS(U) false
-#endif
-
-#ifdef LOGIN_PROCESS
-# define UT_TYPE_LOGIN_PROCESS(U) ((U)->ut_type == LOGIN_PROCESS)
-#else
-# define UT_TYPE_LOGIN_PROCESS(U) false
 #endif
 
 #ifdef DEAD_PROCESS
@@ -584,7 +577,7 @@ scan_entries (idx_t n, struct gl_utmp const *utmp_buf)
   while (n--)
     {
       if (!my_line_only
-          || STREQ (ttyname_b, utmp_buf->ut_line))
+          || str_endswith (utmp_buf->ut_line, ttyname_b))
         {
           if (need_users && IS_USER_PROCESS (utmp_buf))
             print_user (utmp_buf, boottime);

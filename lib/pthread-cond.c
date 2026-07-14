@@ -1,5 +1,5 @@
 /* POSIX condition variables.
-   Copyright (C) 2010-2023 Free Software Foundation, Inc.
+   Copyright (C) 2010-2025 Free Software Foundation, Inc.
 
    This file is free software: you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as
@@ -22,7 +22,7 @@
 #include <pthread.h>
 
 #if (defined _WIN32 && ! defined __CYGWIN__) && USE_WINDOWS_THREADS
-# include "windows-thread.h"
+# include "windows-cond.h"
 #else
 # include <errno.h>
 # include <limits.h>

@@ -1,5 +1,5 @@
 /* Test memset_explicit.
-   Copyright 2020-2023 Free Software Foundation, Inc.
+   Copyright 2020-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -40,7 +40,24 @@ static char zero[SECRET_SIZE] = { 0 };
 
 /* Enable this to verify that the test is effective.  */
 #if 0
-# define memset_explicit(a, c, n)  memset (a, c, n)
+# undef memset_explicit
+# define memset_explicit memset
+#endif
+
+/* Test the library, not the compiler+library.  */
+static void *
+lib_memset_explicit (void *s, int c, size_t n)
+{
+  return memset_explicit (s, c, n);
+}
+static void *(*volatile volatile_memset_explicit) (void *, int, size_t)
+  = lib_memset_explicit;
+#undef memset_explicit
+#define memset_explicit volatile_memset_explicit
+
+/* Suppress GCC 13.2.1 false alarm, as this test needs a dangling pointer.  */
+#if _GL_GNUC_PREREQ (12, 0)
+# pragma GCC diagnostic ignored "-Wdangling-pointer"
 #endif
 
 /* =================== Verify operation on static memory =================== */
@@ -65,8 +82,22 @@ test_static (void)
 
 /* =============== Verify operation on heap-allocated memory =============== */
 
+/* Skip this part when an address sanitizer is in use, because it would report
+   a "heap use after free".  */
+#ifndef __has_feature
+# define __has_feature(a) 0
+#endif
+#if defined __SANITIZE_ADDRESS__ || __has_feature (address_sanitizer)
+
+static void
+test_heap (void)
+{
+}
+
+#else
+
 /* Test whether an address range is mapped in memory.  */
-#if VMA_ITERATE_SUPPORTED
+# if VMA_ITERATE_SUPPORTED
 
 struct locals
 {
@@ -101,7 +132,7 @@ is_range_mapped (uintptr_t range_start, uintptr_t range_end)
   return l.range_start == l.range_end;
 }
 
-#else
+# else
 
 static bool
 is_range_mapped (uintptr_t range_start, uintptr_t range_end)
@@ -109,14 +140,14 @@ is_range_mapped (uintptr_t range_start, uintptr_t range_end)
   return true;
 }
 
-#endif
+# endif
 
 static void
 test_heap (void)
 {
   char *heapbuf = (char *) malloc (SECRET_SIZE);
   ASSERT (heapbuf);
-  uintptr_t volatile addr = (uintptr_t) heapbuf;
+  uintptr_t addr = (uintptr_t) heapbuf;
   memcpy (heapbuf, SECRET, SECRET_SIZE);
   memset_explicit (heapbuf, 0, SECRET_SIZE);
   free (heapbuf);
@@ -132,18 +163,39 @@ test_heap (void)
     printf ("test_heap: address range is unmapped after free().\n");
 }
 
+#endif /* ! address sanitizer enabled */
+
 /* =============== Verify operation on stack-allocated memory =============== */
+
+/* Skip this part when an address sanitizer is in use, because it would report
+   a "stack use after return".  */
+#ifndef __has_feature
+# define __has_feature(a) 0
+#endif
+#if defined __SANITIZE_ADDRESS__ || __has_feature (address_sanitizer)
+
+static void
+test_stack (void)
+{
+}
+
+#else
 
 /* There are two passes:
      1. Put a secret in memory and invoke memset_explicit on it.
      2. Verify that the memory has been erased.
    Implement them in the same function, so that they access the same memory
-   range on the stack.  Declare the local scalars to be volatile so they
-   are not optimized away.  That way, the test verifies that the compiler
+   range on the stack.  That way, the test verifies that the compiler
    does not eliminate a call to memset_explicit, even if data flow analysis
    reveals that the stack area is dead at the end of the function.  */
 static bool _GL_ATTRIBUTE_NOINLINE
-do_secret_stuff (int volatile pass, char *volatile *volatile last_stackbuf)
+# if _GL_GNUC_PREREQ (4, 5)
+__attribute__ ((__noclone__))
+# endif
+# if _GL_GNUC_PREREQ (8, 0)
+__attribute__ ((__noipa__))
+# endif
+do_secret_stuff (int pass, char *volatile *last_stackbuf)
 {
   char stackbuf[SECRET_SIZE];
   if (pass == 1)
@@ -191,6 +243,8 @@ test_stack (void)
   ASSERT (count < 50);
 }
 
+#endif /* ! address sanitizer enabled */
+
 /* ========================================================================== */
 
 int
@@ -200,5 +254,9 @@ main ()
   test_heap ();
   test_stack ();
 
-  return 0;
+  /* Test zero-length operations on NULL pointers, allowed by
+     <https://www.open-std.org/jtc1/sc22/wg14/www/docs/n3322.pdf>.  */
+  ASSERT (memset_explicit (NULL, '?', 0) == NULL);
+
+  return test_exit_status;
 }

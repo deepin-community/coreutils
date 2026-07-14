@@ -1,5 +1,5 @@
 /* stat.c -- display file or file system status
-   Copyright (C) 2001-2023 Free Software Foundation, Inc.
+   Copyright (C) 2001-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -53,16 +53,18 @@
 # include <fs_info.h>
 #endif
 #include <selinux/selinux.h>
+#include <getopt.h>
 
 #include "system.h"
 
 #include "areadlink.h"
 #include "argmatch.h"
+#include "c-ctype.h"
 #include "file-type.h"
 #include "filemode.h"
 #include "fs.h"
-#include "getopt.h"
 #include "mountlist.h"
+#include "octhexdigits.h"
 #include "quote.h"
 #include "stat-size.h"
 #include "stat-time.h"
@@ -165,12 +167,6 @@ statfs (char const *filename, struct fs_info *buf)
 # include <attr.h>
 # include <sys/nvpair.h>
 #endif
-
-/* FIXME: these are used by printf.c, too */
-#define isodigit(c) ('0' <= (c) && (c) <= '7')
-#define octtobin(c) ((c) - '0')
-#define hextobin(c) ((c) >= 'a' && (c) <= 'f' ? (c) - 'a' + 10 : \
-                     (c) >= 'A' && (c) <= 'F' ? (c) - 'A' + 10 : (c) - '0')
 
 static char const digits[] = "0123456789";
 
@@ -305,6 +301,8 @@ human_fstype (STRUCT_STATVFS const *statfsbuf)
       return "autofs";
     case S_MAGIC_BALLOON_KVM: /* 0x13661366 local */
       return "balloon-kvm-fs";
+    case S_MAGIC_BCACHEFS: /* 0xCA451A4E local */
+      return "bcachefs";
     case S_MAGIC_BEFS: /* 0x42465331 local */
       return "befs";
     case S_MAGIC_BDEVFS: /* 0x62646576 local */
@@ -377,8 +375,8 @@ human_fstype (STRUCT_STATVFS const *statfsbuf)
       return "fat";
     case S_MAGIC_FHGFS: /* 0x19830326 remote */
       return "fhgfs";
-    case S_MAGIC_FUSEBLK: /* 0x65735546 remote */
-      return "fuseblk";
+    case S_MAGIC_FUSE: /* 0x65735546 remote */
+      return "fuse";
     case S_MAGIC_FUSECTL: /* 0x65735543 remote */
       return "fusectl";
     case S_MAGIC_FUTEXFS: /* 0x0BAD1DEA local */
@@ -462,6 +460,8 @@ human_fstype (STRUCT_STATVFS const *statfsbuf)
       return "overlayfs";
     case S_MAGIC_PANFS: /* 0xAAD7AAEA remote */
       return "panfs";
+    case S_MAGIC_PID_FS: /* 0x50494446 local */
+      return "pidfs";
     case S_MAGIC_PIPEFS: /* 0x50495045 remote */
       /* FIXME: change syntax or add an optional attribute like "inotify:no".
          pipefs and prlfs are labeled as "remote" so that tail always polls,
@@ -693,25 +693,25 @@ out_string (char *pformat, size_t prefix_len, char const *arg)
 static int
 out_int (char *pformat, size_t prefix_len, intmax_t arg)
 {
-  make_format (pformat, prefix_len, "'-+ 0", PRIdMAX);
+  make_format (pformat, prefix_len, "'-+ 0", "jd");
   return printf (pformat, arg);
 }
 static int
 out_uint (char *pformat, size_t prefix_len, uintmax_t arg)
 {
-  make_format (pformat, prefix_len, "'-0", PRIuMAX);
+  make_format (pformat, prefix_len, "'-0", "ju");
   return printf (pformat, arg);
 }
 static void
 out_uint_o (char *pformat, size_t prefix_len, uintmax_t arg)
 {
-  make_format (pformat, prefix_len, "-#0", PRIoMAX);
+  make_format (pformat, prefix_len, "-#0", "jo");
   printf (pformat, arg);
 }
 static void
 out_uint_x (char *pformat, size_t prefix_len, uintmax_t arg)
 {
-  make_format (pformat, prefix_len, "-#0", PRIxMAX);
+  make_format (pformat, prefix_len, "-#0", "jx");
   printf (pformat, arg);
 }
 static int
@@ -738,7 +738,7 @@ out_epoch_sec (char *pformat, size_t prefix_len,
       sec_prefix_len = dot - pformat;
       pformat[prefix_len] = '\0';
 
-      if (ISDIGIT (dot[1]))
+      if (c_isdigit (dot[1]))
         {
           long int lprec = strtol (dot + 1, nullptr, 10);
           precision = (lprec <= INT_MAX ? lprec : INT_MAX);
@@ -748,7 +748,7 @@ out_epoch_sec (char *pformat, size_t prefix_len,
           precision = 9;
         }
 
-      if (precision && ISDIGIT (dot[-1]))
+      if (precision && c_isdigit (dot[-1]))
         {
           /* If a nontrivial width is given, subtract the width of the
              decimal point and PRECISION digits that will be output
@@ -758,7 +758,7 @@ out_epoch_sec (char *pformat, size_t prefix_len,
 
           do
             --p;
-          while (ISDIGIT (p[-1]));
+          while (c_isdigit (p[-1]));
 
           long int lwidth = strtol (p, nullptr, 10);
           width = (lwidth <= INT_MAX ? lwidth : INT_MAX);
@@ -972,7 +972,7 @@ find_bind_mount (char const * name)
           struct stat dev_stats;
 
           if (stat (me->me_devname, &dev_stats) == 0
-              && SAME_INODE (name_stats, dev_stats))
+              && psame_inode (&name_stats, &dev_stats))
             {
               bind_mount = me->me_devname;
               break;
@@ -1039,7 +1039,7 @@ neg_to_zero (struct timespec ts)
 {
   if (0 <= ts.tv_nsec)
     return ts;
-  struct timespec z = {0, 0};
+  struct timespec z = {0};
   return z;
 }
 
@@ -1139,8 +1139,8 @@ print_it (char const *format, int fd, char const *filename,
   enum
     {
       MAX_ADDITIONAL_BYTES =
-        (MAX (sizeof PRIdMAX,
-              MAX (sizeof PRIoMAX, MAX (sizeof PRIuMAX, sizeof PRIxMAX)))
+        (MAX (sizeof "jd",
+              MAX (sizeof "jo", MAX (sizeof "ju", sizeof "jx")))
          - 1)
     };
   size_t n_alloc = strlen (format) + MAX_ADDITIONAL_BYTES + 1;
@@ -1203,28 +1203,28 @@ print_it (char const *format, int fd, char const *filename,
               break;
             }
           ++b;
-          if (isodigit (*b))
+          if (isoct (*b))
             {
-              int esc_value = octtobin (*b);
+              int esc_value = fromoct (*b);
               int esc_length = 1;	/* number of octal digits */
-              for (++b; esc_length < 3 && isodigit (*b);
+              for (++b; esc_length < 3 && isoct (*b);
                    ++esc_length, ++b)
                 {
-                  esc_value = esc_value * 8 + octtobin (*b);
+                  esc_value = esc_value * 8 + fromoct (*b);
                 }
               putchar (esc_value);
               --b;
             }
-          else if (*b == 'x' && isxdigit (to_uchar (b[1])))
+          else if (*b == 'x' && c_isxdigit (b[1]))
             {
-              int esc_value = hextobin (b[1]);	/* Value of \xhh escape. */
+              int esc_value = fromhex (b[1]);	/* Value of \xhh escape. */
               /* A hexadecimal \xhh escape sequence must have
                  1 or 2 hex. digits.  */
               ++b;
-              if (isxdigit (to_uchar (b[1])))
+              if (c_isxdigit (b[1]))
                 {
                   ++b;
-                  esc_value = esc_value * 16 + hextobin (*b);
+                  esc_value = esc_value * 16 + fromhex (*b);
                 }
               putchar (esc_value);
             }
@@ -1370,11 +1370,11 @@ do_stat (char const *filename, char const *format, char const *format2)
   int fd = STREQ (filename, "-") ? 0 : AT_FDCWD;
   int flags = 0;
   struct stat st;
-  struct statx stx = { 0, };
+  struct statx stx = {0};
   char const *pathname = filename;
   struct print_args pa;
   pa.st = &st;
-  pa.btime = (struct timespec) {-1, -1};
+  pa.btime = (struct timespec) {.tv_sec = -1, .tv_nsec = -1};
 
   if (AT_FDCWD != fd)
     {
@@ -1460,7 +1460,7 @@ do_stat (char const *filename, char const *format,
   struct stat statbuf;
   struct print_args pa;
   pa.st = &statbuf;
-  pa.btime = (struct timespec) {-1, -1};
+  pa.btime = (struct timespec) {.tv_sec = -1, .tv_nsec = -1};
 
   if (0 <= fd)
     {
@@ -1603,10 +1603,10 @@ print_stat (char *pformat, size_t prefix_len, char mod, char m,
       out_uint (pformat, prefix_len, ST_NBLOCKSIZE);
       break;
     case 'b':
-      out_uint (pformat, prefix_len, ST_NBLOCKS (*statbuf));
+      out_uint (pformat, prefix_len, STP_NBLOCKS (statbuf));
       break;
     case 'o':
-      out_uint (pformat, prefix_len, ST_BLKSIZE (*statbuf));
+      out_uint (pformat, prefix_len, STP_BLKSIZE (statbuf));
       break;
     case 'w':
       {
@@ -1732,9 +1732,10 @@ default_format (bool fs, bool terse, bool device)
             }
 
           temp = format;
-          /* TRANSLATORS: This string uses format specifiers from
-             'stat --help' without --file-system, and NOT from printf.  */
           format = xasprintf ("%s%s", format,
+                              /* TRANSLATORS: This string uses format specifiers
+                                 from 'stat --help' without --file-system, and
+                                 NOT from printf.  */
                               _("Access: %x\n"
                                 "Modify: %y\n"
                                 "Change: %z\n"
@@ -1788,7 +1789,7 @@ The MODE argument of --cached can be: always, never, or default.\n\
       fputs (_("\n\
 The valid format sequences for files (without --file-system):\n\
 \n\
-  %a   permission bits in octal (note '#' and '0' printf flags)\n\
+  %a   permission bits in octal (see '#' and '0' printf flags)\n\
   %A   permission bits and file type in human readable form\n\
   %b   number of blocks allocated (see %B)\n\
   %B   the size in bytes of each block reported by %b\n\

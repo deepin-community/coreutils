@@ -1,5 +1,5 @@
 /* Test of conversion of multibyte character to wide character.
-   Copyright (C) 2008-2023 Free Software Foundation, Inc.
+   Copyright (C) 2008-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -141,7 +141,7 @@ main (int argc, char *argv[])
                 ASSERT (mbsinit (&state));
               }
         }
-        return 0;
+        return test_exit_status;
 
       case '2':
         /* Locale encoding is ISO-8859-1 or ISO-8859-15.  */
@@ -173,7 +173,7 @@ main (int argc, char *argv[])
           ASSERT (ret == 1);
           ASSERT (mbsinit (&state));
         }
-        return 0;
+        return test_exit_status;
 
       case '3':
         /* Locale encoding is UTF-8.  */
@@ -211,7 +211,7 @@ main (int argc, char *argv[])
           ASSERT (ret == 1);
           ASSERT (mbsinit (&state));
         }
-        return 0;
+        return test_exit_status;
 
       case '4':
         /* Locale encoding is EUC-JP.  */
@@ -250,7 +250,7 @@ main (int argc, char *argv[])
           ASSERT (ret == 1);
           ASSERT (mbsinit (&state));
         }
-        return 0;
+        return test_exit_status;
 
       case '5':
         /* Locale encoding is GB18030.  */
@@ -290,7 +290,7 @@ main (int argc, char *argv[])
           ASSERT (ret == 1);
           ASSERT (mbsinit (&state));
         }
-        return 0;
+        return test_exit_status;
       }
 
   return 1;

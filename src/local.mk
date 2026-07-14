@@ -1,7 +1,7 @@
 # Make coreutils programs.                             -*-Makefile-*-
 # This is included by the top-level Makefile.am.
 
-## Copyright (C) 1990-2023 Free Software Foundation, Inc.
+## Copyright (C) 1990-2025 Free Software Foundation, Inc.
 
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -40,6 +40,7 @@ noinst_PROGRAMS =		\
   src/make-prime-list
 
 noinst_HEADERS =		\
+  src/chown.h			\
   src/chown-core.h		\
   src/copy.h			\
   src/cp-hash.h			\
@@ -53,14 +54,17 @@ noinst_HEADERS =		\
   src/iopoll.h			\
   src/longlong.h		\
   src/ls.h			\
+  src/octhexdigits.h		\
   src/operand2sig.h		\
   src/prog-fprintf.h		\
   src/remove.h			\
   src/set-fields.h		\
+  src/show-date.h		\
   src/statx.h			\
   src/system.h			\
   src/temp-stream.h		\
-  src/uname.h
+  src/uname.h			\
+  src/wc.h
 
 EXTRA_DIST +=		\
   src/dcgen		\
@@ -104,7 +108,7 @@ src_basenc_LDADD = $(LDADD)
 src_basename_LDADD = $(LDADD)
 src_cat_LDADD = $(LDADD)
 src_chcon_LDADD = $(LDADD)
-src_chgrp_LDADD = $(LDADD)
+# See chgrp_LDADD below
 src_chmod_LDADD = $(LDADD)
 src_chown_LDADD = $(LDADD)
 src_chroot_LDADD = $(LDADD)
@@ -218,6 +222,7 @@ src_yes_LDADD = $(LDADD)
 src___LDADD = $(src_test_LDADD)
 src_dir_LDADD = $(src_ls_LDADD)
 src_vdir_LDADD = $(src_ls_LDADD)
+src_chgrp_LDADD = $(src_chown_LDADD)
 
 src_cp_LDADD += $(copy_ldadd)
 src_ginstall_LDADD += $(copy_ldadd)
@@ -263,7 +268,7 @@ src_pr_LDADD += $(CLOCK_TIME_LIB)
 src_sort_LDADD += $(CLOCK_TIME_LIB)
 src_split_LDADD += $(CLOCK_TIME_LIB)
 src_tac_LDADD += $(CLOCK_TIME_LIB)
-src_timeout_LDADD += $(LIB_TIMER_TIME)
+src_timeout_LDADD += $(TIMER_TIME_LIB)
 src_touch_LDADD += $(CLOCK_TIME_LIB)
 
 # for gethrxtime
@@ -273,9 +278,9 @@ src_dd_LDADD += $(GETHRXTIME_LIB)
 src_ls_LDADD += $(LIB_CAP)
 
 # for fdatasync
-src_dd_LDADD += $(LIB_FDATASYNC)
-src_shred_LDADD += $(LIB_FDATASYNC)
-src_sync_LDADD += $(LIB_FDATASYNC)
+src_dd_LDADD += $(FDATASYNC_LIB)
+src_shred_LDADD += $(FDATASYNC_LIB)
+src_sync_LDADD += $(FDATASYNC_LIB)
 
 # for xnanosleep
 src_sleep_LDADD += $(NANOSLEEP_LIB)
@@ -301,7 +306,7 @@ src_printf_LDADD += $(LIBICONV)
 
 # for libcrypto hash routines
 src_md5sum_LDADD += $(LIB_CRYPTO)
-src_sort_LDADD += $(LIB_CRYPTO)
+src_sort_LDADD += $(LIB_DL) $(LIB_CRYPTO)
 src_sha1sum_LDADD += $(LIB_CRYPTO)
 src_sha224sum_LDADD += $(LIB_CRYPTO)
 src_sha256sum_LDADD += $(LIB_CRYPTO)
@@ -369,7 +374,9 @@ nodist_src_coreutils_SOURCES = src/coreutils.h
 src_coreutils_SOURCES = src/coreutils.c
 
 src_cp_SOURCES = src/cp.c $(copy_sources) $(selinux_sources)
+src_date_SOURCES = src/date.c src/show-date.c
 src_dir_SOURCES = src/ls.c src/ls-dir.c
+src_du_SOURCES = src/du.c src/show-date.c
 src_env_SOURCES = src/env.c src/operand2sig.c
 src_vdir_SOURCES = src/ls.c src/ls-vdir.c
 src_id_SOURCES = src/id.c src/group-list.c
@@ -378,8 +385,8 @@ src_ls_SOURCES = src/ls.c src/ls-ls.c
 src_ln_SOURCES = src/ln.c \
   src/force-link.c src/force-link.h \
   src/relpath.c src/relpath.h
-src_chown_SOURCES = src/chown.c src/chown-core.c
-src_chgrp_SOURCES = src/chgrp.c src/chown-core.c
+src_chown_SOURCES = src/chown.c src/chown-core.c src/chown-chown.c
+src_chgrp_SOURCES = src/chown.c src/chown-core.c src/chown-chgrp.c
 src_kill_SOURCES = src/kill.c src/operand2sig.c
 src_realpath_SOURCES = src/realpath.c src/relpath.c src/relpath.h
 src_timeout_SOURCES = src/timeout.c src/operand2sig.c
@@ -432,12 +439,34 @@ src_b2sum_SOURCES = src/digest.c \
 src_cksum_SOURCES = $(src_b2sum_SOURCES) src/sum.c src/sum.h \
 		    src/cksum.c src/cksum.h src/crctab.c
 src_cksum_CPPFLAGS = -DHASH_ALGO_CKSUM=1 -DHAVE_CONFIG_H $(AM_CPPFLAGS)
+
+if USE_AVX512_CRC32
+noinst_LIBRARIES += src/libcksum_avx512.a
+src_libcksum_avx512_a_SOURCES = src/cksum_avx512.c src/cksum.h
+cksum_avx512_ldadd = src/libcksum_avx512.a
+src_cksum_LDADD += $(cksum_avx512_ldadd)
+src_libcksum_avx512_a_CFLAGS = -mavx512bw -mavx512f -mvpclmulqdq $(AM_CFLAGS)
+endif
+if USE_AVX2_CRC32
+noinst_LIBRARIES += src/libcksum_avx2.a
+src_libcksum_avx2_a_SOURCES = src/cksum_avx2.c src/cksum.h
+cksum_avx2_ldadd = src/libcksum_avx2.a
+src_cksum_LDADD += $(cksum_avx2_ldadd)
+src_libcksum_avx2_a_CFLAGS = -mpclmul -mavx -mavx2 -mvpclmulqdq $(AM_CFLAGS)
+endif
 if USE_PCLMUL_CRC32
 noinst_LIBRARIES += src/libcksum_pclmul.a
 src_libcksum_pclmul_a_SOURCES = src/cksum_pclmul.c src/cksum.h
 cksum_pclmul_ldadd = src/libcksum_pclmul.a
 src_cksum_LDADD += $(cksum_pclmul_ldadd)
 src_libcksum_pclmul_a_CFLAGS = -mavx -mpclmul $(AM_CFLAGS)
+endif
+if USE_VMULL_CRC32
+noinst_LIBRARIES += src/libcksum_vmull.a
+src_libcksum_vmull_a_SOURCES = src/cksum_vmull.c src/cksum.h
+cksum_vmull_ldadd = src/libcksum_vmull.a
+src_cksum_LDADD += $(cksum_vmull_ldadd)
+src_libcksum_vmull_a_CFLAGS = -march=armv8-a+crypto $(AM_CFLAGS)
 endif
 
 src_base64_SOURCES = src/basenc.c
@@ -475,13 +504,13 @@ if SINGLE_BINARY
 src_coreutils_CFLAGS = -DSINGLE_BINARY $(AM_CFLAGS)
 #src_coreutils_LDFLAGS = $(AM_LDFLAGS)
 src_coreutils_LDADD = $(single_binary_deps) $(LDADD) $(single_binary_libs)
-src_coreutils_DEPENDENCIES = $(LDADD) $(single_binary_deps)
+EXTRA_src_coreutils_DEPENDENCIES = $(single_binary_deps)
 
 include $(top_srcdir)/src/single-binary.mk
 
 # Creates symlinks or shebangs to the installed programs when building
 # coreutils single binary.
-EXTRA_src_coreutils_DEPENDENCIES = src/coreutils_$(single_binary_install_type)
+EXTRA_src_coreutils_DEPENDENCIES += src/coreutils_$(single_binary_install_type)
 endif SINGLE_BINARY
 
 CLEANFILES += src/coreutils_symlinks
@@ -514,8 +543,8 @@ clean-local:
 	done
 
 
-BUILT_SOURCES += src/dircolors.h
-src/dircolors.h: src/dcgen src/dircolors.hin
+BUILT_SOURCES += $(top_srcdir)/src/dircolors.h
+$(top_srcdir)/src/dircolors.h: src/dcgen src/dircolors.hin
 	$(AM_V_GEN)rm -f $@ $@-t
 	$(AM_V_at)${MKDIR_P} src
 	$(AM_V_at)$(PERL) -w -- $(srcdir)/src/dcgen \
@@ -607,8 +636,8 @@ src/fs-kernel-magic: Makefile src/fs-latest-magic.h
 	  | $(ASSORT) -u						\
 	  > $@-t && mv $@-t $@
 
-BUILT_SOURCES += src/fs-is-local.h
-src/fs-is-local.h: src/stat.c src/extract-magic
+BUILT_SOURCES += $(top_srcdir)/src/fs-is-local.h
+$(top_srcdir)/src/fs-is-local.h: src/stat.c src/extract-magic
 	$(AM_V_GEN)rm -f $@
 	$(AM_V_at)${MKDIR_P} src
 	$(AM_V_at)$(PERL) $(srcdir)/src/extract-magic \
@@ -616,8 +645,8 @@ src/fs-is-local.h: src/stat.c src/extract-magic
 	$(AM_V_at)chmod a-w $@t
 	$(AM_V_at)mv $@t $@
 
-BUILT_SOURCES += src/fs.h
-src/fs.h: src/stat.c src/extract-magic
+BUILT_SOURCES += $(top_srcdir)/src/fs.h
+$(top_srcdir)/src/fs.h: src/stat.c src/extract-magic
 	$(AM_V_GEN)rm -f $@
 	$(AM_V_at)${MKDIR_P} src
 	$(AM_V_at)$(PERL) $(srcdir)/src/extract-magic \
@@ -630,6 +659,7 @@ src/version.c: Makefile
 	$(AM_V_GEN)rm -f $@
 	$(AM_V_at)${MKDIR_P} src
 	$(AM_V_at)printf '#include <config.h>\n' > $@t
+	$(AM_V_at)printf '#include "version.h"\n' >> $@t
 	$(AM_V_at)printf 'char const *Version = "$(PACKAGE_VERSION)";\n' >> $@t
 	$(AM_V_at)chmod a-w $@t
 	$(AM_V_at)mv $@t $@

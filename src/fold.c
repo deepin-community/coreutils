@@ -1,5 +1,5 @@
 /* fold -- wrap each input line to fit in specified width.
-   Copyright (C) 1991-2023 Free Software Foundation, Inc.
+   Copyright (C) 1991-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 
 #include <config.h>
 
+#include <ctype.h>
 #include <stdio.h>
 #include <getopt.h>
 #include <sys/types.h>
@@ -120,9 +121,9 @@ fold_file (char const *filename, size_t width)
   FILE *istream;
   int c;
   size_t column = 0;		/* Screen column where next char will go. */
-  size_t offset_out = 0;	/* Index in 'line_out' for next char. */
+  idx_t offset_out = 0;		/* Index in 'line_out' for next char. */
   static char *line_out = nullptr;
-  static size_t allocated_out = 0;
+  static idx_t allocated_out = 0;
   int saved_errno;
 
   if (STREQ (filename, "-"))
@@ -143,8 +144,8 @@ fold_file (char const *filename, size_t width)
 
   while ((c = getc (istream)) != EOF)
     {
-      if (offset_out + 1 >= allocated_out)
-        line_out = X2REALLOC (line_out, &allocated_out);
+      if (allocated_out - offset_out <= 1)
+        line_out = xpalloc (line_out, &allocated_out, 1, -1, sizeof *line_out);
 
       if (c == '\n')
         {
@@ -165,7 +166,7 @@ fold_file (char const *filename, size_t width)
           if (break_spaces)
             {
               bool found_blank = false;
-              size_t logical_end = offset_out;
+              idx_t logical_end = offset_out;
 
               /* Look for the last blank. */
               while (logical_end)
@@ -180,19 +181,17 @@ fold_file (char const *filename, size_t width)
 
               if (found_blank)
                 {
-                  size_t i;
-
                   /* Found a blank.  Don't output the part after it. */
                   logical_end++;
-                  fwrite (line_out, sizeof (char), (size_t) logical_end,
-                          stdout);
+                  fwrite (line_out, sizeof (char), logical_end, stdout);
                   putchar ('\n');
                   /* Move the remainder to the beginning of the next line.
                      The areas being copied here might overlap. */
                   memmove (line_out, line_out + logical_end,
                            offset_out - logical_end);
                   offset_out -= logical_end;
-                  for (column = i = 0; i < offset_out; i++)
+                  column = 0;
+                  for (idx_t i = 0; i < offset_out; i++)
                     column = adjust_column (column, line_out[i]);
                   goto rescan;
                 }
@@ -205,7 +204,7 @@ fold_file (char const *filename, size_t width)
             }
 
           line_out[offset_out++] = '\n';
-          fwrite (line_out, sizeof (char), (size_t) offset_out, stdout);
+          fwrite (line_out, sizeof (char), offset_out, stdout);
           column = offset_out = 0;
           goto rescan;
         }
@@ -218,7 +217,7 @@ fold_file (char const *filename, size_t width)
     saved_errno = 0;
 
   if (offset_out)
-    fwrite (line_out, sizeof (char), (size_t) offset_out, stdout);
+    fwrite (line_out, sizeof (char), offset_out, stdout);
 
   if (STREQ (filename, "-"))
     clearerr (istream);
@@ -278,8 +277,9 @@ main (int argc, char **argv)
             }
           FALLTHROUGH;
         case 'w':		/* Line width. */
-          width = xdectoumax (optarg, 1, SIZE_MAX - TAB_WIDTH - 1, "",
-                              _("invalid number of columns"), 0);
+          width = xnumtoumax (optarg, 10, 1, SIZE_MAX - TAB_WIDTH - 1, "",
+                              _("invalid number of columns"), 0,
+                              XTOINT_MIN_RANGE | XTOINT_MAX_RANGE);
           break;
 
         case_GETOPT_HELP_CHAR;

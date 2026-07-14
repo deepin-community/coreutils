@@ -1,5 +1,5 @@
 /* nl -- number lines of files
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 
 #include <config.h>
 
-#include <stdckdint.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <getopt.h>
@@ -44,13 +43,13 @@
    value, and a string separator.  */
 
 /* Right justified, no leading zeroes.  */
-static char const FORMAT_RIGHT_NOLZ[] = "%*" PRIdMAX "%s";
+static char const FORMAT_RIGHT_NOLZ[] = "%*jd%s";
 
 /* Right justified, leading zeroes.  */
-static char const FORMAT_RIGHT_LZ[] = "%0*" PRIdMAX "%s";
+static char const FORMAT_RIGHT_LZ[] = "%0*jd%s";
 
 /* Left justified, no leading zeroes.  */
-static char const FORMAT_LEFT[] = "%-*" PRIdMAX "%s";
+static char const FORMAT_LEFT[] = "%-*jd%s";
 
 /* Default section delimiter characters.  */
 static char DEFAULT_SECTION_DELIMITERS[] = "\\:";
@@ -532,15 +531,17 @@ main (int argc, char **argv)
           reset_numbers = false;
           break;
         case 'l':
-          blank_join = xdectoimax (optarg, 1, INTMAX_MAX, "",
-                                   _("invalid line number of blank lines"), 0);
+          blank_join = xnumtoimax (optarg, 10, 1, INTMAX_MAX, "",
+                                   _("invalid line number of blank lines"),
+                                   0, XTOINT_MIN_RANGE | XTOINT_MAX_QUIET);
           break;
         case 's':
           separator_str = optarg;
           break;
         case 'w':
-          lineno_width = xdectoimax (optarg, 1, INT_MAX, "",
-                                     _("invalid line number field width"), 0);
+          lineno_width = xnumtoimax (optarg, 10, 1, INT_MAX, "",
+                                     _("invalid line number field width"),
+                                     0, XTOINT_MIN_RANGE);
           break;
         case 'n':
           if (STREQ (optarg, "ln"))

@@ -1,5 +1,5 @@
 /* tac - concatenate and print files in reverse
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -188,7 +188,7 @@ tac_seekable (int input_fd, char const *file, off_t file_pos)
   char *past_end;
 
   /* Length of the record growing in 'G_buffer'. */
-  size_t saved_record_size;
+  ptrdiff_t saved_record_size;
 
   /* True if 'output' has not been called yet for any file.
      Only used when the separator is attached to the preceding record. */
@@ -224,16 +224,16 @@ tac_seekable (int input_fd, char const *file, off_t file_pos)
   /* Now scan forward, looking for end of file.  */
   while (saved_record_size == read_size)
     {
-      size_t nread = safe_read (input_fd, G_buffer, read_size);
+      ptrdiff_t nread = safe_read (input_fd, G_buffer, read_size);
       if (nread == 0)
         break;
       saved_record_size = nread;
-      if (saved_record_size == SAFE_READ_ERROR)
+      if (saved_record_size < 0)
         break;
       file_pos += nread;
     }
 
-  if (saved_record_size == SAFE_READ_ERROR)
+  if (saved_record_size < 0)
     {
       error (0, errno, _("%s: read error"), quotef (file));
       return false;
@@ -385,10 +385,10 @@ copy_to_temp (FILE **g_tmp, char **g_tempfile, int input_fd, char const *file)
 
   while (true)
     {
-      size_t bytes_read = safe_read (input_fd, G_buffer, read_size);
+      ptrdiff_t bytes_read = safe_read (input_fd, G_buffer, read_size);
       if (bytes_read == 0)
         break;
-      if (bytes_read == SAFE_READ_ERROR)
+      if (bytes_read < 0)
         {
           error (0, errno, _("%s: read error"), quotef (file));
           return -1;
@@ -553,7 +553,7 @@ main (int argc, char **argv)
   G_buffer = xmalloc (G_buffer_size);
   if (sentinel_length)
     {
-      memcpy (G_buffer, separator, sentinel_length + 1);
+      memcpy (G_buffer, separator, sentinel_length + !!*separator);
       G_buffer += sentinel_length;
     }
   else

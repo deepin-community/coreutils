@@ -1,42 +1,92 @@
-coreutils (9.4-2-1deepin5) unstable; urgency=medium
+coreutils (9.7-3deepin3) unstable; urgency=medium
 
-  * Explicitly disable OpenSSL support (--with-openssl=no) to eliminate 
+  * Remove cp-n.diff patch (upstream 9.7 already handles -n correctly
+    via I_ALWAYS_SKIP mapping to --update=none)
+  * Add automake, autoconf to Build-Depends; skip dh_autoreconf (gnulib
+    macros unavailable on OBS builders) and pre-generate src/single-binary.mk
+    before make to prevent automake-1.16 rebuild rule from firing
+    (fixes OBS build failure on architectures without automake-1.16)
+  * Pass CPPFLAGS="-DHAVE_USEC" LIBS="-lmagic -lusec" to configure since
+    patches' AC_CHECK_LIB for libmagic and libusec never run when autoreconf
+    is skipped (fixes link-time undefined reference to usec_* and magic_*)
+  * Default --with-usec is disabled (only enabled on UOS systems)
+
+ -- lichenggang <lichenggang@uniontech.com>  Tue, 14 Jul 2026 15:54:11 +0800
+
+coreutils (9.7-3deepin2) unstable; urgency=medium
+
+  * Port remaining deepin-specific patches from master branch:
+    - cp-n.diff: Revert cp -n behavior to Debian 12 and prior
+    - 0001-feat-add-sw-support.patch: Add sw64 architecture support
+    - 81_uniontech-add-cp-copy-audit-support.patch: cp copy audit
+    - uniontech-implement-USEC-with-libusec.patch: USEC auditing with libusec.so
+  * Explicitly disable OpenSSL support (--with-openssl=no) to eliminate
     dynamic linking overhead of libcrypto and libzstd.
-  * This restores the startup performance of basic utilities like 'sort', 
-    fixing a 15-25% regression observed in short-lived process benchmarks. 
+  * Add missing Build-Depends: libmagic-dev (required by 81 audit patch).
 
- -- xinpeng.wang <wangxinpeng@uniontech.com>  Wed, 11 Mar 2026 11:39:57 +0800
+ -- lichenggang <lichenggang@uniontech.com>  Tue, 14 Jul 2026 14:48:01 +0800
 
-coreutils (9.4-2-1deepin4) unstable; urgency=medium
+coreutils (9.7-3deepin1) unstable; urgency=medium
 
-  * implement USEC with libusec.so
+  * Port deepin-specific patches from master branch: - 81_uniontech-add-
+    cp-copy-audit-support.patch
 
- -- zhouzilong <zhouzilong@uniontech.com>  Fri, 06 Mar 2026 17:44:51 +0800
+ -- lichenggang <lichenggang@uniontech.com>  Tue, 23 Jun 2026 21:21:47 +0800
 
-coreutils (9.4-2-1deepin3) unstable; urgency=medium
+coreutils (9.7-3) unstable; urgency=high
 
-  * fix CVE-2024-0684 
+  * Correct spurious permission denied errors messages when copying from a file
+    with NFS ACLs to a filesystem which supports different ACLs.
+    (Backport of upstream fix.) (Closes: #1107169)
+  * Additional lintian overrides (for "mono", which is not defined for
+    terminals but is for other output formats) to address remaining lintian
+    warnings.
 
- -- zengwei <zengwei1@uniontech.com>  Wed, 24 Dec 2025 15:39:19 +0800
+ -- Michael Stone <mstone@debian.org>  Wed, 04 Jun 2025 11:14:05 -0400
 
-coreutils (9.4-2-1deepin2) unstable; urgency=medium
+coreutils (9.7-2) unstable; urgency=low
 
-  * Bump version to 9.4-2-1deepin2 to mitigate previous packaging issue.
-    https://github.com/deepin-community/coreutils/pull/3
+  * Build without y2038 support on hurd-i386 (Closes: #1078000)
+  * Hardening build flags (Closes: #1023556)
+  * Update URLs and metadata (Closes: #1057101)
+  * Support nodoc build profile (Closes: #1057136)
+  * Remove md5sum.textutils link (Closes: #1061302)
+  * Use DEB_VENDOR for packager name
+  * Lintian overrides
+  * Update standards version (no changes)
 
- -- Tianyu Chen <sweetyfish@deepin.org>  Thu, 21 Aug 2025 10:47:12 +0800
+ -- Michael Stone <mstone@debian.org>  Sun, 20 Apr 2025 13:39:09 -0400
 
-coreutils (9.4-3.1deepin2) unstable; urgency=medium
+coreutils (9.7-1) unstable; urgency=low
 
-  * feat: add sw64 support
+  * New upstream version
+  * Remove Breaks: usrmerge
+  * Add libsystemd dependency (Closes: #1080330)
+  * Add packager to version output (Closes: #1094325)
 
- -- Deepin Packages Builder <packages@deepin.org>  Tue, 27 May 2025 14:10:04 +0800
+ -- Michael Stone <mstone@debian.org>  Wed, 09 Apr 2025 09:09:41 -0400
 
-coreutils (9.4-3.1deepin1) unstable; urgency=medium
+coreutils (9.6-2) unstable; urgency=low
 
-  * chore: add missing patch
+  * Backport upstream commit 915004f4 to address crash in ls -Z
 
- -- Deepin Packages Builder <packages@deepin.org>  Tue, 27 May 2025 14:08:19 +0800
+ -- Michael Stone <mstone@debian.org>  Fri, 04 Apr 2025 10:54:18 -0400
+
+coreutils (9.6-1) unstable; urgency=low
+
+  * New upstream version
+  * Disable autoreconf on build (for now)
+
+ -- Michael Stone <mstone@debian.org>  Thu, 03 Apr 2025 13:29:08 -0400
+
+coreutils (9.5-1) unstable; urgency=low
+
+  * New upstream version (Closes: #1033277)
+  * drop cp -n patch
+  * drop non-essential attributes in upstream/signing-key.asc to reduce size
+  * update watch file to use https rather than ftp
+
+ -- Michael Stone <mstone@debian.org>  Wed, 23 Oct 2024 09:08:43 -0400
 
 coreutils (9.4-3.1) unstable; urgency=medium
 

@@ -1,5 +1,5 @@
 /* GNU fmt -- simple text formatter.
-   Copyright (C) 1994-2023 Free Software Foundation, Inc.
+   Copyright (C) 1994-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
 /* Written by Ross Paterson <rap@doc.ic.ac.uk>.  */
 
 #include <config.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <getopt.h>
@@ -333,7 +334,7 @@ main (int argc, char **argv)
   prefix = "";
   prefix_length = prefix_lead_space = prefix_full_length = 0;
 
-  if (argc > 1 && argv[1][0] == '-' && ISDIGIT (argv[1][1]))
+  if (argc > 1 && argv[1][0] == '-' && c_isdigit (argv[1][1]))
     {
       /* Old option syntax; a dash followed by one or more digits.  */
       max_width_option = argv[1] + 1;
@@ -350,7 +351,7 @@ main (int argc, char **argv)
     switch (optchar)
       {
       default:
-        if (ISDIGIT (optchar))
+        if (c_isdigit (optchar))
           error (0, 0, _("invalid option -- %c; -WIDTH is recognized\
  only when it is the first\noption; use -w N instead"),
                  optchar);
@@ -394,8 +395,8 @@ main (int argc, char **argv)
     {
       /* Limit max_width to MAXCHARS / 2; otherwise, the resulting
          output can be quite ugly.  */
-      max_width = xdectoumax (max_width_option, 0, MAXCHARS / 2, "",
-                              _("invalid width"), 0);
+      max_width = xnumtoumax (max_width_option, 10, 0, MAXCHARS / 2, "",
+                              _("invalid width"), 0, XTOINT_MAX_RANGE);
     }
 
   if (goal_width_option)
@@ -909,7 +910,7 @@ fmt_paragraph (void)
 }
 
 /* Work around <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=109628>.  */
-#if 13 <= __GNUC__
+#if __GNUC__ == 13
 # pragma GCC diagnostic ignored "-Wanalyzer-use-of-uninitialized-value"
 #endif
 

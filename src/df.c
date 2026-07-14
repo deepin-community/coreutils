@@ -1,5 +1,5 @@
 /* df - summarize free file system space
-   Copyright (C) 1991-2023 Free Software Foundation, Inc.
+   Copyright (C) 1991-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -23,21 +23,20 @@
 #include <sys/types.h>
 #include <getopt.h>
 #include <c-ctype.h>
-#include <wchar.h>
-#include <wctype.h>
+#include <uchar.h>
 
 #include "system.h"
 #include "assure.h"
 #include "canonicalize.h"
 #include "fsusage.h"
 #include "human.h"
-#include "mbsalign.h"
 #include "mbswidth.h"
 #include "mountlist.h"
 #include "quote.h"
 #include "find-mount-point.h"
 #include "hash.h"
 #include "xstrtol-error.h"
+#include "xvasprintf.h"
 
 /* The official name of this program (e.g., no 'g' prefix).  */
 #define PROGRAM_NAME "df"
@@ -169,48 +168,48 @@ struct field_data_t
   char const *arg;
   field_type_t field_type;
   char const *caption;/* nullptr means use default header of this field.  */
-  size_t width;       /* Auto adjusted (up) widths used to align columns.  */
-  mbs_align_t align;  /* Alignment for this field.  */
+  int width;          /* Auto adjusted (up) widths used to align columns.  */
+  bool align_right;   /* Whether to right-align columns, not left-align.  */
   bool used;
 };
 
 /* Header strings, minimum width and alignment for the above fields.  */
 static struct field_data_t field_data[] = {
   [SOURCE_FIELD] = { SOURCE_FIELD,
-    "source", OTHER_FLD, N_("Filesystem"), 14, MBS_ALIGN_LEFT,  false },
+    "source", OTHER_FLD, N_("Filesystem"), 14, false,  false },
 
   [FSTYPE_FIELD] = { FSTYPE_FIELD,
-    "fstype", OTHER_FLD, N_("Type"),        4, MBS_ALIGN_LEFT,  false },
+    "fstype", OTHER_FLD, N_("Type"),        4, false,  false },
 
   [SIZE_FIELD] = { SIZE_FIELD,
-    "size",   BLOCK_FLD, N_("blocks"),      5, MBS_ALIGN_RIGHT, false },
+    "size",   BLOCK_FLD, N_("blocks"),      5, true, false },
 
   [USED_FIELD] = { USED_FIELD,
-    "used",   BLOCK_FLD, N_("Used"),        5, MBS_ALIGN_RIGHT, false },
+    "used",   BLOCK_FLD, N_("Used"),        5, true, false },
 
   [AVAIL_FIELD] = { AVAIL_FIELD,
-    "avail",  BLOCK_FLD, N_("Available"),   5, MBS_ALIGN_RIGHT, false },
+    "avail",  BLOCK_FLD, N_("Available"),   5, true, false },
 
   [PCENT_FIELD] = { PCENT_FIELD,
-    "pcent",  BLOCK_FLD, N_("Use%"),        4, MBS_ALIGN_RIGHT, false },
+    "pcent",  BLOCK_FLD, N_("Use%"),        4, true, false },
 
   [ITOTAL_FIELD] = { ITOTAL_FIELD,
-    "itotal", INODE_FLD, N_("Inodes"),      5, MBS_ALIGN_RIGHT, false },
+    "itotal", INODE_FLD, N_("Inodes"),      5, true, false },
 
   [IUSED_FIELD] = { IUSED_FIELD,
-    "iused",  INODE_FLD, N_("IUsed"),       5, MBS_ALIGN_RIGHT, false },
+    "iused",  INODE_FLD, N_("IUsed"),       5, true, false },
 
   [IAVAIL_FIELD] = { IAVAIL_FIELD,
-    "iavail", INODE_FLD, N_("IFree"),       5, MBS_ALIGN_RIGHT, false },
+    "iavail", INODE_FLD, N_("IFree"),       5, true, false },
 
   [IPCENT_FIELD] = { IPCENT_FIELD,
-    "ipcent", INODE_FLD, N_("IUse%"),       4, MBS_ALIGN_RIGHT, false },
+    "ipcent", INODE_FLD, N_("IUse%"),       4, true, false },
 
   [TARGET_FIELD] = { TARGET_FIELD,
-    "target", OTHER_FLD, N_("Mounted on"),  0, MBS_ALIGN_LEFT,  false },
+    "target", OTHER_FLD, N_("Mounted on"),  0, false,  false },
 
   [FILE_FIELD] = { FILE_FIELD,
-    "file",   OTHER_FLD, N_("File"),        0, MBS_ALIGN_LEFT,  false }
+    "file",   OTHER_FLD, N_("File"),        0, false,  false }
 };
 
 static char const *all_args_string =
@@ -220,8 +219,8 @@ static char const *all_args_string =
 /* Storage for the definition of output columns.  */
 static struct field_data_t **columns;
 
-/* The current number of output columns.  */
-static size_t ncolumns;
+/* The current and allocated number of output columns.  */
+static idx_t ncolumns, ncolumns_alloc;
 
 /* Field values.  */
 struct field_values_t
@@ -239,8 +238,9 @@ struct field_values_t
 /* Storage for pointers for each string (cell of table).  */
 static char ***table;
 
-/* The current number of processed rows (including header).  */
-static size_t nrows;
+/* The current number of processed rows (including header),
+   and the number of slots allocated for rows.  */
+static idx_t nrows, nrows_alloc;
 
 /* For long options that have no equivalent short option, use a
    non-character as a pseudo short option, starting with CHAR_MAX + 1.  */
@@ -295,6 +295,8 @@ automount_stat_err (char const *file, struct stat *st)
     }
 }
 
+enum { MBSWIDTH_FLAGS = MBSW_REJECT_INVALID | MBSW_REJECT_UNPRINTABLE };
+
 /* Replace problematic chars with '?'.
    Since only control characters are currently considered,
    this should work in all encodings.  */
@@ -305,7 +307,7 @@ replace_control_chars (char *cell)
   char *p = cell;
   while (*p)
     {
-      if (c_iscntrl (to_uchar (*p)))
+      if (c_iscntrl (*p))
         *p = '?';
       p++;
     }
@@ -318,18 +320,18 @@ replace_invalid_chars (char *cell)
 {
   char *srcend = cell + strlen (cell);
   char *dst = cell;
-  mbstate_t mbstate = { 0, };
+  mbstate_t mbstate; mbszero (&mbstate);
   size_t n;
 
   for (char *src = cell; src != srcend; src += n)
     {
-      wchar_t wc;
+      char32_t wc;
       size_t srcbytes = srcend - src;
-      n = mbrtowc (&wc, src, srcbytes, &mbstate);
+      n = mbrtoc32 (&wc, src, srcbytes, &mbstate);
       bool ok = n <= srcbytes;
 
       if (ok)
-        ok = !iswcntrl (wc);
+        ok = !c32iscntrl (wc);
       else
         n = 1;
 
@@ -341,7 +343,7 @@ replace_invalid_chars (char *cell)
       else
         {
           *dst++ = '?';
-          memset (&mbstate, 0, sizeof mbstate);
+          mbszero (&mbstate);
         }
     }
 
@@ -365,9 +367,9 @@ replace_problematic_chars (char *cell)
 static void
 alloc_table_row (void)
 {
-  nrows++;
-  table = xnrealloc (table, nrows, sizeof (char **));
-  table[nrows - 1] = xnmalloc (ncolumns, sizeof (char *));
+  if (nrows == nrows_alloc)
+    table = xpalloc (table, &nrows_alloc, 1, -1, sizeof *table);
+  table[nrows++] = xinmalloc (ncolumns, sizeof *table[0]);
 }
 
 /* Output each cell in the table, accounting for the
@@ -376,12 +378,9 @@ alloc_table_row (void)
 static void
 print_table (void)
 {
-  size_t row;
-
-  for (row = 0; row < nrows; row++)
+  for (idx_t row = 0; row < nrows; row++)
     {
-      size_t col;
-      for (col = 0; col < ncolumns; col++)
+      for (idx_t col = 0; col < ncolumns; col++)
         {
           char *cell = table[row][col];
 
@@ -392,15 +391,15 @@ print_table (void)
           if (col != 0)
             putchar (' ');
 
-          int flags = 0;
-          if (col == ncolumns - 1) /* The last one.  */
-            flags = MBA_NO_RIGHT_PAD;
-
-          size_t width = columns[col]->width;
-          cell = ambsalign (cell, &width, columns[col]->align, flags);
-          /* When ambsalign fails, output unaligned data.  */
-          fputs (cell ? cell : table[row][col], stdout);
-          free (cell);
+          int width = mbswidth (cell, MBSWIDTH_FLAGS);
+          int fill = width < 0 ? 0 : columns[col]->width - width;
+          if (columns[col]->align_right)
+            for (; 0 < fill; fill--)
+              putchar (' ');
+          fputs (cell, stdout);
+          if (col + 1 < ncolumns)
+            for (; 0 < fill; fill--)
+              putchar (' ');
         }
       putchar ('\n');
     }
@@ -412,11 +411,11 @@ print_table (void)
 static void
 alloc_field (int f, char const *c)
 {
-  ncolumns++;
-  columns = xnrealloc (columns, ncolumns, sizeof (struct field_data_t *));
-  columns[ncolumns - 1] = &field_data[f];
+  if (ncolumns == ncolumns_alloc)
+    columns = xpalloc (columns, &ncolumns_alloc, 1, -1, sizeof *columns);
+  columns[ncolumns++] = &field_data[f];
   if (c != nullptr)
-    columns[ncolumns - 1]->caption = c;
+    field_data[f].caption = c;
 
   affirm (!field_data[f].used);
 
@@ -488,6 +487,7 @@ decode_output_arg (char const *arg)
           alloc_field (field, N_("Avail"));
           break;
 
+        case INVALID_FIELD:
         default:
           affirm (!"invalid field");
         }
@@ -567,13 +567,11 @@ get_field_list (void)
 static void
 get_header (void)
 {
-  size_t col;
-
   alloc_table_row ();
 
-  for (col = 0; col < ncolumns; col++)
+  for (idx_t col = 0; col < ncolumns; col++)
     {
-      char *cell = nullptr;
+      char *cell;
       char const *header = _(columns[col]->caption);
 
       if (columns[col]->field == SIZE_FIELD
@@ -616,8 +614,7 @@ get_header (void)
           header = _("blocks");
 
           /* TRANSLATORS: this is the "1K-blocks" header in "df" output.  */
-          if (asprintf (&cell, _("%s-%s"), num, header) == -1)
-            cell = nullptr;
+          cell = xasprintf (_("%s-%s"), num, header);
         }
       else if (header_mode == POSIX_MODE && columns[col]->field == SIZE_FIELD)
         {
@@ -625,20 +622,16 @@ get_header (void)
           char *num = umaxtostr (output_block_size, buf);
 
           /* TRANSLATORS: this is the "1024-blocks" header in "df -P".  */
-          if (asprintf (&cell, _("%s-%s"), num, header) == -1)
-            cell = nullptr;
+          cell = xasprintf (_("%s-%s"), num, header);
         }
       else
-        cell = strdup (header);
-
-      if (!cell)
-        xalloc_die ();
+        cell = xstrdup (header);
 
       replace_problematic_chars (cell);
 
       table[nrows - 1][col] = cell;
 
-      size_t cell_width = mbswidth (cell, 0);
+      int cell_width = mbswidth (cell, MBSWIDTH_FLAGS);
       columns[col]->width = MAX (columns[col]->width, cell_width);
     }
 }
@@ -1125,8 +1118,7 @@ get_dev (char const *device, char const *mount_point, char const *file,
   if (print_grand_total && ! force_fsu)
     add_to_grand_total (&block_values, &inode_values);
 
-  size_t col;
-  for (col = 0; col < ncolumns; col++)
+  for (idx_t col = 0; col < ncolumns; col++)
     {
       char buf[LONGEST_HUMAN_READABLE + 2];
       char *cell;
@@ -1214,17 +1206,7 @@ get_dev (char const *device, char const *mount_point, char const *file,
                   }
               }
 
-            if (0 <= pct)
-              {
-                if (asprintf (&cell, "%.0f%%", pct) == -1)
-                  cell = nullptr;
-              }
-            else
-              cell = strdup ("-");
-
-            if (!cell)
-              xalloc_die ();
-
+            cell = pct < 0 ? xstrdup ("-") : xasprintf ("%.0f%%", pct);
             break;
           }
 
@@ -1245,6 +1227,7 @@ get_dev (char const *device, char const *mount_point, char const *file,
           cell = xstrdup (mount_point);
           break;
 
+        case INVALID_FIELD:
         default:
           affirm (!"unhandled field");
         }
@@ -1252,7 +1235,7 @@ get_dev (char const *device, char const *mount_point, char const *file,
       affirm (cell);
 
       replace_problematic_chars (cell);
-      size_t cell_width = mbswidth (cell, 0);
+      int cell_width = mbswidth (cell, MBSWIDTH_FLAGS);
       columns[col]->width = MAX (columns[col]->width, cell_width);
       table[nrows - 1][col] = cell;
     }
@@ -1553,8 +1536,12 @@ or all file systems by default.\n\
 "), stdout);
       fputs (_("\
       --output[=FIELD_LIST]  use the output format defined by FIELD_LIST,\n\
-                               or print all fields if FIELD_LIST is omitted.\n\
+                               or print all fields if FIELD_LIST is omitted\n\
+"), stdout);
+      fputs (_("\
   -P, --portability     use the POSIX output format\n\
+"), stdout);
+      fputs (_("\
       --sync            invoke sync before getting usage info\n\
 "), stdout);
       fputs (_("\

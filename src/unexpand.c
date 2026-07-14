@@ -1,5 +1,5 @@
 /* unexpand - convert blanks to tabs
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@
 
 #include <config.h>
 
+#include <ctype.h>
 #include <stdio.h>
 #include <getopt.h>
 #include <sys/types.h>
@@ -116,7 +117,7 @@ unexpand (void)
   /* The worst case is a non-blank character, then one blank, then a
      tab stop, then MAX_COLUMN_WIDTH - 1 blanks, then a non-blank; so
      allocate MAX_COLUMN_WIDTH bytes to store the blanks.  */
-  pending_blank = xmalloc (max_column_width);
+  pending_blank = ximalloc (max_column_width);
 
   while (true)
     {
@@ -131,13 +132,13 @@ unexpand (void)
          is true:  */
 
       /* Column of next input character.  */
-      uintmax_t column = 0;
+      colno column = 0;
 
       /* Column the next input tab stop is on.  */
-      uintmax_t next_tab_column = 0;
+      colno next_tab_column = 0;
 
       /* Index in TAB_LIST of next tab stop to examine.  */
-      size_t tab_index = 0;
+      idx_t tab_index = 0;
 
       /* If true, the first pending blank came just before a tab stop.  */
       bool one_blank_before_tab_stop = false;
@@ -148,7 +149,7 @@ unexpand (void)
       bool prev_blank = true;
 
       /* Number of pending columns of blanks.  */
-      size_t pending = 0;
+      idx_t pending = 0;
 
 
       /* Convert a line of text.  */
@@ -174,9 +175,6 @@ unexpand (void)
 
                   if (convert)
                     {
-                      if (next_tab_column < column)
-                        error (EXIT_FAILURE, 0, _("input line is too long"));
-
                       if (c == '\t')
                         {
                           column = next_tab_column;
@@ -254,7 +252,7 @@ int
 main (int argc, char **argv)
 {
   bool have_tabval = false;
-  uintmax_t tabval IF_LINT ( = 0);
+  colno tabval IF_LINT ( = 0);
   int c;
 
   /* If true, cancel the effect of any -a (explicit or implicit in -t),
@@ -299,7 +297,7 @@ main (int argc, char **argv)
               tabval = 0;
               have_tabval = true;
             }
-          if (!DECIMAL_DIGIT_ACCUMULATE (tabval, c - '0', uintmax_t))
+          if (!DECIMAL_DIGIT_ACCUMULATE (tabval, c - '0'))
             error (EXIT_FAILURE, 0, _("tab stop value is too large"));
           break;
         }

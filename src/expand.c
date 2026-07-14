@@ -1,5 +1,5 @@
 /* expand - convert tabs to spaces
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -34,6 +34,7 @@
 
 #include <config.h>
 
+#include <ctype.h>
 #include <stdio.h>
 #include <getopt.h>
 #include <sys/types.h>
@@ -112,10 +113,10 @@ expand (void)
          is true:  */
 
       /* Column of next input character.  */
-      uintmax_t column = 0;
+      colno column = 0;
 
       /* Index in TAB_LIST of next tab stop to examine.  */
-      size_t tab_index = 0;
+      idx_t tab_index = 0;
 
 
       /* Convert a line of text.  */
@@ -130,17 +131,9 @@ expand (void)
               if (c == '\t')
                 {
                   /* Column the next input tab stop is on.  */
-                  uintmax_t next_tab_column;
                   bool last_tab;
-
-                  next_tab_column = get_next_tab_column (column, &tab_index,
-                                                         &last_tab);
-
-                  if (last_tab)
-                    next_tab_column = column + 1;
-
-                  if (next_tab_column < column)
-                    error (EXIT_FAILURE, 0, _("input line is too long"));
+                  colno next_tab_column
+                    = get_next_tab_column (column, &tab_index, &last_tab);
 
                   while (++column < next_tab_column)
                     if (putchar (' ') < 0)
@@ -157,8 +150,7 @@ expand (void)
                 }
               else
                 {
-                  column++;
-                  if (!column)
+                  if (ckd_add (&column, column, 1))
                     error (EXIT_FAILURE, 0, _("input line is too long"));
                 }
 

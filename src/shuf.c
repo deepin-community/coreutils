@@ -1,6 +1,6 @@
 /* Shuffle lines of text.
 
-   Copyright (C) 2006-2023 Free Software Foundation, Inc.
+   Copyright (C) 2006-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,10 +20,10 @@
 #include <config.h>
 
 #include <sys/types.h>
+#include <getopt.h>
 #include "system.h"
 
 #include "fadvise.h"
-#include "getopt.h"
 #include "linebuffer.h"
 #include "quote.h"
 #include "randint.h"
@@ -36,9 +36,6 @@
 #define PROGRAM_NAME "shuf"
 
 #define AUTHORS proper_name ("Paul Eggert")
-
-/* For reservoir-sampling, allocate the reservoir lines in batches.  */
-enum { RESERVOIR_LINES_INCREMENT = 1024 };
 
 /* reservoir-sampling introduces CPU overhead for small inputs.
    So only enable it for inputs >= this limit.
@@ -168,33 +165,30 @@ input_size (void)
 /* Read all lines and store up to K permuted lines in *OUT_RSRV.
    Return the number of lines read, up to a maximum of K.  */
 
-static size_t
-read_input_reservoir_sampling (FILE *in, char eolbyte, size_t k,
+static idx_t
+read_input_reservoir_sampling (FILE *in, char eolbyte, idx_t k,
                                struct randint_source *s,
                                struct linebuffer **out_rsrv)
 {
   randint n_lines = 0;
-  size_t n_alloc_lines = MIN (k, RESERVOIR_LINES_INCREMENT);
+  idx_t n_alloc_lines = 0;
   struct linebuffer *line = nullptr;
-  struct linebuffer *rsrv;
-
-  rsrv = xcalloc (n_alloc_lines, sizeof (struct linebuffer));
+  struct linebuffer *rsrv = nullptr;
 
   /* Fill the first K lines, directly into the reservoir.  */
-  while (n_lines < k
-         && (line =
-             readlinebuffer_delim (&rsrv[n_lines], in, eolbyte)) != nullptr)
+  for (n_lines = 0; n_lines < k; n_lines++)
     {
-      n_lines++;
-
-      /* Enlarge reservoir.  */
-      if (n_lines >= n_alloc_lines)
+      /* Enlarge reservoir if needed.  */
+      if (n_lines == n_alloc_lines)
         {
-          n_alloc_lines += RESERVOIR_LINES_INCREMENT;
-          rsrv = xnrealloc (rsrv, n_alloc_lines, sizeof (struct linebuffer));
-          memset (&rsrv[n_lines], 0,
-                  RESERVOIR_LINES_INCREMENT * sizeof (struct linebuffer));
+          idx_t old = n_alloc_lines;
+          rsrv = xpalloc (rsrv, &n_alloc_lines, 1, k, sizeof *rsrv);
+          memset (&rsrv[n_lines], 0, (n_alloc_lines - old) * sizeof *rsrv);
         }
+
+      line = readlinebuffer_delim (&rsrv[n_lines], in, eolbyte);
+      if (!line)
+        break;
     }
 
   /* last line wasn't null - so there may be more lines to read.  */
@@ -372,7 +366,7 @@ main (int argc, char **argv)
   bool input_range = false;
   size_t lo_input = SIZE_MAX;
   size_t hi_input = 0;
-  size_t head_lines = SIZE_MAX;
+  idx_t head_lines = MIN (IDX_MAX, SIZE_MAX);
   char const *outfile = nullptr;
   char *random_source = nullptr;
   char eolbyte = '\n';
@@ -510,7 +504,7 @@ main (int argc, char **argv)
     }
   else if (input_range)
     {
-      n_lines = hi_input - lo_input + 1;
+      IF_LINT (n_lines = hi_input - lo_input + 1); /* Avoid GCC 10 warning.  */
       line = nullptr;
     }
   else
@@ -523,7 +517,7 @@ main (int argc, char **argv)
 
       fadvise (stdin, FADVISE_SEQUENTIAL);
 
-      if (repeat || head_lines == SIZE_MAX
+      if (repeat || head_lines == MIN (IDX_MAX, SIZE_MAX)
           || input_size () <= RESERVOIR_MIN_INPUT)
         {
           n_lines = read_input (stdin, eolbyte, &input_lines);
@@ -538,7 +532,7 @@ main (int argc, char **argv)
 
   /* The adjusted head line count; can be less than HEAD_LINES if the
      input is small and if not repeating.  */
-  size_t ahead_lines = repeat || head_lines < n_lines ? head_lines : n_lines;
+  idx_t ahead_lines = repeat || head_lines < n_lines ? head_lines : n_lines;
 
   randint_source = randint_all_new (random_source,
                                     (use_reservoir_sampling || repeat
@@ -598,6 +592,8 @@ main (int argc, char **argv)
 
   if (i != 0)
     write_error ();
+
+  IF_LINT (randint_all_free (randint_source));  /* For older valgrind.  */
 
   main_exit (EXIT_SUCCESS);
 }

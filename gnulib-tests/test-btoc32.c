@@ -1,5 +1,5 @@
 /* Test of conversion of unibyte character to 32-bit wide character.
-   Copyright (C) 2008-2023 Free Software Foundation, Inc.
+   Copyright (C) 2008-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -71,7 +71,7 @@ main (int argc, char *argv[])
                    But on musl libc, the bytes 0x80..0xFF map to U+DF80..U+DFFF.  */
                 ASSERT (wc == c || wc == 0xDF00 + c);
             }
-        return 0;
+        return test_exit_status;
 
       case '2':
         /* Locale encoding is ISO-8859-1 or ISO-8859-15.  */
@@ -79,7 +79,7 @@ main (int argc, char *argv[])
           ASSERT (btoc32 (c) == c);
         for (c = 0xA0; c < 0x100; c++)
           ASSERT (btoc32 (c) != WEOF);
-        return 0;
+        return test_exit_status;
 
       case '3':
         /* Locale encoding is UTF-8.  */
@@ -87,7 +87,7 @@ main (int argc, char *argv[])
           ASSERT (btoc32 (c) == c);
         for (c = 0x80; c < 0x100; c++)
           ASSERT (btoc32 (c) == WEOF);
-        return 0;
+        return test_exit_status;
       }
 
   return 1;

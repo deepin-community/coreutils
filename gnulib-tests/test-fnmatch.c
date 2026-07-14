@@ -1,5 +1,5 @@
 /* Test of fnmatch string matching function.
-   Copyright (C) 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -615,7 +615,7 @@ main (int argc, char *argv[])
       {
       case '1':
         /* C or POSIX locale.  */
-        return 0;
+        return test_exit_status;
 
       case '2':
         /* Locale encoding is ISO-8859-1 or ISO-8859-15.  */
@@ -671,7 +671,7 @@ main (int argc, char *argv[])
         ASSERT (fnmatch ("H\366hLe", "H\326hle", FNM_CASEFOLD) == 0);
         #endif
 
-        return 0;
+        return test_exit_status;
 
       case '3':
         /* Locale encoding is UTF-8.  */
@@ -766,7 +766,7 @@ main (int argc, char *argv[])
         }
         #endif
 
-        return 0;
+        return test_exit_status;
 
       case '4':
         /* Locale encoding is EUC-JP.  */
@@ -849,11 +849,13 @@ main (int argc, char *argv[])
         }
         #endif
 
-        return 0;
+        return test_exit_status;
 
       case '5':
         /* Locale encoding is GB18030.  */
         #if (defined __GLIBC__ && __GLIBC__ == 2 && __GLIBC_MINOR__ >= 13 && __GLIBC_MINOR__ <= 15)
+        if (test_exit_status != EXIT_SUCCESS)
+          return test_exit_status;
         fputs ("Skipping test: The GB18030 converter in this system's iconv is broken.\n", stderr);
         return 77;
         #endif
@@ -893,7 +895,7 @@ main (int argc, char *argv[])
         /* U+20000 <CJK Ideograph> */
         ASSERT (fnmatch ("x[[:print:]]y", "x\225\062\202\066y", 0) == 0);
         #endif
-        #if !(defined __FreeBSD__ || defined __DragonFly__)
+        #if !(defined __FreeBSD__ || defined __DragonFly__ || defined __illumos__)
         /* U+00D7 MULTIPLICATION SIGN */
         ASSERT (fnmatch ("x[[:punct:]]y", "x\241\301y", 0) == 0);
         #endif
@@ -956,7 +958,7 @@ main (int argc, char *argv[])
         }
         #endif
 
-        return 0;
+        return test_exit_status;
       }
 
   return 1;

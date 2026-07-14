@@ -1,5 +1,5 @@
 /* split.c -- split a file into pieces.
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
    * support --suppress-matched as in csplit.  */
 #include <config.h>
 
-#include <stdckdint.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <getopt.h>
 #include <signal.h>
@@ -91,7 +91,7 @@ static char const *numeric_suffix_start;
 static char const *additional_suffix;
 
 /* Name of input file.  May be "-".  */
-static char *infile;
+static char const *infile;
 
 /* stat buf for input file.  */
 static struct stat in_stat_buf;
@@ -486,13 +486,11 @@ create (char const *name)
       struct stat out_stat_buf;
       if (fstat (fd, &out_stat_buf) != 0)
         error (EXIT_FAILURE, errno, _("failed to stat %s"), quoteaf (name));
-      if (SAME_INODE (in_stat_buf, out_stat_buf))
+      if (psame_inode (&in_stat_buf, &out_stat_buf))
         error (EXIT_FAILURE, 0, _("%s would overwrite input; aborting"),
                quoteaf (name));
-      bool regularish
-        = S_ISREG (out_stat_buf.st_mode) || S_TYPEISSHM (&out_stat_buf);
-      if (! (regularish && out_stat_buf.st_size == 0)
-          && ftruncate (fd, 0) < 0 && regularish)
+      if (ftruncate (fd, 0) < 0
+          && (S_ISREG (out_stat_buf.st_mode) || S_TYPEISSHM (&out_stat_buf)))
         error (EXIT_FAILURE, errno, _("%s: error truncating"), quotef (name));
 
       return fd;
@@ -809,10 +807,7 @@ line_bytes_split (intmax_t n_bytes, char *buf, idx_t bufsize)
             {
               cwrite (n_out == 0, hold, n_hold);
               n_out += n_hold;
-              if (n_hold > bufsize)
-                hold = xirealloc (hold, bufsize);
               n_hold = 0;
-              hold_size = bufsize;
             }
 
           /* Output to eol if present.  */
@@ -1367,8 +1362,8 @@ main (int argc, char **argv)
 
   /* Parse command line options.  */
 
-  infile = bad_cast ("-");
-  outbase = bad_cast ("x");
+  infile = "-";
+  outbase = "x";
 
   while (true)
     {
@@ -1541,10 +1536,11 @@ main (int argc, char **argv)
           break;
 
         case IO_BLKSIZE_OPTION:
-          in_blk_size = xdectoumax (optarg, 1,
+          in_blk_size = xnumtoumax (optarg, 10, 1,
                                     MIN (SYS_BUFSIZE_MAX,
                                          MIN (IDX_MAX, SIZE_MAX) - 1),
-                                    multipliers, _("invalid IO block size"), 0);
+                                    multipliers, _("invalid IO block size"),
+                                    0, XTOINT_MIN_RANGE);
           break;
 
         case VERBOSE_OPTION:
@@ -1626,7 +1622,7 @@ main (int argc, char **argv)
 
   if (in_blk_size == 0)
     {
-      in_blk_size = io_blksize (in_stat_buf);
+      in_blk_size = io_blksize (&in_stat_buf);
       if (SYS_BUFSIZE_MAX < in_blk_size)
         in_blk_size = SYS_BUFSIZE_MAX;
     }
@@ -1687,7 +1683,7 @@ main (int argc, char **argv)
       }
       break;
 
-    default:
+    case type_undef: default:
       affirm (false);
     }
 

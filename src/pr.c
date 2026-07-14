@@ -1,5 +1,5 @@
 /* pr -- convert text files for printing.
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -309,10 +309,11 @@
 
 #include <config.h>
 
+#include <ctype.h>
 #include <getopt.h>
-#include <stdckdint.h>
 #include <sys/types.h>
 #include "system.h"
+#include "c-ctype.h"
 #include "fadvise.h"
 #include "hard-locale.h"
 #include "mbswidth.h"
@@ -425,8 +426,7 @@ static bool skip_to_page (uintmax_t page);
 static void print_header (void);
 static void pad_across_to (int position);
 static void add_line_number (COLUMN *p);
-static void getoptnum (char const *n_str, int min, int *num,
-                       char const *errfmt);
+static int getoptnum (char const *n_str, int min, char const *errfmt);
 static void getoptarg (char *arg, char switch_char, char *character,
                        int *number);
 static void print_files (int number_of_files, char **av);
@@ -461,7 +461,7 @@ static unsigned int buff_current;
 
 /* The number of characters in buff.
    Used for allocation of buff and to detect overflow of buff. */
-static size_t buff_allocated;
+static idx_t buff_allocated;
 
 /* Array of indices into buff.
    Each entry is an index of the first character of a line.
@@ -838,7 +838,7 @@ first_last_page (int oi, char c, char const *pages)
 static void
 parse_column_count (char const *s)
 {
-  getoptnum (s, 1, &columns, _("invalid number of columns"));
+  columns = getoptnum (s, 1, _("invalid number of columns"));
   explicit_columns = true;
 }
 
@@ -865,8 +865,8 @@ main (int argc, char **argv)
 
   /* Accumulate the digits of old-style options like -99.  */
   char *column_count_string = nullptr;
-  size_t n_digits = 0;
-  size_t n_alloc = 0;
+  idx_t n_digits = 0;
+  idx_t n_alloc = 0;
 
   initialize_main (&argc, &argv);
   set_program_name (argv[0]);
@@ -888,12 +888,12 @@ main (int argc, char **argv)
       if (c == -1)
         break;
 
-      if (ISDIGIT (c))
+      if (c_isdigit (c))
         {
           /* Accumulate column-count digits specified via old-style options. */
           if (n_digits + 1 >= n_alloc)
-            column_count_string
-              = X2REALLOC (column_count_string, &n_alloc);
+            column_count_string = xpalloc (column_count_string, &n_alloc, 2, -1,
+                                           sizeof *column_count_string);
           column_count_string[n_digits++] = c;
           column_count_string[n_digits] = '\0';
           continue;
@@ -975,8 +975,9 @@ main (int argc, char **argv)
           join_lines = true;
           break;
         case 'l':
-          getoptnum (optarg, 1, &lines_per_page,
-                     _("'-l PAGE_LENGTH' invalid number of lines"));
+          lines_per_page
+            = getoptnum (optarg, 1,
+                         _("'-l PAGE_LENGTH' invalid number of lines"));
           break;
         case 'm':
           parallel_files = true;
@@ -990,12 +991,13 @@ main (int argc, char **argv)
           break;
         case 'N':
           skip_count = false;
-          getoptnum (optarg, INT_MIN, &start_line_num,
-                     _("'-N NUMBER' invalid starting line number"));
+          start_line_num
+            = getoptnum (optarg, INT_MIN,
+                         _("'-N NUMBER' invalid starting line number"));
           break;
         case 'o':
-          getoptnum (optarg, 0, &chars_per_margin,
-                     _("'-o MARGIN' invalid line offset"));
+          chars_per_margin = getoptnum (optarg, 0,
+                                        _("'-o MARGIN' invalid line offset"));
           break;
         case 'r':
           ignore_failed_opens = true;
@@ -1030,9 +1032,9 @@ main (int argc, char **argv)
           old_options = true;
           old_w = true;
           {
-            int tmp_cpl;
-            getoptnum (optarg, 1, &tmp_cpl,
-                       _("'-w PAGE_WIDTH' invalid number of characters"));
+            int tmp_cpl
+              = getoptnum (optarg, 1,
+                           _("'-w PAGE_WIDTH' invalid number of characters"));
             if (! truncate_lines)
               chars_per_line = tmp_cpl;
           }
@@ -1040,8 +1042,9 @@ main (int argc, char **argv)
         case 'W':
           old_w = false;			/* dominates -w */
           truncate_lines = true;
-          getoptnum (optarg, 1, &chars_per_line,
-                     _("'-W PAGE_WIDTH' invalid number of characters"));
+          chars_per_line
+            = getoptnum (optarg, 1,
+                         _("'-W PAGE_WIDTH' invalid number of characters"));
           break;
         case_GETOPT_HELP_CHAR;
         case_GETOPT_VERSION_CHAR (PROGRAM_NAME, AUTHORS);
@@ -1151,11 +1154,11 @@ main (int argc, char **argv)
 
 /* Parse numeric arguments, ensuring MIN <= number <= INT_MAX.  */
 
-static void
-getoptnum (char const *n_str, int min, int *num, char const *err)
+static int
+getoptnum (char const *n_str, int min, char const *err)
 {
-  intmax_t tnum = xdectoimax (n_str, min, INT_MAX, "", err, 0);
-  *num = tnum;
+  return xnumtoimax (n_str, 10, min, INT_MAX, "", err, 0,
+                     min <= 0 ? 0 : XTOINT_MIN_RANGE);
 }
 
 /* Parse options of the form -scNNN.
@@ -1173,7 +1176,7 @@ getoptarg (char *arg, char switch_char, char *character, int *number)
       usage (EXIT_FAILURE);
     }
 
-  if (!ISDIGIT (*arg))
+  if (!c_isdigit (*arg))
     *character = *arg++;
   if (*arg)
     {
@@ -1908,11 +1911,13 @@ print_page (void)
 static void
 init_store_cols (void)
 {
+  /* Tune this.  */
   int total_lines, total_lines_1, chars_per_column_1, chars_if_truncate;
   if (ckd_mul (&total_lines, lines_per_body, columns)
       || ckd_add (&total_lines_1, total_lines, 1)
       || ckd_add (&chars_per_column_1, chars_per_column, 1)
-      || ckd_mul (&chars_if_truncate, total_lines, chars_per_column_1))
+      || ckd_mul (&chars_if_truncate, total_lines, chars_per_column_1)
+      || ckd_mul (&buff_allocated, chars_if_truncate, use_col_separator + 1))
     integer_overflow ();
 
   free (line_vector);
@@ -1923,9 +1928,7 @@ init_store_cols (void)
   end_vector = xnmalloc (total_lines, sizeof *end_vector);
 
   free (buff);
-  buff = xnmalloc (chars_if_truncate, use_col_separator + 1);
-  buff_allocated = chars_if_truncate;  /* Tune this. */
-  buff_allocated *= use_col_separator + 1;
+  buff = ximalloc (buff_allocated);
 }
 
 /* Store all but the rightmost column.
@@ -2019,7 +2022,7 @@ store_char (char c)
   if (buff_current >= buff_allocated)
     {
       /* May be too generous. */
-      buff = X2REALLOC (buff, &buff_allocated);
+      buff = xpalloc (buff, &buff_allocated, 1, -1, sizeof *buff);
     }
   buff[buff_current++] = c;
 }
@@ -2354,8 +2357,7 @@ skip_to_page (uintmax_t page)
           /* It's very helpful, normally the total number of pages is
              not known in advance.  */
           error (0, 0,
-                 _("starting page number %"PRIuMAX
-                   " exceeds page count %"PRIuMAX),
+                 _("starting page number %ju exceeds page count %ju"),
                  page, n);
           break;
         }
@@ -2384,9 +2386,9 @@ print_header (void)
     error (EXIT_FAILURE, 0, _("page number overflow"));
 
   /* The translator must ensure that formatting the translation of
-     "Page %"PRIuMAX does not generate more than (sizeof page_text - 1)
+     "Page %ju" does not generate more than (sizeof page_text - 1)
      bytes.  */
-  sprintf (page_text, _("Page %"PRIuMAX), page_number);
+  sprintf (page_text, _("Page %ju"), page_number);
   available_width = header_width_available - mbswidth (page_text, 0);
   available_width = MAX (0, available_width);
   lhs_spaces = available_width >> 1;
@@ -2426,7 +2428,7 @@ static bool
 read_line (COLUMN *p)
 {
   int c;
-  int chars;
+  int chars IF_LINT (= 0);
   int last_input_position;
   int j, k;
   COLUMN *q;

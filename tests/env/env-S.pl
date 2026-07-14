@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # Test 'env -S' feature
 
-# Copyright (C) 2018-2023 Free Software Foundation, Inc.
+# Copyright (C) 2018-2025 Free Software Foundation, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,9 +35,12 @@ $env = $1;
 my $cf = '__CF_USER_TEXT_ENCODING';
 exists $ENV{$cf} and $env .= " -u$cf";
 # Likewise for these Cygwin env vars
-my $cf = 'SYSTEMROOT';
+$cf = 'SYSTEMROOT';
 exists $ENV{$cf} and $env .= " -u$cf";
-my $cf = 'WINDIR';
+$cf = 'WINDIR';
+exists $ENV{$cf} and $env .= " -u$cf";
+# Likewise for these GNU/Hurd env vars
+$cf = 'LD_ORIGIN_PATH';
 exists $ENV{$cf} and $env .= " -u$cf";
 
 my @Tests =

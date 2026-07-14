@@ -1,5 +1,5 @@
 /* system-dependent definitions for coreutils
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -67,6 +67,7 @@
 # define makedev(maj, min)  mkdev (maj, min)
 #endif
 
+#include <stdckdint.h>
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
@@ -142,28 +143,10 @@ enum
 
 #include "timespec.h"
 
-#include <ctype.h>
-
-/* ISDIGIT differs from isdigit, as follows:
-   - Its arg may be any int or unsigned int; it need not be an unsigned char
-     or EOF.
-   - It's typically faster.
-   POSIX says that only '0' through '9' are digits.  Prefer ISDIGIT to
-   isdigit unless it's important to use the locale's definition
-   of 'digit' even when the host does not conform to POSIX.  */
-#define ISDIGIT(c) ((unsigned int) (c) - '0' <= 9)
-
 /* Convert a possibly-signed character to an unsigned character.  This is
    a bit safer than casting to unsigned char, since it catches some type
    errors that the cast doesn't.  */
 static inline unsigned char to_uchar (char ch) { return ch; }
-
-/* '\n' is considered a field separator with  --zero-terminated.  */
-static inline bool
-field_sep (unsigned char ch)
-{
-  return isblank (ch) || ch == '\n';
-}
 
 #include <locale.h>
 
@@ -244,21 +227,6 @@ uid_t getuid (void);
 #include "idx.h"
 #include "xalloc.h"
 #include "verify.h"
-
-/* This is simply a shorthand for the common case in which
-   the third argument to x2nrealloc would be 'sizeof *(P)'.
-   Ensure that sizeof *(P) is *not* 1.  In that case, it'd be
-   better to use X2REALLOC, although not strictly necessary.  */
-#define X2NREALLOC(P, PN) verify_expr (sizeof *(P) != 1, \
-                                       x2nrealloc (P, PN, sizeof *(P)))
-
-/* Using x2realloc (when appropriate) usually makes your code more
-   readable than using x2nrealloc, but it also makes it so your
-   code will malfunction if sizeof *(P) ever becomes 2 or greater.
-   So use this macro instead of using x2realloc directly.  */
-#define X2REALLOC(P, PN) verify_expr (sizeof *(P) == 1, \
-                                      x2realloc (P, PN))
-
 #include "unlocked-io.h"
 #include "same-inode.h"
 
@@ -353,7 +321,7 @@ enum
    Usually it is just PROGRAM_NAME.  */
 #define USAGE_BUILTIN_WARNING \
   _("\n" \
-"NOTE: your shell may have its own version of %s, which usually supersedes\n" \
+"Your shell may have its own version of %s, which usually supersedes\n" \
 "the version described here.  Please refer to your shell's documentation\n" \
 "for details about the options it supports.\n")
 
@@ -553,26 +521,13 @@ is_nul (void const *buf, size_t length)
    return memcmp (buf, p, length) == 0;
 }
 
-/* If 10*Accum + Digit_val is larger than the maximum value for Type,
-   then don't update Accum and return false to indicate it would
-   overflow.  Otherwise, set Accum to that new value and return true.
-   Verify at compile-time that Type is Accum's type, and that Type is
-   unsigned.  Accum must be an object, so that we can take its
-   address.  Accum and Digit_val may be evaluated multiple times.
+/* Set Accum = 10*Accum + Digit_val and return true, where Accum is an
+   integer object and Digit_val an integer expression.  However, if
+   the result overflows, set Accum to an unspecified value and return
+   false.  Accum and Digit_val may be evaluated multiple times.  */
 
-   The "Added check" below is not strictly required, but it causes GCC
-   to return a nonzero exit status instead of merely a warning
-   diagnostic, and that is more useful.  */
-
-#define DECIMAL_DIGIT_ACCUMULATE(Accum, Digit_val, Type)		\
-  (									\
-   (void) (&(Accum) == (Type *) nullptr),  /* The type matches.  */	\
-   verify_expr (! TYPE_SIGNED (Type), /* The type is unsigned.  */      \
-                (((Type) -1 / 10 < (Accum)                              \
-                  || (Type) ((Accum) * 10 + (Digit_val)) < (Accum))     \
-                 ? false                                                \
-                 : (((Accum) = (Accum) * 10 + (Digit_val)), true)))     \
-  )
+#define DECIMAL_DIGIT_ACCUMULATE(Accum, Digit_val)			\
+  (!ckd_mul (&(Accum), Accum, 10) && !ckd_add (&(Accum), Accum, Digit_val))
 
 static inline void
 emit_stdin_note (void)
@@ -617,8 +572,10 @@ emit_update_parameters_note (void)
 UPDATE controls which existing files in the destination are replaced.\n\
 'all' is the default operation when an --update option is not specified,\n\
 and results in all existing files in the destination being replaced.\n\
-'none' is similar to the --no-clobber option, in that no files in the\n\
-destination are replaced, but also skipped files do not induce a failure.\n\
+'none' is like the --no-clobber option, in that no files in the\n\
+destination are replaced, and skipped files do not induce a failure.\n\
+'none-fail' also ensures no files are replaced in the destination,\n\
+but any skipped files are diagnosed and induce a failure.\n\
 'older' is the default operation when --update is specified, and results\n\
 in files being replaced if they're older than the corresponding source file.\n\
 "), stdout);
@@ -640,6 +597,24 @@ the VERSION_CONTROL environment variable.  Here are the values:\n\
   existing, nil   numbered if numbered backups exist, simple otherwise\n\
   simple, never   always make simple backups\n\
 "), stdout);
+}
+
+static inline void
+emit_symlink_recurse_options (char const *default_opt)
+{
+      printf (_("\
+\n\
+The following options modify how a hierarchy is traversed when the -R\n\
+option is also specified.  If more than one is specified, only the final\n\
+one takes effect. %s is the default.\n\
+\n\
+  -H                     if a command line argument is a symbolic link\n\
+                         to a directory, traverse it\n\
+  -L                     traverse every symbolic link to a directory\n\
+                         encountered\n\
+  -P                     do not traverse any symbolic links\n\
+\n\
+"), default_opt);
 }
 
 static inline void
@@ -677,6 +652,13 @@ emit_ancillary_info (char const *program)
     node = map_prog->node;
 
   printf (_("\n%s online help: <%s>\n"), PACKAGE_NAME, PACKAGE_URL);
+
+#ifdef PACKAGE_PACKAGER
+# ifdef PACKAGE_PACKAGER_BUG_REPORTS
+  printf (_("Report %s bugs to: <%s>\n"), PACKAGE_PACKAGER,
+          PACKAGE_PACKAGER_BUG_REPORTS);
+# endif
+#endif
 
   /* Don't output this redundant message for English locales.
      Note we still output for 'C' so that it gets included in the man page.  */
@@ -738,7 +720,7 @@ usable_st_size (struct stat const *sb)
 
 _Noreturn void usage (int status);
 
-#include "error.h"
+#include <error.h>
 
 /* Like error(0, 0, ...), but without an implicit newline.
    Also a noop unless the global DEV_DEBUG is set.  */

@@ -71,7 +71,7 @@
 
 /* Parse a string into an internal timestamp.
 
-   Copyright (C) 1999-2000, 2002-2023 Free Software Foundation, Inc.
+   Copyright (C) 1999-2000, 2002-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -108,7 +108,6 @@
 #include "idx.h"
 #include "intprops.h"
 #include "timespec.h"
-#include "strftime.h"
 
 /* There's no need to extend the stack, so there's no need to involve
    alloca.  */
@@ -131,7 +130,7 @@
 
 #include "gettext.h"
 
-#define _(str) gettext (str)
+#define _(msgid) dgettext ("gnulib", msgid)
 
 /* Bison's skeleton tests _STDLIB_H, while some stdlib.h headers
    use _STDLIB_H_ as witness.  Map the latter to the one bison uses.  */
@@ -181,16 +180,28 @@ time_overflow (intmax_t n)
    errors that the cast doesn't.  */
 static unsigned char to_uchar (char ch) { return ch; }
 
-static void _GL_ATTRIBUTE_FORMAT ((__printf__, 1, 2))
-dbg_printf (char const *msg, ...)
+static void
+dbg_herald (void)
 {
-  va_list args;
   /* TODO: use gnulib's 'program_name' instead?  */
   fputs ("date: ", stderr);
+}
 
-  va_start (args, msg);
-  vfprintf (stderr, msg, args);
+static void _GL_ATTRIBUTE_FORMAT ((__printf__, 1, 2))
+dbg_printf (char const *msgid, ...)
+{
+  dbg_herald ();
+  va_list args;
+  va_start (args, msgid);
+  vfprintf (stderr, msgid, args);
   va_end (args);
+}
+
+static void
+dbg_fputs (char const *msgid)
+{
+  dbg_herald ();
+  fputs (msgid, stderr);
 }
 
 
@@ -213,6 +224,9 @@ typedef struct
 
 /* Meridian: am, pm, or 24-hour style.  */
 enum { MERam, MERpm, MER24 };
+
+/* Maximum length of a time zone abbreviation, plus 1.  */
+enum { TIME_ZONE_BUFSIZE = INT_STRLEN_BOUND (intmax_t) + sizeof ":MM:SS" };
 
 /* A reasonable upper bound for the buffer used in debug output.  */
 enum { DBGBUFSIZE = 100 };
@@ -300,6 +314,11 @@ typedef struct
 
   /* Table of local time zone abbreviations, terminated by a null entry.  */
   table local_time_zone_table[3];
+
+#if !HAVE_STRUCT_TM_TM_ZONE
+  /* The abbreviations in LOCAL_TIME_ZONE_TABLE.  */
+  char tz_abbr[2][TIME_ZONE_BUFSIZE];
+#endif
 } parser_control;
 
 static bool
@@ -314,7 +333,7 @@ debugging (parser_control const *pc)
 
 union YYSTYPE;
 static int yylex (union YYSTYPE *, parser_control *);
-static int yyerror (parser_control const *, char const *);
+static void yyerror (parser_control const *, char const *);
 static bool time_zone_hhmm (parser_control *, textint, intmax_t);
 
 /* Extract into *PC any date and time info from a string of digits
@@ -455,8 +474,6 @@ str_days (parser_control *pc, char *buffer, int n)
 }
 
 /* Convert a time zone to its string representation.  */
-
-enum { TIME_ZONE_BUFSIZE = INT_STRLEN_BOUND (intmax_t) + sizeof ":MM:SS" } ;
 
 static char const *
 time_zone_str (int time_zone, char time_zone_buf[TIME_ZONE_BUFSIZE])
@@ -621,7 +638,7 @@ debug_print_relative_time (char const *item, parser_control const *pc)
 
 
 
-#line 625 "parse-datetime.c"
+#line 642 "parse-datetime.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -644,7 +661,74 @@ debug_print_relative_time (char const *item, parser_control const *pc)
 #  endif
 # endif
 
-#include "parse-datetime-gen.h"
+
+/* Debug traces.  */
+#ifndef YYDEBUG
+# define YYDEBUG 0
+#endif
+#if YYDEBUG
+extern int yydebug;
+#endif
+
+/* Token kinds.  */
+#ifndef YYTOKENTYPE
+# define YYTOKENTYPE
+  enum yytokentype
+  {
+    YYEMPTY = -2,
+    YYEOF = 0,                     /* "end of file"  */
+    YYerror = 256,                 /* error  */
+    YYUNDEF = 257,                 /* "invalid token"  */
+    tAGO = 258,                    /* tAGO  */
+    tDST = 259,                    /* tDST  */
+    tYEAR_UNIT = 260,              /* tYEAR_UNIT  */
+    tMONTH_UNIT = 261,             /* tMONTH_UNIT  */
+    tHOUR_UNIT = 262,              /* tHOUR_UNIT  */
+    tMINUTE_UNIT = 263,            /* tMINUTE_UNIT  */
+    tSEC_UNIT = 264,               /* tSEC_UNIT  */
+    tDAY_UNIT = 265,               /* tDAY_UNIT  */
+    tDAY_SHIFT = 266,              /* tDAY_SHIFT  */
+    tDAY = 267,                    /* tDAY  */
+    tDAYZONE = 268,                /* tDAYZONE  */
+    tLOCAL_ZONE = 269,             /* tLOCAL_ZONE  */
+    tMERIDIAN = 270,               /* tMERIDIAN  */
+    tMONTH = 271,                  /* tMONTH  */
+    tORDINAL = 272,                /* tORDINAL  */
+    tZONE = 273,                   /* tZONE  */
+    tSNUMBER = 274,                /* tSNUMBER  */
+    tUNUMBER = 275,                /* tUNUMBER  */
+    tSDECIMAL_NUMBER = 276,        /* tSDECIMAL_NUMBER  */
+    tUDECIMAL_NUMBER = 277         /* tUDECIMAL_NUMBER  */
+  };
+  typedef enum yytokentype yytoken_kind_t;
+#endif
+
+/* Value type.  */
+#if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
+union YYSTYPE
+{
+#line 582 "parse-datetime.y"
+
+  intmax_t intval;
+  textint textintval;
+  struct timespec timespec;
+  relative_time rel;
+
+#line 718 "parse-datetime.c"
+
+};
+typedef union YYSTYPE YYSTYPE;
+# define YYSTYPE_IS_TRIVIAL 1
+# define YYSTYPE_IS_DECLARED 1
+#endif
+
+
+
+
+int yyparse (parser_control *pc);
+
+
+
 /* Symbol kind.  */
 enum yysymbol_kind_t
 {
@@ -1091,16 +1175,16 @@ static const yytype_int8 yytranslate[] =
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,   592,   592,   593,   597,   605,   607,   611,   616,   621,
-     626,   631,   636,   641,   646,   650,   654,   661,   665,   669,
-     674,   679,   684,   688,   693,   698,   705,   707,   711,   736,
-     738,   748,   750,   752,   757,   762,   765,   767,   772,   777,
-     782,   788,   797,   802,   835,   843,   851,   856,   862,   867,
-     873,   877,   887,   889,   891,   896,   898,   900,   902,   904,
-     906,   908,   911,   914,   916,   918,   920,   922,   924,   926,
-     928,   930,   932,   934,   936,   938,   942,   944,   946,   949,
-     951,   953,   958,   962,   962,   965,   966,   972,   973,   979,
-     984,   995,   996
+       0,   609,   609,   610,   614,   622,   624,   628,   633,   638,
+     643,   648,   653,   658,   663,   667,   671,   678,   682,   686,
+     691,   696,   701,   705,   710,   715,   722,   724,   728,   753,
+     755,   765,   767,   769,   774,   779,   782,   784,   789,   794,
+     799,   805,   814,   819,   852,   860,   868,   873,   879,   884,
+     890,   894,   904,   906,   908,   913,   915,   917,   919,   921,
+     923,   925,   928,   931,   933,   935,   937,   939,   941,   943,
+     945,   947,   949,   951,   953,   955,   959,   961,   963,   966,
+     968,   970,   975,   979,   979,   982,   983,   989,   990,   996,
+    1001,  1012,  1013
 };
 #endif
 
@@ -1751,278 +1835,278 @@ yyreduce:
   switch (yyn)
     {
   case 4: /* timespec: '@' seconds  */
-#line 598 "parse-datetime.y"
+#line 615 "parse-datetime.y"
       {
         pc->seconds = (yyvsp[0].timespec);
         pc->timespec_seen = true;
         debug_print_current_time (_("number of seconds"), pc);
       }
-#line 1761 "parse-datetime.c"
+#line 1845 "parse-datetime.c"
     break;
 
   case 7: /* item: datetime  */
-#line 612 "parse-datetime.y"
+#line 629 "parse-datetime.y"
       {
         pc->times_seen++; pc->dates_seen++;
         debug_print_current_time (_("datetime"), pc);
       }
-#line 1770 "parse-datetime.c"
+#line 1854 "parse-datetime.c"
     break;
 
   case 8: /* item: time  */
-#line 617 "parse-datetime.y"
+#line 634 "parse-datetime.y"
       {
         pc->times_seen++;
         debug_print_current_time (_("time"), pc);
       }
-#line 1779 "parse-datetime.c"
+#line 1863 "parse-datetime.c"
     break;
 
   case 9: /* item: local_zone  */
-#line 622 "parse-datetime.y"
+#line 639 "parse-datetime.y"
       {
         pc->local_zones_seen++;
         debug_print_current_time (_("local_zone"), pc);
       }
-#line 1788 "parse-datetime.c"
+#line 1872 "parse-datetime.c"
     break;
 
   case 10: /* item: 'J'  */
-#line 627 "parse-datetime.y"
+#line 644 "parse-datetime.y"
       {
         pc->J_zones_seen++;
         debug_print_current_time ("J", pc);
       }
-#line 1797 "parse-datetime.c"
+#line 1881 "parse-datetime.c"
     break;
 
   case 11: /* item: zone  */
-#line 632 "parse-datetime.y"
+#line 649 "parse-datetime.y"
       {
         pc->zones_seen++;
         debug_print_current_time (_("zone"), pc);
       }
-#line 1806 "parse-datetime.c"
+#line 1890 "parse-datetime.c"
     break;
 
   case 12: /* item: date  */
-#line 637 "parse-datetime.y"
+#line 654 "parse-datetime.y"
       {
         pc->dates_seen++;
         debug_print_current_time (_("date"), pc);
       }
-#line 1815 "parse-datetime.c"
+#line 1899 "parse-datetime.c"
     break;
 
   case 13: /* item: day  */
-#line 642 "parse-datetime.y"
+#line 659 "parse-datetime.y"
       {
         pc->days_seen++;
         debug_print_current_time (_("day"), pc);
       }
-#line 1824 "parse-datetime.c"
+#line 1908 "parse-datetime.c"
     break;
 
   case 14: /* item: rel  */
-#line 647 "parse-datetime.y"
+#line 664 "parse-datetime.y"
       {
         debug_print_relative_time (_("relative"), pc);
       }
-#line 1832 "parse-datetime.c"
+#line 1916 "parse-datetime.c"
     break;
 
   case 15: /* item: number  */
-#line 651 "parse-datetime.y"
+#line 668 "parse-datetime.y"
       {
         debug_print_current_time (_("number"), pc);
       }
-#line 1840 "parse-datetime.c"
+#line 1924 "parse-datetime.c"
     break;
 
   case 16: /* item: hybrid  */
-#line 655 "parse-datetime.y"
+#line 672 "parse-datetime.y"
       {
         debug_print_relative_time (_("hybrid"), pc);
       }
-#line 1848 "parse-datetime.c"
+#line 1932 "parse-datetime.c"
     break;
 
   case 19: /* time: tUNUMBER tMERIDIAN  */
-#line 670 "parse-datetime.y"
+#line 687 "parse-datetime.y"
       {
         set_hhmmss (pc, (yyvsp[-1].textintval).value, 0, 0, 0);
         pc->meridian = (yyvsp[0].intval);
       }
-#line 1857 "parse-datetime.c"
+#line 1941 "parse-datetime.c"
     break;
 
   case 20: /* time: tUNUMBER ':' tUNUMBER tMERIDIAN  */
-#line 675 "parse-datetime.y"
+#line 692 "parse-datetime.y"
       {
         set_hhmmss (pc, (yyvsp[-3].textintval).value, (yyvsp[-1].textintval).value, 0, 0);
         pc->meridian = (yyvsp[0].intval);
       }
-#line 1866 "parse-datetime.c"
+#line 1950 "parse-datetime.c"
     break;
 
   case 21: /* time: tUNUMBER ':' tUNUMBER ':' unsigned_seconds tMERIDIAN  */
-#line 680 "parse-datetime.y"
+#line 697 "parse-datetime.y"
       {
         set_hhmmss (pc, (yyvsp[-5].textintval).value, (yyvsp[-3].textintval).value, (yyvsp[-1].timespec).tv_sec, (yyvsp[-1].timespec).tv_nsec);
         pc->meridian = (yyvsp[0].intval);
       }
-#line 1875 "parse-datetime.c"
+#line 1959 "parse-datetime.c"
     break;
 
   case 23: /* iso_8601_time: tUNUMBER zone_offset  */
-#line 689 "parse-datetime.y"
+#line 706 "parse-datetime.y"
       {
         set_hhmmss (pc, (yyvsp[-1].textintval).value, 0, 0, 0);
         pc->meridian = MER24;
       }
-#line 1884 "parse-datetime.c"
+#line 1968 "parse-datetime.c"
     break;
 
   case 24: /* iso_8601_time: tUNUMBER ':' tUNUMBER o_zone_offset  */
-#line 694 "parse-datetime.y"
+#line 711 "parse-datetime.y"
       {
         set_hhmmss (pc, (yyvsp[-3].textintval).value, (yyvsp[-1].textintval).value, 0, 0);
         pc->meridian = MER24;
       }
-#line 1893 "parse-datetime.c"
+#line 1977 "parse-datetime.c"
     break;
 
   case 25: /* iso_8601_time: tUNUMBER ':' tUNUMBER ':' unsigned_seconds o_zone_offset  */
-#line 699 "parse-datetime.y"
+#line 716 "parse-datetime.y"
       {
         set_hhmmss (pc, (yyvsp[-5].textintval).value, (yyvsp[-3].textintval).value, (yyvsp[-1].timespec).tv_sec, (yyvsp[-1].timespec).tv_nsec);
         pc->meridian = MER24;
       }
-#line 1902 "parse-datetime.c"
+#line 1986 "parse-datetime.c"
     break;
 
   case 28: /* zone_offset: tSNUMBER o_colon_minutes  */
-#line 712 "parse-datetime.y"
+#line 729 "parse-datetime.y"
       {
         pc->zones_seen++;
         if (! time_zone_hhmm (pc, (yyvsp[-1].textintval), (yyvsp[0].intval))) YYABORT;
       }
-#line 1911 "parse-datetime.c"
+#line 1995 "parse-datetime.c"
     break;
 
   case 29: /* local_zone: tLOCAL_ZONE  */
-#line 737 "parse-datetime.y"
+#line 754 "parse-datetime.y"
       { pc->local_isdst = (yyvsp[0].intval); }
-#line 1917 "parse-datetime.c"
+#line 2001 "parse-datetime.c"
     break;
 
   case 30: /* local_zone: tLOCAL_ZONE tDST  */
-#line 739 "parse-datetime.y"
+#line 756 "parse-datetime.y"
       {
         pc->local_isdst = 1;
         pc->dsts_seen++;
       }
-#line 1926 "parse-datetime.c"
+#line 2010 "parse-datetime.c"
     break;
 
   case 31: /* zone: tZONE  */
-#line 749 "parse-datetime.y"
+#line 766 "parse-datetime.y"
       { pc->time_zone = (yyvsp[0].intval); }
-#line 1932 "parse-datetime.c"
+#line 2016 "parse-datetime.c"
     break;
 
   case 32: /* zone: 'T'  */
-#line 751 "parse-datetime.y"
+#line 768 "parse-datetime.y"
       { pc->time_zone = -HOUR (7); }
-#line 1938 "parse-datetime.c"
+#line 2022 "parse-datetime.c"
     break;
 
   case 33: /* zone: tZONE relunit_snumber  */
-#line 753 "parse-datetime.y"
+#line 770 "parse-datetime.y"
       { pc->time_zone = (yyvsp[-1].intval);
         if (! apply_relative_time (pc, (yyvsp[0].rel), 1)) YYABORT;
         debug_print_relative_time (_("relative"), pc);
       }
-#line 1947 "parse-datetime.c"
+#line 2031 "parse-datetime.c"
     break;
 
   case 34: /* zone: 'T' relunit_snumber  */
-#line 758 "parse-datetime.y"
+#line 775 "parse-datetime.y"
       { pc->time_zone = -HOUR (7);
         if (! apply_relative_time (pc, (yyvsp[0].rel), 1)) YYABORT;
         debug_print_relative_time (_("relative"), pc);
       }
-#line 1956 "parse-datetime.c"
+#line 2040 "parse-datetime.c"
     break;
 
   case 35: /* zone: tZONE tSNUMBER o_colon_minutes  */
-#line 763 "parse-datetime.y"
+#line 780 "parse-datetime.y"
       { if (! time_zone_hhmm (pc, (yyvsp[-1].textintval), (yyvsp[0].intval))) YYABORT;
         if (ckd_add (&pc->time_zone, pc->time_zone, (yyvsp[-2].intval))) YYABORT; }
-#line 1963 "parse-datetime.c"
+#line 2047 "parse-datetime.c"
     break;
 
   case 36: /* zone: tDAYZONE  */
-#line 766 "parse-datetime.y"
+#line 783 "parse-datetime.y"
       { pc->time_zone = (yyvsp[0].intval) + 60 * 60; }
-#line 1969 "parse-datetime.c"
+#line 2053 "parse-datetime.c"
     break;
 
   case 37: /* zone: tZONE tDST  */
-#line 768 "parse-datetime.y"
+#line 785 "parse-datetime.y"
       { pc->time_zone = (yyvsp[-1].intval) + 60 * 60; }
-#line 1975 "parse-datetime.c"
+#line 2059 "parse-datetime.c"
     break;
 
   case 38: /* day: tDAY  */
-#line 773 "parse-datetime.y"
+#line 790 "parse-datetime.y"
       {
         pc->day_ordinal = 0;
         pc->day_number = (yyvsp[0].intval);
       }
-#line 1984 "parse-datetime.c"
+#line 2068 "parse-datetime.c"
     break;
 
   case 39: /* day: tDAY ','  */
-#line 778 "parse-datetime.y"
+#line 795 "parse-datetime.y"
       {
         pc->day_ordinal = 0;
         pc->day_number = (yyvsp[-1].intval);
       }
-#line 1993 "parse-datetime.c"
+#line 2077 "parse-datetime.c"
     break;
 
   case 40: /* day: tORDINAL tDAY  */
-#line 783 "parse-datetime.y"
+#line 800 "parse-datetime.y"
       {
         pc->day_ordinal = (yyvsp[-1].intval);
         pc->day_number = (yyvsp[0].intval);
         pc->debug_ordinal_day_seen = true;
       }
-#line 2003 "parse-datetime.c"
+#line 2087 "parse-datetime.c"
     break;
 
   case 41: /* day: tUNUMBER tDAY  */
-#line 789 "parse-datetime.y"
+#line 806 "parse-datetime.y"
       {
         pc->day_ordinal = (yyvsp[-1].textintval).value;
         pc->day_number = (yyvsp[0].intval);
         pc->debug_ordinal_day_seen = true;
       }
-#line 2013 "parse-datetime.c"
+#line 2097 "parse-datetime.c"
     break;
 
   case 42: /* date: tUNUMBER '/' tUNUMBER  */
-#line 798 "parse-datetime.y"
+#line 815 "parse-datetime.y"
       {
         pc->month = (yyvsp[-2].textintval).value;
         pc->day = (yyvsp[0].textintval).value;
       }
-#line 2022 "parse-datetime.c"
+#line 2106 "parse-datetime.c"
     break;
 
   case 43: /* date: tUNUMBER '/' tUNUMBER '/' tUNUMBER  */
-#line 803 "parse-datetime.y"
+#line 820 "parse-datetime.y"
       {
         /* Interpret as YYYY/MM/DD if the first value has 4 or more digits,
            otherwise as MM/DD/YY.
@@ -2055,11 +2139,11 @@ yyreduce:
             pc->year = (yyvsp[0].textintval);
           }
       }
-#line 2059 "parse-datetime.c"
+#line 2143 "parse-datetime.c"
     break;
 
   case 44: /* date: tUNUMBER tMONTH tSNUMBER  */
-#line 836 "parse-datetime.y"
+#line 853 "parse-datetime.y"
       {
         /* E.g., 17-JUN-1992.  */
         pc->day = (yyvsp[-2].textintval).value;
@@ -2067,11 +2151,11 @@ yyreduce:
         if (ckd_sub (&pc->year.value, 0, (yyvsp[0].textintval).value)) YYABORT;
         pc->year.digits = (yyvsp[0].textintval).digits;
       }
-#line 2071 "parse-datetime.c"
+#line 2155 "parse-datetime.c"
     break;
 
   case 45: /* date: tMONTH tSNUMBER tSNUMBER  */
-#line 844 "parse-datetime.y"
+#line 861 "parse-datetime.y"
       {
         /* E.g., JUN-17-1992.  */
         pc->month = (yyvsp[-2].intval);
@@ -2079,286 +2163,286 @@ yyreduce:
         if (ckd_sub (&pc->year.value, 0, (yyvsp[0].textintval).value)) YYABORT;
         pc->year.digits = (yyvsp[0].textintval).digits;
       }
-#line 2083 "parse-datetime.c"
+#line 2167 "parse-datetime.c"
     break;
 
   case 46: /* date: tMONTH tUNUMBER  */
-#line 852 "parse-datetime.y"
+#line 869 "parse-datetime.y"
       {
         pc->month = (yyvsp[-1].intval);
         pc->day = (yyvsp[0].textintval).value;
       }
-#line 2092 "parse-datetime.c"
+#line 2176 "parse-datetime.c"
     break;
 
   case 47: /* date: tMONTH tUNUMBER ',' tUNUMBER  */
-#line 857 "parse-datetime.y"
+#line 874 "parse-datetime.y"
       {
         pc->month = (yyvsp[-3].intval);
         pc->day = (yyvsp[-2].textintval).value;
         pc->year = (yyvsp[0].textintval);
       }
-#line 2102 "parse-datetime.c"
+#line 2186 "parse-datetime.c"
     break;
 
   case 48: /* date: tUNUMBER tMONTH  */
-#line 863 "parse-datetime.y"
+#line 880 "parse-datetime.y"
       {
         pc->day = (yyvsp[-1].textintval).value;
         pc->month = (yyvsp[0].intval);
       }
-#line 2111 "parse-datetime.c"
+#line 2195 "parse-datetime.c"
     break;
 
   case 49: /* date: tUNUMBER tMONTH tUNUMBER  */
-#line 868 "parse-datetime.y"
+#line 885 "parse-datetime.y"
       {
         pc->day = (yyvsp[-2].textintval).value;
         pc->month = (yyvsp[-1].intval);
         pc->year = (yyvsp[0].textintval);
       }
-#line 2121 "parse-datetime.c"
+#line 2205 "parse-datetime.c"
     break;
 
   case 51: /* iso_8601_date: tUNUMBER tSNUMBER tSNUMBER  */
-#line 878 "parse-datetime.y"
+#line 895 "parse-datetime.y"
       {
         /* ISO 8601 format.  YYYY-MM-DD.  */
         pc->year = (yyvsp[-2].textintval);
         if (ckd_sub (&pc->month, 0, (yyvsp[-1].textintval).value)) YYABORT;
         if (ckd_sub (&pc->day, 0, (yyvsp[0].textintval).value)) YYABORT;
       }
-#line 2132 "parse-datetime.c"
+#line 2216 "parse-datetime.c"
     break;
 
   case 52: /* rel: relunit tAGO  */
-#line 888 "parse-datetime.y"
+#line 905 "parse-datetime.y"
       { if (! apply_relative_time (pc, (yyvsp[-1].rel), (yyvsp[0].intval))) YYABORT; }
-#line 2138 "parse-datetime.c"
+#line 2222 "parse-datetime.c"
     break;
 
   case 53: /* rel: relunit  */
-#line 890 "parse-datetime.y"
+#line 907 "parse-datetime.y"
       { if (! apply_relative_time (pc, (yyvsp[0].rel), 1)) YYABORT; }
-#line 2144 "parse-datetime.c"
+#line 2228 "parse-datetime.c"
     break;
 
   case 54: /* rel: dayshift  */
-#line 892 "parse-datetime.y"
+#line 909 "parse-datetime.y"
       { if (! apply_relative_time (pc, (yyvsp[0].rel), 1)) YYABORT; }
-#line 2150 "parse-datetime.c"
+#line 2234 "parse-datetime.c"
     break;
 
   case 55: /* relunit: tORDINAL tYEAR_UNIT  */
-#line 897 "parse-datetime.y"
+#line 914 "parse-datetime.y"
       { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).year = (yyvsp[-1].intval); }
-#line 2156 "parse-datetime.c"
+#line 2240 "parse-datetime.c"
     break;
 
   case 56: /* relunit: tUNUMBER tYEAR_UNIT  */
-#line 899 "parse-datetime.y"
+#line 916 "parse-datetime.y"
       { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).year = (yyvsp[-1].textintval).value; }
-#line 2162 "parse-datetime.c"
+#line 2246 "parse-datetime.c"
     break;
 
   case 57: /* relunit: tYEAR_UNIT  */
-#line 901 "parse-datetime.y"
+#line 918 "parse-datetime.y"
       { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).year = 1; }
-#line 2168 "parse-datetime.c"
+#line 2252 "parse-datetime.c"
     break;
 
   case 58: /* relunit: tORDINAL tMONTH_UNIT  */
-#line 903 "parse-datetime.y"
+#line 920 "parse-datetime.y"
       { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).month = (yyvsp[-1].intval); }
-#line 2174 "parse-datetime.c"
+#line 2258 "parse-datetime.c"
     break;
 
   case 59: /* relunit: tUNUMBER tMONTH_UNIT  */
-#line 905 "parse-datetime.y"
+#line 922 "parse-datetime.y"
       { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).month = (yyvsp[-1].textintval).value; }
-#line 2180 "parse-datetime.c"
+#line 2264 "parse-datetime.c"
     break;
 
   case 60: /* relunit: tMONTH_UNIT  */
-#line 907 "parse-datetime.y"
+#line 924 "parse-datetime.y"
       { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).month = 1; }
-#line 2186 "parse-datetime.c"
+#line 2270 "parse-datetime.c"
     break;
 
   case 61: /* relunit: tORDINAL tDAY_UNIT  */
-#line 909 "parse-datetime.y"
+#line 926 "parse-datetime.y"
       { (yyval.rel) = RELATIVE_TIME_0;
         if (ckd_mul (&(yyval.rel).day, (yyvsp[-1].intval), (yyvsp[0].intval))) YYABORT; }
-#line 2193 "parse-datetime.c"
+#line 2277 "parse-datetime.c"
     break;
 
   case 62: /* relunit: tUNUMBER tDAY_UNIT  */
-#line 912 "parse-datetime.y"
+#line 929 "parse-datetime.y"
       { (yyval.rel) = RELATIVE_TIME_0;
         if (ckd_mul (&(yyval.rel).day, (yyvsp[-1].textintval).value, (yyvsp[0].intval))) YYABORT; }
-#line 2200 "parse-datetime.c"
-    break;
-
-  case 63: /* relunit: tDAY_UNIT  */
-#line 915 "parse-datetime.y"
-      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).day = (yyvsp[0].intval); }
-#line 2206 "parse-datetime.c"
-    break;
-
-  case 64: /* relunit: tORDINAL tHOUR_UNIT  */
-#line 917 "parse-datetime.y"
-      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).hour = (yyvsp[-1].intval); }
-#line 2212 "parse-datetime.c"
-    break;
-
-  case 65: /* relunit: tUNUMBER tHOUR_UNIT  */
-#line 919 "parse-datetime.y"
-      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).hour = (yyvsp[-1].textintval).value; }
-#line 2218 "parse-datetime.c"
-    break;
-
-  case 66: /* relunit: tHOUR_UNIT  */
-#line 921 "parse-datetime.y"
-      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).hour = 1; }
-#line 2224 "parse-datetime.c"
-    break;
-
-  case 67: /* relunit: tORDINAL tMINUTE_UNIT  */
-#line 923 "parse-datetime.y"
-      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).minutes = (yyvsp[-1].intval); }
-#line 2230 "parse-datetime.c"
-    break;
-
-  case 68: /* relunit: tUNUMBER tMINUTE_UNIT  */
-#line 925 "parse-datetime.y"
-      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).minutes = (yyvsp[-1].textintval).value; }
-#line 2236 "parse-datetime.c"
-    break;
-
-  case 69: /* relunit: tMINUTE_UNIT  */
-#line 927 "parse-datetime.y"
-      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).minutes = 1; }
-#line 2242 "parse-datetime.c"
-    break;
-
-  case 70: /* relunit: tORDINAL tSEC_UNIT  */
-#line 929 "parse-datetime.y"
-      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).seconds = (yyvsp[-1].intval); }
-#line 2248 "parse-datetime.c"
-    break;
-
-  case 71: /* relunit: tUNUMBER tSEC_UNIT  */
-#line 931 "parse-datetime.y"
-      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).seconds = (yyvsp[-1].textintval).value; }
-#line 2254 "parse-datetime.c"
-    break;
-
-  case 72: /* relunit: tSDECIMAL_NUMBER tSEC_UNIT  */
-#line 933 "parse-datetime.y"
-      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).seconds = (yyvsp[-1].timespec).tv_sec; (yyval.rel).ns = (yyvsp[-1].timespec).tv_nsec; }
-#line 2260 "parse-datetime.c"
-    break;
-
-  case 73: /* relunit: tUDECIMAL_NUMBER tSEC_UNIT  */
-#line 935 "parse-datetime.y"
-      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).seconds = (yyvsp[-1].timespec).tv_sec; (yyval.rel).ns = (yyvsp[-1].timespec).tv_nsec; }
-#line 2266 "parse-datetime.c"
-    break;
-
-  case 74: /* relunit: tSEC_UNIT  */
-#line 937 "parse-datetime.y"
-      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).seconds = 1; }
-#line 2272 "parse-datetime.c"
-    break;
-
-  case 76: /* relunit_snumber: tSNUMBER tYEAR_UNIT  */
-#line 943 "parse-datetime.y"
-      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).year = (yyvsp[-1].textintval).value; }
-#line 2278 "parse-datetime.c"
-    break;
-
-  case 77: /* relunit_snumber: tSNUMBER tMONTH_UNIT  */
-#line 945 "parse-datetime.y"
-      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).month = (yyvsp[-1].textintval).value; }
 #line 2284 "parse-datetime.c"
     break;
 
+  case 63: /* relunit: tDAY_UNIT  */
+#line 932 "parse-datetime.y"
+      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).day = (yyvsp[0].intval); }
+#line 2290 "parse-datetime.c"
+    break;
+
+  case 64: /* relunit: tORDINAL tHOUR_UNIT  */
+#line 934 "parse-datetime.y"
+      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).hour = (yyvsp[-1].intval); }
+#line 2296 "parse-datetime.c"
+    break;
+
+  case 65: /* relunit: tUNUMBER tHOUR_UNIT  */
+#line 936 "parse-datetime.y"
+      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).hour = (yyvsp[-1].textintval).value; }
+#line 2302 "parse-datetime.c"
+    break;
+
+  case 66: /* relunit: tHOUR_UNIT  */
+#line 938 "parse-datetime.y"
+      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).hour = 1; }
+#line 2308 "parse-datetime.c"
+    break;
+
+  case 67: /* relunit: tORDINAL tMINUTE_UNIT  */
+#line 940 "parse-datetime.y"
+      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).minutes = (yyvsp[-1].intval); }
+#line 2314 "parse-datetime.c"
+    break;
+
+  case 68: /* relunit: tUNUMBER tMINUTE_UNIT  */
+#line 942 "parse-datetime.y"
+      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).minutes = (yyvsp[-1].textintval).value; }
+#line 2320 "parse-datetime.c"
+    break;
+
+  case 69: /* relunit: tMINUTE_UNIT  */
+#line 944 "parse-datetime.y"
+      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).minutes = 1; }
+#line 2326 "parse-datetime.c"
+    break;
+
+  case 70: /* relunit: tORDINAL tSEC_UNIT  */
+#line 946 "parse-datetime.y"
+      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).seconds = (yyvsp[-1].intval); }
+#line 2332 "parse-datetime.c"
+    break;
+
+  case 71: /* relunit: tUNUMBER tSEC_UNIT  */
+#line 948 "parse-datetime.y"
+      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).seconds = (yyvsp[-1].textintval).value; }
+#line 2338 "parse-datetime.c"
+    break;
+
+  case 72: /* relunit: tSDECIMAL_NUMBER tSEC_UNIT  */
+#line 950 "parse-datetime.y"
+      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).seconds = (yyvsp[-1].timespec).tv_sec; (yyval.rel).ns = (yyvsp[-1].timespec).tv_nsec; }
+#line 2344 "parse-datetime.c"
+    break;
+
+  case 73: /* relunit: tUDECIMAL_NUMBER tSEC_UNIT  */
+#line 952 "parse-datetime.y"
+      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).seconds = (yyvsp[-1].timespec).tv_sec; (yyval.rel).ns = (yyvsp[-1].timespec).tv_nsec; }
+#line 2350 "parse-datetime.c"
+    break;
+
+  case 74: /* relunit: tSEC_UNIT  */
+#line 954 "parse-datetime.y"
+      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).seconds = 1; }
+#line 2356 "parse-datetime.c"
+    break;
+
+  case 76: /* relunit_snumber: tSNUMBER tYEAR_UNIT  */
+#line 960 "parse-datetime.y"
+      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).year = (yyvsp[-1].textintval).value; }
+#line 2362 "parse-datetime.c"
+    break;
+
+  case 77: /* relunit_snumber: tSNUMBER tMONTH_UNIT  */
+#line 962 "parse-datetime.y"
+      { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).month = (yyvsp[-1].textintval).value; }
+#line 2368 "parse-datetime.c"
+    break;
+
   case 78: /* relunit_snumber: tSNUMBER tDAY_UNIT  */
-#line 947 "parse-datetime.y"
+#line 964 "parse-datetime.y"
       { (yyval.rel) = RELATIVE_TIME_0;
         if (ckd_mul (&(yyval.rel).day, (yyvsp[-1].textintval).value, (yyvsp[0].intval))) YYABORT; }
-#line 2291 "parse-datetime.c"
+#line 2375 "parse-datetime.c"
     break;
 
   case 79: /* relunit_snumber: tSNUMBER tHOUR_UNIT  */
-#line 950 "parse-datetime.y"
+#line 967 "parse-datetime.y"
       { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).hour = (yyvsp[-1].textintval).value; }
-#line 2297 "parse-datetime.c"
+#line 2381 "parse-datetime.c"
     break;
 
   case 80: /* relunit_snumber: tSNUMBER tMINUTE_UNIT  */
-#line 952 "parse-datetime.y"
+#line 969 "parse-datetime.y"
       { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).minutes = (yyvsp[-1].textintval).value; }
-#line 2303 "parse-datetime.c"
+#line 2387 "parse-datetime.c"
     break;
 
   case 81: /* relunit_snumber: tSNUMBER tSEC_UNIT  */
-#line 954 "parse-datetime.y"
+#line 971 "parse-datetime.y"
       { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).seconds = (yyvsp[-1].textintval).value; }
-#line 2309 "parse-datetime.c"
+#line 2393 "parse-datetime.c"
     break;
 
   case 82: /* dayshift: tDAY_SHIFT  */
-#line 959 "parse-datetime.y"
+#line 976 "parse-datetime.y"
       { (yyval.rel) = RELATIVE_TIME_0; (yyval.rel).day = (yyvsp[0].intval); }
-#line 2315 "parse-datetime.c"
+#line 2399 "parse-datetime.c"
     break;
 
   case 86: /* signed_seconds: tSNUMBER  */
-#line 967 "parse-datetime.y"
+#line 984 "parse-datetime.y"
       { if (time_overflow ((yyvsp[0].textintval).value)) YYABORT;
         (yyval.timespec) = (struct timespec) { .tv_sec = (yyvsp[0].textintval).value }; }
-#line 2322 "parse-datetime.c"
+#line 2406 "parse-datetime.c"
     break;
 
   case 88: /* unsigned_seconds: tUNUMBER  */
-#line 974 "parse-datetime.y"
+#line 991 "parse-datetime.y"
       { if (time_overflow ((yyvsp[0].textintval).value)) YYABORT;
         (yyval.timespec) = (struct timespec) { .tv_sec = (yyvsp[0].textintval).value }; }
-#line 2329 "parse-datetime.c"
+#line 2413 "parse-datetime.c"
     break;
 
   case 89: /* number: tUNUMBER  */
-#line 980 "parse-datetime.y"
+#line 997 "parse-datetime.y"
       { digits_to_date_time (pc, (yyvsp[0].textintval)); }
-#line 2335 "parse-datetime.c"
+#line 2419 "parse-datetime.c"
     break;
 
   case 90: /* hybrid: tUNUMBER relunit_snumber  */
-#line 985 "parse-datetime.y"
+#line 1002 "parse-datetime.y"
       {
         /* Hybrid all-digit and relative offset, so that we accept e.g.,
            "YYYYMMDD +N days" as well as "YYYYMMDD N days".  */
         digits_to_date_time (pc, (yyvsp[-1].textintval));
         if (! apply_relative_time (pc, (yyvsp[0].rel), 1)) YYABORT;
       }
-#line 2346 "parse-datetime.c"
+#line 2430 "parse-datetime.c"
     break;
 
   case 91: /* o_colon_minutes: %empty  */
-#line 995 "parse-datetime.y"
+#line 1012 "parse-datetime.y"
       { (yyval.intval) = -1; }
-#line 2352 "parse-datetime.c"
+#line 2436 "parse-datetime.c"
     break;
 
   case 92: /* o_colon_minutes: ':' tUNUMBER  */
-#line 997 "parse-datetime.y"
+#line 1014 "parse-datetime.y"
       { (yyval.intval) = (yyvsp[0].textintval).value; }
-#line 2358 "parse-datetime.c"
+#line 2442 "parse-datetime.c"
     break;
 
 
-#line 2362 "parse-datetime.c"
+#line 2446 "parse-datetime.c"
 
       default: break;
     }
@@ -2551,7 +2635,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 1000 "parse-datetime.y"
+#line 1017 "parse-datetime.y"
 
 
 static table const meridian_table[] =
@@ -2866,7 +2950,7 @@ lookup_zone (parser_control const *pc, char const *name)
   return NULL;
 }
 
-#if ! HAVE_TM_GMTOFF
+#if ! HAVE_STRUCT_TM_TM_GMTOFF
 /* Yield the difference between *A and *B,
    measured in seconds, ignoring leap seconds.
    The body of this function is taken directly from the GNU C Library;
@@ -2891,7 +2975,7 @@ tm_diff (const struct tm *a, const struct tm *b)
                 + (a->tm_min - b->tm_min))
           + (a->tm_sec - b->tm_sec));
 }
-#endif /* ! HAVE_TM_GMTOFF */
+#endif
 
 static table const *
 lookup_word (parser_control const *pc, char *word)
@@ -3094,11 +3178,10 @@ yylex (union YYSTYPE *lvalp, parser_control *pc)
 }
 
 /* Do nothing if the parser reports an error.  */
-static int
+static void
 yyerror (_GL_UNUSED parser_control const *pc,
          _GL_UNUSED char const *s)
 {
-  return 0;
 }
 
 /* If *TM0 is the old and *TM1 is the new value of a struct tm after
@@ -3121,6 +3204,33 @@ mktime_ok (struct tm const *tm0, struct tm const *tm1)
             | (tm0->tm_year ^ tm1->tm_year));
 }
 
+/* Populate PC's local time zone table with information from TM.  */
+
+static void
+populate_local_time_zone_table (parser_control *pc, struct tm const *tm)
+{
+  bool first_entry_exists = !!pc->local_time_zone_table[0].name;
+
+  /* The table entry to be filled in.  There are only two, so this is
+     the first entry if it is missing, the second entry otherwise.  */
+  table *e = &pc->local_time_zone_table[first_entry_exists];
+
+  e->type = tLOCAL_ZONE;
+  e->value = tm->tm_isdst;
+
+  char const *zone = NULL;
+#if HAVE_STRUCT_TM_TM_ZONE
+  if (tm->tm_zone[0])
+    zone = tm->tm_zone;
+#else
+  char *tz_abbr = pc->tz_abbr[first_entry_exists];
+  if (strftime (tz_abbr, TIME_ZONE_BUFSIZE, "%Z", tm))
+    zone = tz_abbr;
+#endif
+  e->name = zone;
+  e[1].name = NULL;
+}
+
 /* Debugging: format a 'struct tm' into a buffer, taking the parser's
    timezone information into account (if pc != NULL).  */
 static char const *
@@ -3136,21 +3246,18 @@ debug_strfdatetime (struct tm const *tm, parser_control const *pc,
         issues with the parsing - better to avoid formats that could
         be mis-interpreted (e.g., just YYYY-MM-DD).
 
-     2. Can strftime be used instead?
-        depends if it is portable and can print invalid dates on all systems.
+     2. Print timezone information ?
 
-     3. Print timezone information ?
+     3. Print DST information ?
 
-     4. Print DST information ?
-
-     5. Print nanosecond information ?
+     4. Print nanosecond information ?
 
      NOTE:
      Printed date/time values might not be valid, e.g., '2016-02-31'
      or '2016-19-2016' .  These are the values as parsed from the user
      string, before validation.
   */
-  int m = nstrftime (buf, n, "(Y-M-D) %Y-%m-%d %H:%M:%S", tm, 0, 0);
+  int m = strftime (buf, n, "(Y-M-D) %Y-%m-%d %H:%M:%S", tm);
 
   /* If parser_control information was provided (for timezone),
      and there's enough space in the buffer, add timezone info.  */
@@ -3217,7 +3324,7 @@ debug_mktime_not_ok (struct tm const *tm0, struct tm const *tm1,
   if (!debugging (pc))
     return;
 
-  dbg_printf (_("error: invalid date/time value:\n"));
+  dbg_fputs (_("error: invalid date/time value:\n"));
   dbg_printf (_("    user provided time: '%s'\n"),
               debug_strfdatetime (tm0, pc, tmp, sizeof tmp));
   dbg_printf (_("       normalized time: '%s'\n"),
@@ -3243,12 +3350,12 @@ debug_mktime_not_ok (struct tm const *tm0, struct tm const *tm1,
     }
   dbg_printf ("%s\n", tmp);
 
-  dbg_printf (_("     possible reasons:\n"));
+  dbg_fputs (_("     possible reasons:\n"));
   if (dst_shift)
-    dbg_printf (_("       nonexistent due to daylight-saving time;\n"));
+    dbg_fputs (_("       nonexistent due to daylight-saving time;\n"));
   if (!eq_mday && !eq_month)
-    dbg_printf (_("       invalid day/month combination;\n"));
-  dbg_printf (_("       numeric values overflow;\n"));
+    dbg_fputs (_("       invalid day/month combination;\n"));
+  dbg_fputs (_("       numeric values overflow;\n"));
   dbg_printf ("       %s\n", (time_zone_seen ? _("incorrect timezone")
                               : _("missing timezone")));
 }
@@ -3358,7 +3465,7 @@ parse_datetime_body (struct timespec *result, char const *p,
   if (ckd_add (&pc.year.value, tmp.tm_year, TM_YEAR_BASE))
     {
       if (debugging (&pc))
-        dbg_printf (_("error: initial year out of range\n"));
+        dbg_fputs (_("error: initial year out of range\n"));
       goto fail;
     }
   pc.year.digits = 0;
@@ -3389,64 +3496,37 @@ parse_datetime_body (struct timespec *result, char const *p,
   pc.debug_year_seen = false;
   pc.debug_ordinal_day_seen = false;
 
-#if HAVE_STRUCT_TM_TM_ZONE
-  pc.local_time_zone_table[0].name = tmp.tm_zone;
-  pc.local_time_zone_table[0].type = tLOCAL_ZONE;
-  pc.local_time_zone_table[0].value = tmp.tm_isdst;
-  pc.local_time_zone_table[1].name = NULL;
+  pc.local_time_zone_table[0].name = NULL;
+  populate_local_time_zone_table (&pc, &tmp);
 
   /* Probe the names used in the next three calendar quarters, looking
      for a tm_isdst different from the one we already have.  */
-  {
-    int quarter;
-    for (quarter = 1; quarter <= 3; quarter++)
-      {
-        time_t probe;
-        if (ckd_add (&probe, Start, quarter * (90 * 24 * 60 * 60)))
-          break;
-        struct tm probe_tm;
-        if (localtime_rz (tz, &probe, &probe_tm) && probe_tm.tm_zone
-            && probe_tm.tm_isdst != pc.local_time_zone_table[0].value)
-          {
-              {
-                pc.local_time_zone_table[1].name = probe_tm.tm_zone;
-                pc.local_time_zone_table[1].type = tLOCAL_ZONE;
-                pc.local_time_zone_table[1].value = probe_tm.tm_isdst;
-                pc.local_time_zone_table[2].name = NULL;
-              }
-            break;
-          }
-      }
-  }
-#else
-#if HAVE_TZNAME
-  {
-# if !HAVE_DECL_TZNAME
-    extern char *tzname[];
-# endif
-    int i;
-    for (i = 0; i < 2; i++)
-      {
-        pc.local_time_zone_table[i].name = tzname[i];
-        pc.local_time_zone_table[i].type = tLOCAL_ZONE;
-        pc.local_time_zone_table[i].value = i;
-      }
-    pc.local_time_zone_table[i].name = NULL;
-  }
-#else
-  pc.local_time_zone_table[0].name = NULL;
-#endif
-#endif
-
-  if (pc.local_time_zone_table[0].name && pc.local_time_zone_table[1].name
-      && ! strcmp (pc.local_time_zone_table[0].name,
-                   pc.local_time_zone_table[1].name))
+  for (int quarter = 1; quarter <= 3; quarter++)
     {
-      /* This locale uses the same abbreviation for standard and
-         daylight times.  So if we see that abbreviation, we don't
-         know whether it's daylight time.  */
-      pc.local_time_zone_table[0].value = -1;
-      pc.local_time_zone_table[1].name = NULL;
+      time_t probe;
+      if (ckd_add (&probe, Start, quarter * (90 * 24 * 60 * 60)))
+        break;
+      struct tm probe_tm;
+      if (localtime_rz (tz, &probe, &probe_tm)
+          && (! pc.local_time_zone_table[0].name
+              || probe_tm.tm_isdst != pc.local_time_zone_table[0].value))
+        {
+          populate_local_time_zone_table (&pc, &probe_tm);
+          if (pc.local_time_zone_table[1].name)
+            {
+              if (! strcmp (pc.local_time_zone_table[0].name,
+                            pc.local_time_zone_table[1].name))
+                {
+                  /* This locale uses the same abbreviation for standard and
+                     daylight times.  So if we see that abbreviation, we don't
+                     know whether it's daylight time.  */
+                  pc.local_time_zone_table[0].value = -1;
+                  pc.local_time_zone_table[1].name = NULL;
+                }
+
+              break;
+            }
+        }
     }
 
   if (yyparse (&pc) != 0)
@@ -3464,12 +3544,12 @@ parse_datetime_body (struct timespec *result, char const *p,
 
   if (debugging (&pc))
     {
-      dbg_printf (_("input timezone: "));
+      dbg_fputs (_("input timezone: "));
 
       if (pc.timespec_seen)
-        fprintf (stderr, _("'@timespec' - always UTC"));
+        fputs (_("'@timespec' - always UTC"), stderr);
       else if (pc.zones_seen)
-        fprintf (stderr, _("parsed date/time string"));
+        fputs (_("parsed date/time string"), stderr);
       else if (tzstring)
         {
           if (tz != tzdefault)
@@ -3477,19 +3557,19 @@ parse_datetime_body (struct timespec *result, char const *p,
           else if (STREQ (tzstring, "UTC0"))
             {
               /* Special case: 'date -u' sets TZ="UTC0".  */
-              fprintf (stderr, _("TZ=\"UTC0\" environment value or -u"));
+              fputs (_("TZ=\"UTC0\" environment value or -u"), stderr);
             }
           else
             fprintf (stderr, _("TZ=\"%s\" environment value"), tzstring);
         }
       else
-        fprintf (stderr, _("system default"));
+        fputs (_("system default"), stderr);
 
       /* Account for DST changes if tLOCAL_ZONE was seen.
          local timezone only changes DST and is relative to the
          default timezone.*/
       if (pc.local_zones_seen && !pc.zones_seen && 0 < pc.local_isdst)
-        fprintf (stderr, ", dst");
+        fputs (", dst", stderr);
 
       if (pc.zones_seen)
         fprintf (stderr, " (%s)", time_zone_str (pc.time_zone, time_zone_buf));
@@ -3507,15 +3587,15 @@ parse_datetime_body (struct timespec *result, char const *p,
           if (debugging (&pc))
             {
               if (pc.times_seen > 1)
-                dbg_printf ("error: seen multiple time parts\n");
+                dbg_fputs (_("error: seen multiple time parts\n"));
               if (pc.dates_seen > 1)
-                dbg_printf ("error: seen multiple date parts\n");
+                dbg_fputs (_("error: seen multiple date parts\n"));
               if (pc.days_seen > 1)
-                dbg_printf ("error: seen multiple days parts\n");
+                dbg_fputs (_("error: seen multiple days parts\n"));
               if (pc.dsts_seen > 1)
-                dbg_printf ("error: seen multiple daylight-saving parts\n");
+                dbg_fputs (_("error: seen multiple daylight-saving parts\n"));
               if ((pc.J_zones_seen + pc.local_zones_seen + pc.zones_seen) > 1)
-                dbg_printf ("error: seen multiple time-zone parts\n");
+                dbg_fputs (_("error: seen multiple time-zone parts\n"));
             }
           goto fail;
         }
@@ -3525,7 +3605,7 @@ parse_datetime_body (struct timespec *result, char const *p,
           || ckd_add (&tm.tm_mday, pc.day, 0))
         {
           if (debugging (&pc))
-            dbg_printf (_("error: year, month, or day overflow\n"));
+            dbg_fputs (_("error: year, month, or day overflow\n"));
           goto fail;
         }
       if (pc.times_seen || (pc.rels_seen && ! pc.dates_seen && ! pc.days_seen))
@@ -3553,7 +3633,8 @@ parse_datetime_body (struct timespec *result, char const *p,
           tm.tm_hour = tm.tm_min = tm.tm_sec = 0;
           pc.seconds.tv_nsec = 0;
           if (debugging (&pc))
-            dbg_printf ("warning: using midnight as starting time: 00:00:00\n");
+            dbg_printf (_("warning: using midnight as starting time: %s\n"),
+                        "00:00:00");
         }
 
       /* Let mktime deduce tm_isdst if we have an absolute timestamp.  */
@@ -3681,13 +3762,13 @@ parse_datetime_body (struct timespec *result, char const *p,
           if (debugging (&pc))
             {
               if ((pc.rel.year != 0 || pc.rel.month != 0) && tm.tm_mday != 15)
-                dbg_printf (_("warning: when adding relative months/years, "
-                              "it is recommended to specify the 15th of the "
-                              "months\n"));
+                dbg_fputs (_("warning: when adding relative months/years, "
+                             "it is recommended to specify the 15th of the "
+                             "months\n"));
 
               if (pc.rel.day != 0 && tm.tm_hour != 12)
-                dbg_printf (_("warning: when adding relative days, "
-                              "it is recommended to specify noon\n"));
+                dbg_fputs (_("warning: when adding relative days, "
+                             "it is recommended to specify noon\n"));
             }
 
           int year, month, day;
@@ -3743,8 +3824,8 @@ parse_datetime_body (struct timespec *result, char const *p,
                  mktime (&tm).
               */
               if (tm0.tm_isdst != -1 && tm.tm_isdst != tm0.tm_isdst)
-                dbg_printf (_("warning: daylight saving time changed after "
-                              "date adjustment\n"));
+                dbg_fputs (_("warning: daylight saving time changed after "
+                             "date adjustment\n"));
 
               /* Warn if the user did not ask to adjust days but mday changed,
                  or
@@ -3762,8 +3843,8 @@ parse_datetime_body (struct timespec *result, char const *p,
                   && (tm.tm_mday != day
                       || (pc.rel.month == 0 && tm.tm_mon != month)))
                 {
-                  dbg_printf (_("warning: month/year adjustment resulted in "
-                                "shifted dates:\n"));
+                  dbg_fputs (_("warning: month/year adjustment resulted in "
+                               "shifted dates:\n"));
                   char tm_year_buf[TM_YEAR_BUFSIZE];
                   dbg_printf (_("     adjusted Y M D: %s %02d %02d\n"),
                               tm_year_str (year, tm_year_buf), month + 1, day);
@@ -3780,7 +3861,7 @@ parse_datetime_body (struct timespec *result, char const *p,
       if (pc.zones_seen)
         {
           bool overflow = false;
-#ifdef HAVE_TM_GMTOFF
+#ifdef HAVE_STRUCT_TM_TM_GMTOFF
           long int utcoff = tm.tm_gmtoff;
 #else
           time_t t = Start;
@@ -3834,8 +3915,8 @@ parse_datetime_body (struct timespec *result, char const *p,
             || ckd_add (&t4, t3, d4))
           {
             if (debugging (&pc))
-              dbg_printf (_("error: adding relative time caused an "
-                            "overflow\n"));
+              dbg_fputs (_("error: adding relative time caused an "
+                           "overflow\n"));
             goto fail;
           }
 
@@ -3867,8 +3948,8 @@ parse_datetime_body (struct timespec *result, char const *p,
             struct tm lmt;
             if (tm.tm_isdst != -1 && localtime_rz (tz, &result->tv_sec, &lmt)
                 && tm.tm_isdst != lmt.tm_isdst)
-              dbg_printf (_("warning: daylight saving time changed after "
-                            "time adjustment\n"));
+              dbg_fputs (_("warning: daylight saving time changed after "
+                           "time adjustment\n"));
           }
       }
     }
@@ -3877,9 +3958,9 @@ parse_datetime_body (struct timespec *result, char const *p,
     {
       /* Special case: using 'date -u' simply set TZ=UTC0 */
       if (! tzstring)
-        dbg_printf (_("timezone: system default\n"));
+        dbg_fputs (_("timezone: system default\n"));
       else if (STREQ (tzstring, "UTC0"))
-        dbg_printf (_("timezone: Universal Time\n"));
+        dbg_fputs (_("timezone: Universal Time\n"));
       else
         dbg_printf (_("timezone: TZ=\"%s\" environment value\n"), tzstring);
 
@@ -3896,7 +3977,7 @@ parse_datetime_body (struct timespec *result, char const *p,
                                         dbg_tm, sizeof dbg_tm));
       if (localtime_rz (tz, &result->tv_sec, &lmt))
         {
-#ifdef HAVE_TM_GMTOFF
+#ifdef HAVE_STRUCT_TM_TM_GMTOFF
           bool got_utcoff = true;
           long int utcoff = lmt.tm_gmtoff;
 #else

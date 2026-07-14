@@ -1,5 +1,5 @@
 /* csplit - split a file into sections determined by context lines
-   Copyright (C) 1991-2023 Free Software Foundation, Inc.
+   Copyright (C) 1991-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,15 +19,16 @@
 
 #include <config.h>
 
+#include <ctype.h>
 #include <getopt.h>
 #include <sys/types.h>
 #include <signal.h>
-#include <stdckdint.h>
 
 #include "system.h"
 
 #include <regex.h>
 
+#include "c-ctype.h"
 #include "fd-reopen.h"
 #include "quote.h"
 #include "safe-read.h"
@@ -255,17 +256,15 @@ save_to_hold_area (char *start, idx_t num)
 static idx_t
 read_input (char *dest, idx_t max_n_bytes)
 {
-  idx_t bytes_read;
-
   if (max_n_bytes == 0)
     return 0;
 
-  bytes_read = safe_read (STDIN_FILENO, dest, max_n_bytes);
+  ptrdiff_t bytes_read = safe_read (STDIN_FILENO, dest, max_n_bytes);
 
   if (bytes_read == 0)
     have_read_eof = true;
 
-  if (bytes_read == SAFE_READ_ERROR)
+  if (bytes_read < 0)
     {
       error (0, errno, _("read error"));
       cleanup_fatal ();
@@ -495,13 +494,14 @@ load_buffer (void)
     }
 }
 
-/* Return the line number of the first line that has not yet been retrieved. */
+/* Return the line number of the first line that has not yet been retrieved.
+   Return 0 if no lines available.  */
 
 static intmax_t
 get_first_line_in_buffer (void)
 {
   if (head == nullptr && !load_buffer ())
-    error (EXIT_FAILURE, errno, _("input disappeared"));
+    return 0;
 
   return head->first_available;
 }
@@ -628,7 +628,7 @@ write_to_file (intmax_t last_line, bool ignore, int argnum)
 
   first_line = get_first_line_in_buffer ();
 
-  if (first_line > last_line)
+  if (! first_line || first_line > last_line)
     {
       error (0, 0, _("%s: line number out of range"),
              quote (global_argv[argnum]));
@@ -673,7 +673,7 @@ handle_line_error (const struct control *p, intmax_t repetition)
   fprintf (stderr, _("%s: %s: line number out of range"),
            program_name, quote (imaxtostr (p->lines_required, buf)));
   if (repetition)
-    fprintf (stderr, _(" on repetition %s\n"), imaxtostr (repetition, buf));
+    fprintf (stderr, _(" on repetition %jd\n"), repetition);
   else
     fprintf (stderr, "\n");
 
@@ -699,7 +699,9 @@ process_line_count (const struct control *p, intmax_t repetition)
   if (no_more_lines () && suppress_matched)
     handle_line_error (p, repetition);
 
-  linenum = get_first_line_in_buffer ();
+  if (!(linenum = get_first_line_in_buffer ()))
+    handle_line_error (p, repetition);
+
   while (linenum++ < last_line_to_save)
     {
       struct cstring *line = remove_line ();
@@ -726,10 +728,7 @@ regexp_error (struct control *p, intmax_t repetition, bool ignore)
            program_name, quote (global_argv[p->argnum]));
 
   if (repetition)
-    {
-      char buf[INT_BUFSIZE_BOUND (intmax_t)];
-      fprintf (stderr, _(" on repetition %s\n"), imaxtostr (repetition, buf));
-    }
+    fprintf (stderr, _(" on repetition %jd\n"), repetition);
   else
     fprintf (stderr, "\n");
 
@@ -988,10 +987,7 @@ close_output_file (void)
       else
         {
           if (!suppress_count)
-            {
-              char buf[INT_BUFSIZE_BOUND (intmax_t)];
-              fprintf (stdout, "%s\n", imaxtostr (bytes_written, buf));
-            }
+            fprintf (stdout, "%jd\n", bytes_written);
         }
       output_stream = nullptr;
     }
@@ -1152,13 +1148,9 @@ parse_patterns (int argc, int start, char **argv)
             error (EXIT_FAILURE, 0,
                    _("%s: line number must be greater than zero"), argv[i]);
           if (val < last_val)
-            {
-              char buf[INT_BUFSIZE_BOUND (intmax_t)];
-              error (EXIT_FAILURE, 0,
-                     _("line number %s is smaller than preceding line number,"
-                       " %s"),
-                     quote (argv[i]), imaxtostr (last_val, buf));
-            }
+            error (EXIT_FAILURE, 0,
+                   _("line number %s is smaller than preceding line number,"
+                     " %jd"), quote (argv[i]), last_val);
 
           if (val == last_val)
             error (0, 0,
@@ -1274,10 +1266,10 @@ max_out (char *format)
         percent = true;
         int flags;
         f += get_format_flags (f, &flags);
-        while (ISDIGIT (*f))
+        while (c_isdigit (*f))
           f++;
         if (*f == '.')
-          while (ISDIGIT (*++f))
+          while (c_isdigit (*++f))
             continue;
         check_format_conv_type (f, flags);
       }
@@ -1287,7 +1279,7 @@ max_out (char *format)
            _("missing %% conversion specification in suffix"));
 
   int maxlen = snprintf (nullptr, 0, format, INT_MAX);
-  if (maxlen < 0)
+  if (! (0 <= maxlen && maxlen <= IDX_MAX))
     xalloc_die ();
   return maxlen;
 }

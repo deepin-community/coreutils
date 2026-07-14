@@ -1,16 +1,18 @@
-# serial 35
-
-# Copyright (C) 2001, 2003, 2005-2006, 2009-2023 Free Software Foundation, Inc.
-# This file is free software; the Free Software Foundation
-# gives unlimited permission to copy and/or distribute it,
-# with or without modifications, as long as this notice is preserved.
+# rename.m4
+# serial 37
+dnl Copyright (C) 2001, 2003, 2005-2006, 2009-2025 Free Software Foundation,
+dnl Inc.
+dnl This file is free software; the Free Software Foundation
+dnl gives unlimited permission to copy and/or distribute it,
+dnl with or without modifications, as long as this notice is preserved.
+dnl This file is offered as-is, without any warranty.
 
 dnl From Volker Borchert.
 dnl Determine whether rename works for source file names with a trailing slash.
 dnl The rename from SunOS 4.1.1_U1 doesn't.
 dnl
-dnl If it doesn't, then define RENAME_TRAILING_SLASH_BUG and arrange
-dnl to compile the wrapper function.
+dnl If it doesn't, arrange to compile the wrapper function and define
+dnl macros for use by that function.
 dnl
 
 AC_DEFUN([gl_FUNC_RENAME],
@@ -55,10 +57,9 @@ AC_DEFUN([gl_FUNC_RENAME],
       [gl_cv_func_rename_slash_dst_works=no],
       dnl When crosscompiling, assume rename is broken.
       [case "$host_os" in
-                            # Guess yes on Linux systems.
-         linux-* | linux)   gl_cv_func_rename_slash_dst_works="guessing yes" ;;
-                            # Guess yes on systems that emulate the Linux system calls.
-         midipix*)          gl_cv_func_rename_slash_dst_works="guessing yes" ;;
+                            # Guess yes on Linux systems
+                            # and on systems that emulate the Linux system calls.
+         linux* | midipix*) gl_cv_func_rename_slash_dst_works="guessing yes" ;;
                             # Guess yes on glibc systems.
          *-gnu*)            gl_cv_func_rename_slash_dst_works="guessing yes" ;;
                             # Guess no on native Windows.
@@ -113,10 +114,9 @@ AC_DEFUN([gl_FUNC_RENAME],
       [gl_cv_func_rename_slash_src_works=no],
       dnl When crosscompiling, assume rename is broken.
       [case "$host_os" in
-                            # Guess yes on Linux systems.
-         linux-* | linux)   gl_cv_func_rename_slash_src_works="guessing yes" ;;
-                            # Guess yes on systems that emulate the Linux system calls.
-         midipix*)          gl_cv_func_rename_slash_src_works="guessing yes" ;;
+                            # Guess yes on Linux systems
+                            # and on systems that emulate the Linux system calls.
+         linux* | midipix*) gl_cv_func_rename_slash_src_works="guessing yes" ;;
                             # Guess yes on glibc systems.
          *-gnu*)            gl_cv_func_rename_slash_src_works="guessing yes" ;;
                             # Guess yes on native Windows.
@@ -186,10 +186,9 @@ AC_DEFUN([gl_FUNC_RENAME],
        else
          dnl When crosscompiling, assume rename is broken.
          case "$host_os" in
-                              # Guess yes on Linux systems.
-           linux-* | linux)   gl_cv_func_rename_link_works="guessing yes" ;;
-                              # Guess yes on systems that emulate the Linux system calls.
-           midipix*)          gl_cv_func_rename_link_works="guessing yes" ;;
+                              # Guess yes on Linux systems
+                              # and on systems that emulate the Linux system calls.
+           linux* | midipix*) gl_cv_func_rename_link_works="guessing yes" ;;
                               # Guess yes on glibc systems.
            *-gnu*)            gl_cv_func_rename_link_works="guessing yes" ;;
                               # Guess yes on native Windows.
@@ -237,8 +236,9 @@ AC_DEFUN([gl_FUNC_RENAME],
       [gl_cv_func_rename_dest_works=no],
       dnl When crosscompiling, assume rename is broken.
       [case "$host_os" in
-                            # Guess yes on Linux systems.
-         linux-* | linux)   gl_cv_func_rename_dest_works="guessing yes" ;;
+                            # Guess yes on Linux systems
+                            # and on systems that emulate the Linux system calls.
+         linux* | midipix*) gl_cv_func_rename_dest_works="guessing yes" ;;
                             # Guess yes on glibc systems.
          *-gnu*)            gl_cv_func_rename_dest_works="guessing yes" ;;
                             # Guess no on native Windows.

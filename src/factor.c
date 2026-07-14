@@ -1,5 +1,5 @@
 /* factor -- print prime factors of n.
-   Copyright (C) 1986-2023 Free Software Foundation, Inc.
+   Copyright (C) 1986-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -103,11 +103,13 @@
 
 #include <config.h>
 #include <getopt.h>
+#include <stdbit.h>
 #include <stdio.h>
 #include <gmp.h>
 
 #include "system.h"
 #include "assure.h"
+#include "c-ctype.h"
 #include "full-write.h"
 #include "quote.h"
 #include "readtokens.h"
@@ -135,18 +137,11 @@
 # endif
 #endif
 
+#define W_TYPE_SIZE UINTMAX_WIDTH
+
 #if USE_LONGLONG_H
 
 /* Make definitions for longlong.h to make it do what it can do for us */
-
-/* bitcount for uintmax_t */
-# if UINTMAX_MAX == UINT32_MAX
-#  define W_TYPE_SIZE 32
-# elif UINTMAX_MAX == UINT64_MAX
-#  define W_TYPE_SIZE 64
-# elif UINTMAX_MAX == UINT128_MAX
-#  define W_TYPE_SIZE 128
-# endif
 
 # define UWtype  uintmax_t
 # define UHWtype unsigned long int
@@ -172,46 +167,27 @@ typedef unsigned long int UDItype;
 # define LONGLONG_STANDALONE     /* Don't require GMP's longlong.h mdep files */
 # define ASSERT(x)               /* FIXME make longlong.h really standalone */
 # define __GMP_DECLSPEC          /* FIXME make longlong.h really standalone */
-# define __clz_tab factor_clz_tab /* Rename to avoid glibc collision */
 # ifndef __GMP_GNUC_PREREQ
 #  define __GMP_GNUC_PREREQ(a,b) 1
 # endif
 
-/* These stub macros are only used in longlong.h in certain system compiler
-   combinations, so ensure usage to avoid -Wunused-macros warnings.  */
-# if __GMP_GNUC_PREREQ (1,1) && defined __clz_tab
-ASSERT (1)
-__GMP_DECLSPEC
+/* longlong.h uses these macros only in certain system compiler combinations.
+   Ensure usage to pacify -Wunused-macros.  */
+# if (defined ASSERT || defined UHWtype \
+      || defined __GMP_DECLSPEC || defined __GMP_GNUC_PREREQ)
 # endif
 
 # if _ARCH_PPC
 #  define HAVE_HOST_CPU_FAMILY_powerpc 1
 # endif
 # include "longlong.h"
-# ifdef COUNT_LEADING_ZEROS_NEED_CLZ_TAB
-const unsigned char factor_clz_tab[129] =
-{
-  1,2,3,3,4,4,4,4,5,5,5,5,5,5,5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
-  7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,
-  8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
-  8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
-  9
-};
-# endif
 
 #else /* not USE_LONGLONG_H */
 
-# define W_TYPE_SIZE (8 * sizeof (uintmax_t))
 # define __ll_B ((uintmax_t) 1 << (W_TYPE_SIZE / 2))
 # define __ll_lowpart(t)  ((uintmax_t) (t) & (__ll_B - 1))
 # define __ll_highpart(t) ((uintmax_t) (t) >> (W_TYPE_SIZE / 2))
 
-#endif
-
-#if !defined __clz_tab && !defined UHWtype
-/* Without this seemingly useless conditional, gcc -Wunused-macros
-   warns that each of the two tested macros is unused on Fedora 18.
-   FIXME: this is just an ugly band-aid.  Fix it properly.  */
 #endif
 
 /* 2*3*5*7*11...*101 is 128 bits, and has 26 prime factors */
@@ -234,9 +210,47 @@ static struct option const long_options[] =
 /* If true, use p^e output format.  */
 static bool print_exponents;
 
+/* This represents an unsigned integer twice as wide as uintmax_t.  */
+typedef struct { uintmax_t uu[2]; } uuint;
+
+/* Accessors and constructors for the type.  Pprograms should not
+   access the type's internals directly, in case some future version
+   replaces the type with unsigned __int128 or whatever.  */
+static uintmax_t lo (uuint u) { return u.uu[0]; }
+static uintmax_t hi (uuint u) { return u.uu[1]; }
+static void hiset (uuint *u, uintmax_t hi) { u->uu[1] = hi; }
+static void
+uuset (uintmax_t *phi, uintmax_t *plo, uuint uu)
+{
+  *phi = hi (uu);
+  *plo = lo (uu);
+}
+static uuint
+make_uuint (uintmax_t hi, uintmax_t lo)
+{
+  return (uuint) {{lo, hi}};
+}
+
+/* BIG_POWER_OF_10 is a positive power of 10 that does not exceed UINTMAX_MAX.
+   The larger it is, the more efficient the code will likely be.
+   LOG_BIG_POWER_OF_10 = log (BIG_POWER_OF_10).  */
+#if UINTMAX_WIDTH < 64
+# error "platform does not support 64-bit integers"
+#elif UINTMAX_WIDTH < 128 || !defined UINTMAX_C
+/* Mainstream platforms as of 2024, with at-least-64-bit uintmax_t.  */
+static uintmax_t const BIG_POWER_OF_10 = 10000000000000000000llu;
+enum { LOG_BIG_POWER_OF_10 = 19 };
+#else
+/* For so-far-only-theoretical platforms with at-least-128-bit uintmax_t.
+   This is for performance; the 64-bit mainstream code will still work.  */
+static uintmax_t const BIG_POWER_OF_10 =
+  UINTMAX_C (100000000000000000000000000000000000000);
+enum { LOG_BIG_POWER_OF_10 = 38 };
+#endif
+
 struct factors
 {
-  uintmax_t     plarge[2]; /* Can have a single large factor */
+  uuint plarge; /* Can have a single large factor */
   uintmax_t     p[MAX_NFACTS];
   unsigned char e[MAX_NFACTS];
   unsigned char nfactors;
@@ -247,6 +261,7 @@ struct mp_factors
   mpz_t             *p;
   unsigned long int *e;
   idx_t nfactors;
+  idx_t nalloc;
 };
 
 static void factor (uintmax_t, uintmax_t, struct factors *);
@@ -316,12 +331,14 @@ static void factor (uintmax_t, uintmax_t, struct factors *);
   } while (0)
 #endif
 
+/* Set (rh,rl) = (ah,al) >> cnt, where 0 < cnt < W_TYPE_SIZE.  */
 #define rsh2(rh, rl, ah, al, cnt)                                       \
   do {                                                                  \
     (rl) = ((ah) << (W_TYPE_SIZE - (cnt))) | ((al) >> (cnt));           \
     (rh) = (ah) >> (cnt);                                               \
   } while (0)
 
+/* Set (rh,rl) = (ah,al) << cnt, where 0 < cnt < W_TYPE_SIZE.  */
 #define lsh2(rh, rl, ah, al, cnt)                                       \
   do {                                                                  \
     (rh) = ((ah) << cnt) | ((al) >> (W_TYPE_SIZE - (cnt)));             \
@@ -341,33 +358,6 @@ static void factor (uintmax_t, uintmax_t, struct factors *);
     _cy = (al) < (bl);                                                  \
     (rl) = (al) - (bl);                                                 \
     (rh) = (ah) - (bh) - _cy;                                           \
-  } while (0)
-#endif
-
-#ifndef count_leading_zeros
-# define count_leading_zeros(count, x) do {                             \
-    uintmax_t __clz_x = (x);                                            \
-    int __clz_c;                                                        \
-    for (__clz_c = 0;                                                   \
-         (__clz_x & ((uintmax_t) 0xff << (W_TYPE_SIZE - 8))) == 0;      \
-         __clz_c += 8)                                                  \
-      __clz_x <<= 8;                                                    \
-    for (; (intmax_t)__clz_x >= 0; __clz_c++)                           \
-      __clz_x <<= 1;                                                    \
-    (count) = __clz_c;                                                  \
-  } while (0)
-#endif
-
-#ifndef count_trailing_zeros
-# define count_trailing_zeros(count, x) do {                            \
-    uintmax_t __ctz_x = (x);                                            \
-    int __ctz_c = 0;                                                    \
-    while ((__ctz_x & 1) == 0)                                          \
-      {                                                                 \
-        __ctz_x >>= 1;                                                  \
-        __ctz_c++;                                                      \
-      }                                                                 \
-    (count) = __ctz_c;                                                  \
   } while (0)
 #endif
 
@@ -403,34 +393,31 @@ static void factor (uintmax_t, uintmax_t, struct factors *);
    : ((x) & ((uintmax_t) 1 << (W_TYPE_SIZE - 1))                        \
       ? UINTMAX_MAX : (uintmax_t) 0))
 
-/* Compute r = a mod d, where r = <*t1,retval>, a = <a1,a0>, d = <d1,d0>.
+/* Return r = a mod d, where a = <a1,a0>, d = <d1,d0>.
    Requires that d1 != 0.  */
-static uintmax_t
-mod2 (uintmax_t *r1, uintmax_t a1, uintmax_t a0, uintmax_t d1, uintmax_t d0)
+ATTRIBUTE_PURE static uuint
+mod2 (uintmax_t a1, uintmax_t a0, uintmax_t d1, uintmax_t d0)
 {
-  int cntd, cnta;
-
   affirm (d1 != 0);
 
-  if (a1 == 0)
+  if (a1)
     {
-      *r1 = 0;
-      return a0;
+      int cntd = stdc_leading_zeros (d1);
+      int cnta = stdc_leading_zeros (a1);
+      int cnt = cntd - cnta;
+      if (0 < cnt)
+        {
+          lsh2 (d1, d0, d1, d0, cnt);
+          for (int i = 0; i < cnt; i++)
+            {
+              if (ge2 (a1, a0, d1, d0))
+                sub_ddmmss (a1, a0, a1, a0, d1, d0);
+              rsh2 (d1, d0, d1, d0, 1);
+            }
+        }
     }
 
-  count_leading_zeros (cntd, d1);
-  count_leading_zeros (cnta, a1);
-  int cnt = cntd - cnta;
-  lsh2 (d1, d0, d1, d0, cnt);
-  for (int i = 0; i < cnt; i++)
-    {
-      if (ge2 (a1, a0, d1, d0))
-        sub_ddmmss (a1, a0, a1, a0, d1, d0);
-      rsh2 (d1, d0, d1, d0, 1);
-    }
-
-  *r1 = a1;
-  return a0;
+  return make_uuint (a1, a0);
 }
 
 ATTRIBUTE_CONST
@@ -454,8 +441,8 @@ gcd_odd (uintmax_t a, uintmax_t b)
       uintmax_t t;
       uintmax_t bgta;
 
-      while ((a & 1) == 0)
-        a >>= 1;
+      assume (a);
+      a >>= stdc_trailing_zeros (a);
       a >>= 1;
 
       t = a - b;
@@ -472,48 +459,50 @@ gcd_odd (uintmax_t a, uintmax_t b)
     }
 }
 
-static uintmax_t
-gcd2_odd (uintmax_t *r1, uintmax_t a1, uintmax_t a0, uintmax_t b1, uintmax_t b0)
+ATTRIBUTE_PURE static uuint
+gcd2_odd (uintmax_t a1, uintmax_t a0, uintmax_t b1, uintmax_t b0)
 {
   affirm (b0 & 1);
 
   if ((a0 | a1) == 0)
-    {
-      *r1 = b1;
-      return b0;
-    }
-
-  while ((a0 & 1) == 0)
-    rsh2 (a1, a0, a1, a0, 1);
+    return make_uuint (b1, b0);
+  if (!a0)
+    a0 = a1, a1 = 0;
+  assume (a0);
+  int ctz = stdc_trailing_zeros (a0);
+  if (ctz)
+    rsh2 (a1, a0, a1, a0, ctz);
 
   for (;;)
     {
       if ((b1 | a1) == 0)
-        {
-          *r1 = 0;
-          return gcd_odd (b0, a0);
-        }
+        return make_uuint (0, gcd_odd (b0, a0));
 
       if (gt2 (a1, a0, b1, b0))
         {
           sub_ddmmss (a1, a0, a1, a0, b1, b0);
-          do
-            rsh2 (a1, a0, a1, a0, 1);
-          while ((a0 & 1) == 0);
+          if (!a0)
+            a0 = a1, a1 = 0;
+          assume (a0);
+          ctz = stdc_trailing_zeros (a0);
+          if (ctz)
+            rsh2 (a1, a0, a1, a0, ctz);
         }
       else if (gt2 (b1, b0, a1, a0))
         {
           sub_ddmmss (b1, b0, b1, b0, a1, a0);
-          do
-            rsh2 (b1, b0, b1, b0, 1);
-          while ((b0 & 1) == 0);
+          if (!b0)
+            b0 = b1, b1 = 0;
+          assume (b0);
+          ctz = stdc_trailing_zeros (b0);
+          if (ctz)
+            rsh2 (b1, b0, b1, b0, ctz);
         }
       else
         break;
     }
 
-  *r1 = a1;
-  return a0;
+  return make_uuint (a1, a0);
 }
 
 static void
@@ -557,9 +546,8 @@ factor_insert_large (struct factors *factors,
 {
   if (p1 > 0)
     {
-      affirm (factors->plarge[1] == 0);
-      factors->plarge[0] = p0;
-      factors->plarge[1] = p1;
+      affirm (hi (factors->plarge) == 0);
+      factors->plarge = make_uuint (p1, p0);
     }
   else
     factor_insert (factors, p0);
@@ -595,6 +583,7 @@ mp_factor_init (struct mp_factors *factors)
   factors->p = nullptr;
   factors->e = nullptr;
   factors->nfactors = 0;
+  factors->nalloc = 0;
 }
 
 static void
@@ -624,11 +613,14 @@ mp_factor_insert (struct mp_factors *factors, mpz_t prime)
 
   if (i < 0 || mpz_cmp (p[i], prime) != 0)
     {
-      p = xireallocarray (p, nfactors + 1, sizeof p[0]);
-      e = xireallocarray (e, nfactors + 1, sizeof e[0]);
+      if (factors->nfactors == factors->nalloc)
+        {
+          p = xpalloc (p, &factors->nalloc, 1, -1, sizeof *p);
+          e = xireallocarray (e, factors->nalloc, sizeof *e);
+        }
 
       mpz_init (p[nfactors]);
-      for (long j = nfactors - 1; j > i; j--)
+      for (ptrdiff_t j = nfactors - 1; j > i; j--)
         {
           mpz_set (p[j + 1], p[j]);
           e[j + 1] = e[j];
@@ -657,12 +649,6 @@ mp_factor_insert_ui (struct mp_factors *factors, unsigned long int prime)
 }
 
 
-/* Number of bits in an uintmax_t.  */
-enum { W = sizeof (uintmax_t) * CHAR_BIT };
-
-/* Verify that uintmax_t does not have holes in its representation.  */
-static_assert (UINTMAX_MAX >> (W - 1) == 1);
-
 #define P(a,b,c,d) a,
 static const unsigned char primes_diff[] = {
 #include "primes.h"
@@ -670,8 +656,7 @@ static const unsigned char primes_diff[] = {
 };
 #undef P
 
-#define PRIMES_PTAB_ENTRIES \
-  (sizeof (primes_diff) / sizeof (primes_diff[0]) - 8 + 1)
+#define PRIMES_PTAB_ENTRIES (ARRAY_CARDINALITY (primes_diff) - 8 + 1)
 
 #define P(a,b,c,d) b,
 static const unsigned char primes_diff8[] = {
@@ -694,7 +679,7 @@ static const struct primes_dtab primes_dtab[] = {
 
 /* Verify that uintmax_t is not wider than
    the integers used to generate primes.h.  */
-static_assert (W <= WIDE_UINT_BITS);
+static_assert (UINTMAX_WIDTH <= WIDE_UINT_BITS);
 
 /* debugging for developers.  Enables devmsg().
    This flag is used only in the GMP code.  */
@@ -747,8 +732,8 @@ factor_insert_refind (struct factors *factors, uintmax_t p, int i, int off)
    order, and the non-multiples of p onto the range lim < q < B.
  */
 
-static uintmax_t
-factor_using_division (uintmax_t *t1p, uintmax_t t1, uintmax_t t0,
+static uuint
+factor_using_division (uintmax_t t1, uintmax_t t0,
                        struct factors *factors)
 {
   if (t0 % 2 == 0)
@@ -757,14 +742,15 @@ factor_using_division (uintmax_t *t1p, uintmax_t t1, uintmax_t t0,
 
       if (t0 == 0)
         {
-          count_trailing_zeros (cnt, t1);
+          assume (t1);
+          cnt = stdc_trailing_zeros (t1);
           t0 = t1 >> cnt;
           t1 = 0;
           cnt += W_TYPE_SIZE;
         }
       else
         {
-          count_trailing_zeros (cnt, t0);
+          cnt = stdc_trailing_zeros (t0);
           rsh2 (t1, t0, t1, t0, cnt);
         }
 
@@ -793,8 +779,6 @@ factor_using_division (uintmax_t *t1p, uintmax_t t1, uintmax_t t0,
         }
       p += primes_diff[i + 1];
     }
-  if (t1p)
-    *t1p = t1;
 
 #define DIVBLOCK(I)                                                     \
   do {                                                                  \
@@ -826,7 +810,7 @@ factor_using_division (uintmax_t *t1p, uintmax_t t1, uintmax_t t0,
         break;
     }
 
-  return t0;
+  return make_uuint (t1, t0);
 }
 
 static void
@@ -1073,9 +1057,8 @@ powm (uintmax_t b, uintmax_t e, uintmax_t n, uintmax_t ni, uintmax_t one)
   return y;
 }
 
-static uintmax_t
-powm2 (uintmax_t *r1m,
-       const uintmax_t *bp, const uintmax_t *ep, const uintmax_t *np,
+ATTRIBUTE_PURE static uuint
+powm2 (const uintmax_t *bp, const uintmax_t *ep, const uintmax_t *np,
        uintmax_t ni, const uintmax_t *one)
 {
   uintmax_t r1, r0, b1, b0, n1, n0;
@@ -1094,24 +1077,27 @@ powm2 (uintmax_t *r1m,
     {
       if (e & 1)
         {
-          r0 = mulredc2 (r1m, r1, r0, b1, b0, n1, n0, ni);
-          r1 = *r1m;
+          uintmax_t r1m1;
+          r0 = mulredc2 (&r1m1, r1, r0, b1, b0, n1, n0, ni);
+          r1 = r1m1;
         }
-      b0 = mulredc2 (r1m, b1, b0, b1, b0, n1, n0, ni);
-      b1 = *r1m;
+      uintmax_t r1m;
+      b0 = mulredc2 (&r1m, b1, b0, b1, b0, n1, n0, ni);
+      b1 = r1m;
     }
   for (e = ep[1]; e > 0; e >>= 1)
     {
       if (e & 1)
         {
-          r0 = mulredc2 (r1m, r1, r0, b1, b0, n1, n0, ni);
-          r1 = *r1m;
+          uintmax_t r1m1;
+          r0 = mulredc2 (&r1m1, r1, r0, b1, b0, n1, n0, ni);
+          r1 = r1m1;
         }
-      b0 = mulredc2 (r1m, b1, b0, b1, b0, n1, n0, ni);
-      b1 = *r1m;
+      uintmax_t r1m;
+      b0 = mulredc2 (&r1m, b1, b0, b1, b0, n1, n0, ni);
+      b1 = r1m;
     }
-  *r1m = r1;
-  return r0;
+  return make_uuint (r1, r0);
 }
 
 ATTRIBUTE_CONST
@@ -1144,8 +1130,7 @@ millerrabin2 (const uintmax_t *np, uintmax_t ni, const uintmax_t *bp,
 {
   uintmax_t y1, y0, nm1_1, nm1_0, r1m;
 
-  y0 = powm2 (&r1m, bp, qp, np, ni, one);
-  y1 = r1m;
+  uuset (&y1, &y0, powm2 (bp, qp, np, ni, one));
 
   if (y0 == one[0] && y1 == one[1])
     return true;
@@ -1193,7 +1178,6 @@ mp_millerrabin (mpz_srcptr n, mpz_srcptr nm1, mpz_ptr x, mpz_ptr y,
 static bool ATTRIBUTE_PURE
 prime_p (uintmax_t n)
 {
-  mp_bitcnt_t k;
   bool is_prime;
   uintmax_t a_prim, one, ni;
   struct factors factors;
@@ -1206,9 +1190,8 @@ prime_p (uintmax_t n)
     return true;
 
   /* Precomputation for Miller-Rabin.  */
-  uintmax_t q = n - 1;
-  for (k = 0; (q & 1) == 0; k++)
-    q >>= 1;
+  int k = stdc_trailing_zeros (n - 1);
+  uintmax_t q = (n - 1) >> k;
 
   uintmax_t a = 2;
   binv (ni, n);                 /* ni <- 1/n mod B */
@@ -1289,7 +1272,8 @@ prime2_p (uintmax_t n1, uintmax_t n0)
   nm1[0] = n0 - 1;
   if (nm1[0] == 0)
     {
-      count_trailing_zeros (k, nm1[1]);
+      assume (nm1[1]);
+      k = stdc_trailing_zeros (nm1[1]);
 
       q[0] = nm1[1] >> k;
       q[1] = 0;
@@ -1297,7 +1281,7 @@ prime2_p (uintmax_t n1, uintmax_t n0)
     }
   else
     {
-      count_trailing_zeros (k, nm1[0]);
+      k = stdc_trailing_zeros (nm1[0]);
       rsh2 (q[1], q[0], nm1[1], nm1[0], k);
     }
 
@@ -1324,19 +1308,20 @@ prime2_p (uintmax_t n1, uintmax_t n0)
   for (idx_t r = 0; r < PRIMES_PTAB_ENTRIES; r++)
     {
       bool is_prime;
-      uintmax_t e[2], y[2];
+      uintmax_t e[2];
+      uuint y;
 
       if (flag_prove_primality)
         {
           is_prime = true;
-          if (factors.plarge[1])
+          if (hi (factors.plarge))
             {
               uintmax_t pi;
-              binv (pi, factors.plarge[0]);
+              binv (pi, lo (factors.plarge));
               e[0] = pi * nm1[0];
               e[1] = 0;
-              y[0] = powm2 (&y[1], a_prim, e, na, ni, one);
-              is_prime = (y[0] != one[0] || y[1] != one[1]);
+              y = powm2 (a_prim, e, na, ni, one);
+              is_prime = (lo (y) != one[0] || hi (y) != one[1]);
             }
           for (int i = 0; i < factors.nfactors && is_prime; i++)
             {
@@ -1347,8 +1332,8 @@ prime2_p (uintmax_t n1, uintmax_t n0)
                 rsh2 (e[1], e[0], nm1[1], nm1[0], 1);
               else
                 divexact_21 (e[1], e[0], nm1[1], nm1[0], factors.p[i]);
-              y[0] = powm2 (&y[1], a_prim, e, na, ni, one);
-              is_prime = (y[0] != one[0] || y[1] != one[1]);
+              y = powm2 (a_prim, e, na, ni, one);
+              is_prime = (lo (y) != one[0] || hi (y) != one[1]);
             }
         }
       else
@@ -1570,7 +1555,7 @@ factor_using_pollard_rho2 (uintmax_t n1, uintmax_t n0, unsigned long int a,
 
               if (k % 32 == 1)
                 {
-                  g0 = gcd2_odd (&g1, P1, P0, n1, n0);
+                  uuset (&g1, &g0, gcd2_odd (P1, P0, n1, n0));
                   if (g1 != 0 || g0 != 1)
                     goto factor_found;
                   y1 = x1; y0 = x0;
@@ -1598,7 +1583,7 @@ factor_using_pollard_rho2 (uintmax_t n1, uintmax_t n0, unsigned long int a,
           addmod2 (y1, y0, y1, y0, 0, (uintmax_t) a, n1, n0);
 
           submod2 (t1, t0, z1, z0, y1, y0, n1, n0);
-          g0 = gcd2_odd (&g1, t1, t0, n1, n0);
+          uuset (&g1, &g0, gcd2_odd (t1, t0, n1, n0));
         }
       while (g1 == 0 && g0 == 1);
 
@@ -1656,9 +1641,9 @@ factor_using_pollard_rho2 (uintmax_t n1, uintmax_t n0, unsigned long int a,
           break;
         }
 
-      x0 = mod2 (&x1, x1, x0, n1, n0);
-      z0 = mod2 (&z1, z1, z0, n1, n0);
-      y0 = mod2 (&y1, y1, y0, n1, n0);
+      uuset (&x1, &x0, mod2 (x1, x0, n1, n0));
+      uuset (&z1, &z0, mod2 (z1, z0, n1, n0));
+      uuset (&y1, &y0, mod2 (y1, y0, n1, n0));
     }
 }
 
@@ -1761,15 +1746,13 @@ ATTRIBUTE_CONST
 static uintmax_t
 isqrt (uintmax_t n)
 {
-  uintmax_t x;
-  int c;
   if (n == 0)
     return 0;
 
-  count_leading_zeros (c, n);
+  int c = stdc_leading_zeros (n);
 
   /* Make x > sqrt(n).  This will be invariant through the loop.  */
-  x = (uintmax_t) 1 << ((W_TYPE_SIZE + 1 - c) >> 1);
+  uintmax_t x = (uintmax_t) 1 << ((W_TYPE_SIZE + 1 - c) >> 1);
 
   for (;;)
     {
@@ -1785,20 +1768,16 @@ ATTRIBUTE_CONST
 static uintmax_t
 isqrt2 (uintmax_t nh, uintmax_t nl)
 {
-  int shift;
-  uintmax_t x;
-
   /* Ensures the remainder fits in an uintmax_t.  */
   affirm (nh < ((uintmax_t) 1 << (W_TYPE_SIZE - 2)));
 
   if (nh == 0)
     return isqrt (nl);
 
-  count_leading_zeros (shift, nh);
-  shift &= ~1;
+  int shift = stdc_leading_zeros (nh) & ~1;
 
   /* Make x > sqrt (n).  */
-  x = isqrt ((nh << shift) + (nl >> (W_TYPE_SIZE - shift))) + 1;
+  uintmax_t x = isqrt ((nh << shift) + (nl >> (W_TYPE_SIZE - shift))) + 1;
   x <<= (W_TYPE_SIZE - shift) >> 1;
 
   /* Do we need more than one iteration?  */
@@ -1881,9 +1860,8 @@ static short const invtab[0x81] =
   do {                                                                  \
     if ((u) / 0x40 < (d))                                               \
       {                                                                 \
-        int _cnt;                                                       \
         uintmax_t _dinv, _mask, _q, _r;                                 \
-        count_leading_zeros (_cnt, (d));                                \
+        int _cnt = stdc_leading_zeros (d);				\
         _r = (u);                                                       \
         if (UNLIKELY (_cnt > (W_TYPE_SIZE - 8)))                        \
           {                                                             \
@@ -2216,12 +2194,12 @@ static void
 factor (uintmax_t t1, uintmax_t t0, struct factors *factors)
 {
   factors->nfactors = 0;
-  factors->plarge[1] = 0;
+  hiset (&factors->plarge, 0);
 
   if (t1 == 0 && t0 < 2)
     return;
 
-  t0 = factor_using_division (&t1, t1, t0, factors);
+  uuset (&t1, &t0, factor_using_division (t1, t0, factors));
 
   if (t1 == 0 && t0 < 2)
     return;
@@ -2280,7 +2258,7 @@ strto2uintmax (uintmax_t *hip, uintmax_t *lop, char const *s)
       if (c == 0)
         break;
 
-      if (UNLIKELY (!ISDIGIT (c)))
+      if (UNLIKELY (!c_isdigit (c)))
         {
           err = LONGINT_INVALID;
           break;
@@ -2325,115 +2303,169 @@ strto2uintmax (uintmax_t *hip, uintmax_t *lop, char const *s)
   return err;
 }
 
-/* Structure and routines for buffering and outputting full lines,
-   to support parallel operation efficiently.  */
-static struct lbuf_
-{
-  char *buf;
-  char *end;
-} lbuf;
-
-/* 512 is chosen to give good performance,
+/* FACTOR_PIPE_BUF is chosen to give good performance,
    and also is the max guaranteed size that
    consumers can read atomically through pipes.
    Also it's big enough to cater for max line length
    even with 128 bit uintmax_t.  */
-#define FACTOR_PIPE_BUF 512
+#ifndef _POSIX_PIPE_BUF
+# define _POSIX_PIPE_BUF 512
+#endif
+#ifdef PIPE_BUF
+enum { FACTOR_PIPE_BUF = PIPE_BUF };
+#else
+enum { FACTOR_PIPE_BUF = _POSIX_PIPE_BUF };
+#endif
 
-static void
-lbuf_alloc (void)
-{
-  if (lbuf.buf)
-    return;
+/* Structure and routines for buffering and outputting full lines, to
+   support parallel operation efficiently.
 
-  /* Double to ensure enough space for
-     previous numbers + next number.  */
-  lbuf.buf = xmalloc (FACTOR_PIPE_BUF * 2);
-  lbuf.end = lbuf.buf;
-}
+   The buffer is twice FACTOR_PIPE_BUF so that its second half can
+   hold the remainder of data that is somewhat too large.  Also, the
+   very end of the second half is used to hold temporary data when
+   stringifying integers, which is most conveniently done
+   right-to-left.
+
+   Although the buffer's second half doesn't need to be quite so large
+   - its necessary size is bounded above by roughly the maximum output
+   line for a uuint plus the string length of a uuint - it'd be a bit
+   of a pain to figure out exactly how small it can be without causing
+   trouble.  */
+static char lbuf_buf[2 * FACTOR_PIPE_BUF];
+static idx_t lbuffered;
 
 /* Write complete LBUF to standard output.  */
 static void
 lbuf_flush (void)
 {
-  size_t size = lbuf.end - lbuf.buf;
-  if (full_write (STDOUT_FILENO, lbuf.buf, size) != size)
+  idx_t size = lbuffered;
+
+  /* Update lbuffered now, to avoid infinite recursion on write error.  */
+  lbuffered = 0;
+
+  if (full_write (STDOUT_FILENO, lbuf_buf, size) != size)
     write_error ();
-  lbuf.end = lbuf.buf;
 }
 
-/* Add a character C to LBUF and if it's a newline
-   and enough bytes are already buffered,
-   then write atomically to standard output.  */
+/* Write LBUF to standard output.
+   LBUF should contain at least FACTOR_PIPE_BUF bytes.
+   If possible, write a prefix of LBUF that is newline terminated
+   and contains <= FACTOR_PIPE_BUF bytes, so consumers can read atomically.
+   But if the first FACTOR_PIPE_BUF bytes contain no newlines,
+   give up on atomicity and just write the first FACTOR_PIPE_BUF bytes.  */
+static void
+lbuf_half_flush (void)
+{
+  char *nl = memrchr (lbuf_buf, '\n', FACTOR_PIPE_BUF);
+  char *suffix = nl ? nl + 1 : lbuf_buf + FACTOR_PIPE_BUF;
+  idx_t prefix_size = suffix - lbuf_buf;
+  idx_t suffix_size = lbuffered - prefix_size;
+  lbuffered = prefix_size;
+  lbuf_flush ();
+  lbuffered = suffix_size;
+  memmove (lbuf_buf, suffix, suffix_size);
+}
+
+/* Add a character C to lbuf_buf.  */
 static void
 lbuf_putc (char c)
 {
-  *lbuf.end++ = c;
+  lbuf_buf[lbuffered++] = c;
+}
 
-  if (c == '\n')
+/* Add a newline to lbuf_buf.  Then, if enough bytes are already
+   buffered, write the buffer atomically to standard output.  */
+static void
+lbuf_putnl (void)
+{
+  lbuf_putc ('\n');
+
+  /* Provide immediate output for interactive use.  */
+  static int line_buffered = -1;
+  if (line_buffered < 0)
+    line_buffered = isatty (STDOUT_FILENO);
+
+  if (line_buffered)
+    lbuf_flush ();
+  else if (FACTOR_PIPE_BUF <= lbuffered)
+    lbuf_half_flush ();
+}
+
+/* Append the string representation of I to lbuf_buf, followed by
+   everything from BUFEND to lbuf_buf's end.  Use the area just before
+   BUFEND temporarily.  */
+static void
+lbuf_putint_append (uintmax_t i, char *bufend)
+{
+  char *istr = bufend;
+  do
     {
-      size_t buffered = lbuf.end - lbuf.buf;
+      *--istr = '0' + i % 10;
+      i /= 10;
+    }
+  while (i);
 
-      /* Provide immediate output for interactive use.  */
-      static int line_buffered = -1;
-      if (line_buffered == -1)
-        line_buffered = isatty (STDIN_FILENO) || isatty (STDOUT_FILENO);
-      if (line_buffered)
-        lbuf_flush ();
-      else if (buffered >= FACTOR_PIPE_BUF)
+  char *p = lbuf_buf + lbuffered;
+  do
+    *p++ = *istr++;
+  while (istr < lbuf_buf + sizeof lbuf_buf);
+
+  lbuffered = p - lbuf_buf;
+}
+
+/* Append the string representation of I to lbuf_buf.  */
+static void
+lbuf_putint (uintmax_t i)
+{
+  lbuf_putint_append (i, lbuf_buf + sizeof lbuf_buf);
+}
+
+/* Append the string representation of T to lbuf_buf.  */
+static void
+print_uuint (uuint t)
+{
+  uintmax_t t1 = hi (t), t0 = lo (t);
+  char *bufend = lbuf_buf + sizeof lbuf_buf;
+
+  while (t1)
+    {
+      uintmax_t r = t1 % BIG_POWER_OF_10;
+      t1 /= BIG_POWER_OF_10;
+      udiv_qrnnd (t0, r, r, t0, BIG_POWER_OF_10);
+      for (int i = 0; i < LOG_BIG_POWER_OF_10; i++)
         {
-          /* Write output in <= PIPE_BUF chunks
-             so consumers can read atomically.  */
-          char const *tend = lbuf.end;
-
-          /* Since a umaxint_t's factors must fit in 512
-             we're guaranteed to find a newline here.  */
-          char *tlend = lbuf.buf + FACTOR_PIPE_BUF;
-          while (*--tlend != '\n');
-          tlend++;
-
-          lbuf.end = tlend;
-          lbuf_flush ();
-
-          /* Buffer the remainder.  */
-          memcpy (lbuf.buf, tlend, tend - tlend);
-          lbuf.end = lbuf.buf + (tend - tlend);
+          *--bufend = '0' + r % 10;
+          r /= 10;
         }
     }
+
+  lbuf_putint_append (t0, bufend);
 }
 
-/* Buffer an int to the internal LBUF.  */
+/* Buffer an mpz to the internal LBUF, possibly writing if it is long.  */
 static void
-lbuf_putint (uintmax_t i, size_t min_width)
+lbuf_putmpz (mpz_t const i)
 {
-  char buf[INT_BUFSIZE_BOUND (uintmax_t)];
-  char const *umaxstr = umaxtostr (i, buf);
-  size_t width = sizeof (buf) - (umaxstr - buf) - 1;
-  size_t z = width;
-
-  for (; z < min_width; z++)
-    *lbuf.end++ = '0';
-
-  memcpy (lbuf.end, umaxstr, width);
-  lbuf.end += width;
-}
-
-static void
-print_uintmaxes (uintmax_t t1, uintmax_t t0)
-{
-  uintmax_t q, r;
-
-  if (t1 == 0)
-    lbuf_putint (t0, 0);
+  idx_t sizeinbase = mpz_sizeinbase (i, 10);
+  char *lbuf_bufend = lbuf_buf + sizeof lbuf_buf;
+  char *p = lbuf_buf + lbuffered;
+  if (sizeinbase < lbuf_bufend - p)
+    {
+      mpz_get_str (p, 10, i);
+      p += sizeinbase;
+      lbuffered = p - !p[-1] - lbuf_buf;
+      while (FACTOR_PIPE_BUF <= lbuffered)
+        lbuf_half_flush ();
+    }
   else
     {
-      /* Use very plain code here since it seems hard to write fast code
-         without assuming a specific word size.  */
-      q = t1 / 1000000000;
-      r = t1 % 1000000000;
-      udiv_qrnnd (t0, r, r, t0, 1000000000);
-      print_uintmaxes (q, t0);
-      lbuf_putint (r, 9);
+      lbuf_flush ();
+      char *istr = ximalloc (sizeinbase + 1);
+      mpz_get_str (istr, 10, i);
+      idx_t istrlen = sizeinbase - !istr[sizeinbase - 1];
+      if (full_write (STDOUT_FILENO, istr, istrlen) != istrlen)
+        write_error ();
+      free (istr);
     }
 }
 
@@ -2443,7 +2475,7 @@ print_factors_single (uintmax_t t1, uintmax_t t0)
 {
   struct factors factors;
 
-  print_uintmaxes (t1, t0);
+  print_uuint (make_uuint (t1, t0));
   lbuf_putc (':');
 
   factor (t1, t0, &factors);
@@ -2452,22 +2484,22 @@ print_factors_single (uintmax_t t1, uintmax_t t0)
     for (int k = 0; k < factors.e[j]; k++)
       {
         lbuf_putc (' ');
-        print_uintmaxes (0, factors.p[j]);
+        print_uuint (make_uuint (0, factors.p[j]));
         if (print_exponents && factors.e[j] > 1)
           {
             lbuf_putc ('^');
-            lbuf_putint (factors.e[j], 0);
+            lbuf_putint (factors.e[j]);
             break;
           }
       }
 
-  if (factors.plarge[1])
+  if (hi (factors.plarge))
     {
       lbuf_putc (' ');
-      print_uintmaxes (factors.plarge[1], factors.plarge[0]);
+      print_uuint (factors.plarge);
     }
 
-  lbuf_putc ('\n');
+  lbuf_putnl ();
 }
 
 /* Emit the factors of the indicated number.  If we have the option of using
@@ -2507,6 +2539,9 @@ print_factors (char const *input)
       /* Try GMP.  */
       break;
 
+    case LONGINT_INVALID:
+    case LONGINT_INVALID_SUFFIX_CHAR:
+    case LONGINT_INVALID_SUFFIX_CHAR_WITH_OVERFLOW:
     default:
       error (0, 0, _("%s is not a valid positive integer"), quote (input));
       return false;
@@ -2518,26 +2553,26 @@ print_factors (char const *input)
 
   mpz_init_set_str (t, str, 10);
 
-  mpz_out_str (stdout, 10, t);
-  putchar (':');
+  lbuf_putmpz (t);
+  lbuf_putc (':');
   mp_factor (t, &factors);
 
   for (idx_t j = 0; j < factors.nfactors; j++)
     for (unsigned long int k = 0; k < factors.e[j]; k++)
       {
-        putchar (' ');
-        mpz_out_str (stdout, 10, factors.p[j]);
+        lbuf_putc (' ');
+        lbuf_putmpz (factors.p[j]);
         if (print_exponents && factors.e[j] > 1)
           {
-            printf ("^%lu", factors.e[j]);
+            lbuf_putc ('^');
+            lbuf_putint (factors.e[j]);
             break;
           }
       }
 
   mp_factor_clear (&factors);
   mpz_clear (t);
-  putchar ('\n');
-  fflush (stdout);
+  lbuf_putnl ();
   return true;
 }
 
@@ -2602,9 +2637,7 @@ main (int argc, char **argv)
   bindtextdomain (PACKAGE, LOCALEDIR);
   textdomain (PACKAGE);
 
-  lbuf_alloc ();
   atexit (close_stdout);
-  atexit (lbuf_flush);
 
   int c;
   while ((c = getopt_long (argc, argv, "h", long_options, nullptr)) != -1)
@@ -2627,6 +2660,8 @@ main (int argc, char **argv)
           usage (EXIT_FAILURE);
         }
     }
+
+  atexit (lbuf_flush);
 
 #if STAT_SQUFOF
   memset (q_freq, 0, sizeof (q_freq));

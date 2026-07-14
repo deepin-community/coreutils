@@ -1,5 +1,5 @@
-/* printf wrappers that fail immediately for non-file-related errors
-   Copyright (C) 2007-2023 Free Software Foundation, Inc.
+/* printf and fprintf wrappers that fail immediately for non-file-related errors
+   Copyright (C) 2007-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -25,7 +25,14 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-extern int xprintf (char const *restrict format, ...)
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+/* Like zprintf, but call error if it fails without setting stdout's
+   error indicator, i.e. upon ENOMEM, EOVERFLOW, or EILSEQ errors.  */
+extern off64_t xprintf (char const *restrict format, ...)
 #if GNULIB_VPRINTF_POSIX
      _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_STANDARD, 1, 2))
 #else
@@ -33,7 +40,9 @@ extern int xprintf (char const *restrict format, ...)
 #endif
      ;
 
-extern int xvprintf (char const *restrict format, va_list args)
+/* Like vzprintf, but call error if it fails without setting stdout's
+   error indicator, i.e. upon ENOMEM, EOVERFLOW, or EILSEQ errors.  */
+extern off64_t xvprintf (char const *restrict format, va_list args)
 #if GNULIB_VPRINTF_POSIX
      _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_STANDARD, 1, 0))
 #else
@@ -41,7 +50,10 @@ extern int xvprintf (char const *restrict format, va_list args)
 #endif
      ;
 
-extern int xfprintf (FILE *restrict stream, char const *restrict format, ...)
+/* Like fzprintf, but call error if it fails without setting the stream's
+   error indicator, i.e. upon ENOMEM, EOVERFLOW, or EILSEQ errors.  */
+extern off64_t xfprintf (FILE *restrict stream, char const *restrict format,
+                         ...)
 #if GNULIB_VFPRINTF_POSIX
      _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_STANDARD, 2, 3))
 #else
@@ -49,13 +61,20 @@ extern int xfprintf (FILE *restrict stream, char const *restrict format, ...)
 #endif
      ;
 
-extern int xvfprintf (FILE *restrict stream, char const *restrict format,
-                      va_list args)
+/* Like vfzprintf, but call error if it fails without setting the stream's
+   error indicator, i.e. upon ENOMEM, EOVERFLOW, or EILSEQ errors.  */
+extern off64_t xvfprintf (FILE *restrict stream, char const *restrict format,
+                          va_list args)
 #if GNULIB_VFPRINTF_POSIX
      _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_STANDARD, 2, 0))
 #else
      _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_SYSTEM, 2, 0))
 #endif
      ;
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

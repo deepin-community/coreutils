@@ -1,6 +1,6 @@
 /* Traverse a file hierarchy.
 
-   Copyright (C) 2004-2023 Free Software Foundation, Inc.
+   Copyright (C) 2004-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1443,6 +1443,13 @@ fts_build (register FTS *sp, int type)
                 __set_errno (0);
                 struct dirent *dp = readdir(cur->fts_dirp);
                 if (dp == NULL) {
+                        /* Some readdir()s do not absorb ENOENT (dir
+                           deleted but open).  This bug was fixed in
+                           glibc 2.3 (2002).  */
+#if ! (2 < __GLIBC__ + (3 <= __GLIBC_MINOR__))
+                        if (errno == ENOENT)
+                          errno = 0;
+#endif
                         if (errno) {
                                 cur->fts_errno = errno;
                                 /* If we've not read any items yet, treat
@@ -1714,7 +1721,7 @@ same_fd (int fd1, int fd2)
   struct stat sb1, sb2;
   return (fstat (fd1, &sb1) == 0
           && fstat (fd2, &sb2) == 0
-          && SAME_INODE (sb1, sb2));
+          && psame_inode (&sb1, &sb2));
 }
 
 static void
@@ -1858,13 +1865,13 @@ fts_sort (FTS *sp, FTSENT *head, register size_t nitems)
            run-time representation, and one can convert sp->fts_compar to
            the type qsort expects without problem.  Use the heuristic that
            this is OK if the two pointer types are the same size, and if
-           converting FTSENT ** to long int is the same as converting
-           FTSENT ** to void * and then to long int.  This heuristic isn't
+           converting FTSENT ** to uintptr_t is the same as converting
+           FTSENT ** to void * and then to uintptr_t.  This heuristic isn't
            valid in general but we don't know of any counterexamples.  */
         FTSENT *dummy;
         int (*compare) (void const *, void const *) =
           ((sizeof &dummy == sizeof (void *)
-            && (long int) &dummy == (long int) (void *) &dummy)
+            && (uintptr_t) &dummy == (uintptr_t) (void *) &dummy)
            ? (int (*) (void const *, void const *)) sp->fts_compar
            : fts_compar);
 
